@@ -22,7 +22,7 @@ const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 });
 
 export const gitStackedRebase = async (
-	beginningBranchName: string,
+	nameOfInitialBranch: string,
 	specifiedOptions: SomeOptionsForGitStackedRebase = {}
 ): Promise<void> => {
 	try {
@@ -37,7 +37,7 @@ export const gitStackedRebase = async (
 
 		const beginningBranch: Git.Reference | void = await Git.Branch.lookup(
 			repo, //
-			beginningBranchName,
+			nameOfInitialBranch,
 			Git.Branch.BRANCH.ALL
 		); //
 		// .catch(logErr);
@@ -393,7 +393,7 @@ if (!module.parent) {
 		(process.stderr.write("\ngit-stacked-rebase <branch> [<repo_path=.>]\n\n"), //
 		process.exit(1));
 
-	const beginningBranchName = eatNextArgOrExit();
+	const nameOfInitialBranch: string = eatNextArgOrExit();
 
 	const repoPath = eatNextArg();
 
@@ -401,5 +401,5 @@ if (!module.parent) {
 		repoPath,
 	};
 
-	gitStackedRebase(beginningBranchName, options);
+	gitStackedRebase(nameOfInitialBranch, options);
 }
