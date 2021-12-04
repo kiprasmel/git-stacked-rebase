@@ -6,10 +6,6 @@ import path from "path";
 import assert from "assert";
 import { execSyncP } from "pipestdio";
 
-export const noop = (..._xs: any[]): void => {
-	//
-};
-
 export type OptionsForGitStackedRebase = {
 	repoPath: string;
 	addNewlineAfterBranchEnd: boolean;
@@ -21,18 +17,6 @@ export type OptionsForGitStackedRebase = {
 };
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
-
-export const logErr = (err: any) => (console.error(err), err);
-
-const removeUndefinedValues = <T, K extends keyof Partial<T>>(defaults: Partial<T>): Partial<T> => (
-	Object.keys(defaults).forEach(
-		(k) =>
-			k in defaults && //
-			defaults[k as K] === undefined &&
-			delete defaults[k as K]
-	),
-	defaults
-);
 
 export const gitStackedRebase = async (
 	beginningBranchName: string,
@@ -48,7 +32,7 @@ export const gitStackedRebase = async (
 		const options: OptionsForGitStackedRebase = Object.assign(
 			{},
 			defaultOptions,
-			removeUndefinedValues(specifiedOptions)
+			removeUndefinedProperties(specifiedOptions)
 		);
 
 		console.log({ options });
@@ -137,6 +121,20 @@ export const gitStackedRebase = async (
 		process.exit(1);
 	}
 };
+
+export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
+	object: Partial<T> //
+): Partial<T> {
+	return (
+		Object.keys(object).forEach(
+			(k) =>
+				k in object && //
+				object[k as K] === undefined &&
+				delete object[k as K]
+		),
+		object
+	);
+}
 
 export async function getCommitHistory(
 	repo: Git.Repository, //
@@ -384,6 +382,10 @@ function swapKeyVal(obj: {}) {
 			) => Object.assign(acc, { [(v as unknown) as string]: k }),
 			{}
 		);
+}
+
+export function noop(..._xs: any[]): void {
+	//
 }
 
 if (!module.parent) {
