@@ -10,28 +10,26 @@ export type OptionsForGitStackedRebase = {
 	repoPath: string;
 	/**
 	 * editor name, or a function that opens the file inside some editor.
-	 * defaults to process.env.EDITOR, otherwise "vi"
 	 */
 	editor: string | ((ctx: { filePath: string }) => void);
 };
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
 
+const getDefaultOptions = (): OptionsForGitStackedRebase => ({
+	repoPath: ".", //
+	editor: process.env.EDITOR ?? "vi",
+});
+
 export const gitStackedRebase = async (
 	beginningBranchName: string,
 	specifiedOptions: SomeOptionsForGitStackedRebase = {}
 ): Promise<void> => {
 	try {
-		const defaultOptions: OptionsForGitStackedRebase = {
-			repoPath: ".", //
-			editor: process.env.EDITOR ?? "vi",
+		const options: OptionsForGitStackedRebase = {
+			...getDefaultOptions(), //
+			...removeUndefinedProperties(specifiedOptions),
 		};
-
-		const options: OptionsForGitStackedRebase = Object.assign(
-			{},
-			defaultOptions,
-			removeUndefinedProperties(specifiedOptions)
-		);
 
 		console.log({ options });
 
