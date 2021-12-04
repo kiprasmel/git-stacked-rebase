@@ -1,9 +1,8 @@
 #!/usr/bin/env ts-node-dev
 
+import Git from "nodegit";
 // import assert from "assert";
 import path from "path";
-
-import Git from "nodegit";
 
 const noop = (..._xs: any[]): void => {
 	//
@@ -107,45 +106,86 @@ export const gitStackedRebase = async (
 			}),
 		});
 
-		const commitsByBranch = Object.fromEntries<Git.Commit[]>(branches.map((b) => [b.name(), []]));
+		const commitsByBranch = Object.fromEntries<Git.Commit | null>(branches.map((b) => [b.name(), null]));
 
-		// const _commitsAndBranches = await Promise.all(
+		// // const _commitsAndBranches = await Promise.all(
+		// await Promise.all(
+		// 	wantedCommits
+		// 		.map((commit) =>
+		// 			branches.map(async (branch) => {
+		// 				const someCommit = await branch.peel(Git.Object.TYPE.COMMIT);
+		// 				const matches = someCommit.id().cmp(commit.id());
+		// 				if (matches) {
+		// 					// commitsByBranch.set(branch.name());
+		// 					commitsByBranch[branch.name()].push(commit);
+		// 					return {
+		// 						commit,
+		// 						branch,
+		// 					};
+		// 				} else
+		// 					return {
+		// 						commit,
+		// 						branch: null,
+		// 					};
+		// 			})
+		// 		)
+		// 		.flat()
+		// );
+
 		await Promise.all(
-			wantedCommits
-				.map((commit) =>
-					branches.map(async (branch) => {
-						const someCommit = await branch.peel(Git.Object.TYPE.COMMIT);
-						const matches = someCommit.id().cmp(commit.id());
+			branches
+				.map(async (branch) => {
+					const commitOfBranch = await branch.peel(Git.Object.TYPE.COMMIT);
+					// console.log({ branch: branch.name(), commitOfBranch: commitOfBranch.id().tostrS() });
+
+					wantedCommits.map((commit) => {
+						const matches = !commitOfBranch.id().cmp(commit.id());
+
 						if (matches) {
-							// commitsByBranch.set(branch.name());
-							commitsByBranch[branch.name()].push(commit);
-							return {
-								commit,
-								branch,
-							};
-						} else
-							return {
-								commit,
-								branch: null,
-							};
-					})
-				)
+							// // console.log({
+							// // 	matches, //
+							// // 	commitOfBranch: commitOfBranch.id().tostrS(),
+							// // 	commit: commit.id().tostrS(),
+							// // });
+							// commitsByBranch[branch.name()].push(commit);
+							commitsByBranch[branch.name()] = commit;
+							// // return {
+							// // 	commit,
+							// // 	branch,
+							// // };
+						}
+						// else
+						// 	return {
+						// 		commit,
+						// 		branch: null,
+						// 	};
+					});
+				})
 				.flat()
 		);
 
 		const wantedCommitsByBranch = Object.fromEntries(
-			Object.entries(commitsByBranch).filter(([_branchName, commits]) => commits.length)
+			// Object.entries(commitsByBranch).filter(([_branchName, commits]) => commits.length)
+			Object.entries(commitsByBranch).filter(([_branchName, commit]) => !!commit)
+		);
+		// const wantedCommitsByBranch = commitsByBranch;
+
+		// Object.entries(wantedCommitsByBranch).forEach(([_, commits]) => {
+		// 	assert(commits.length === 1);
+		// });
+
+		const wantedCommitsByBranchStr = Object.fromEntries(
+			Object.entries(wantedCommitsByBranch).map(([branchName, commit]) => [
+				branchName, //
+				// commits.map((c) => c.summary()),
+				commit?.sha(),
+				// commits.map((c) => c.sha()),
+				// ].join("  \n")
+			])
 		);
 
 		console.log({
-			wantedCommitsByBranch: Object.entries(wantedCommitsByBranch)
-				.map(([branchName, commits]) => [
-					branchName, //
-					// commits.map((c) => c.summary()),
-					commits.map((c) => c.sha()),
-					// ].join("  \n")
-				])
-				.flat(),
+			wantedCommitsByBranch: wantedCommitsByBranchStr,
 			// wantedCommitsByBranch.map(([branchName, commits]) => [
 			// 	branchName,
 			// 	commits.map((c) => c),
