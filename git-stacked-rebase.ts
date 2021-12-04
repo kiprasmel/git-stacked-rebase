@@ -4,7 +4,7 @@ import Git from "nodegit";
 // import assert from "assert";
 import path from "path";
 
-const noop = (..._xs: any[]): void => {
+export const noop = (..._xs: any[]): void => {
 	//
 };
 
@@ -38,19 +38,20 @@ export const gitStackedRebase = async (
 		const fixBranchName = (name: string): string =>
 			name
 				// .replace(beginningBranchName.includes(name) ? "" : "refs/heads/", "") //
-				.replace("refs/heads/", "") //
-				.replace(name.includes(beginningBranchName) ? "refs/remotes/" : "", "");
+				.replace("refs/heads/", ""); //
+		// TODO: consider
+		// .replace(name.includes(beginningBranchName) ? "refs/remotes/" : "", "");
 
 		const refs = await Git.Reference.list(repo);
 		const branches: Git.Reference[] = (
 			await Promise.all(
-				refs.map((ref: string) =>
-					Git.Branch.lookup(
-						repo, //
-						fixBranchName(ref),
-						// .replace("refs/remotes/", ""),
-						Git.Branch.BRANCH.ALL /** filtering seems broken, all act the same as ALL */
-					).catch(() => undefined)
+				refs.map(
+					(ref: string): Promise<Git.Reference | undefined> =>
+						Git.Branch.lookup(
+							repo, //
+							fixBranchName(ref),
+							Git.Branch.BRANCH.ALL /** filtering seems broken, all act the same as ALL */
+						).catch(() => undefined)
 				)
 			)
 		).filter((branch) => !!branch) as Git.Reference[];
@@ -91,14 +92,13 @@ export const gitStackedRebase = async (
 		const wantedCommits: Git.Commit[] = await getCommitHistoryUntilIncl(repo, commitOfBB);
 
 		console.log({
-			wantedCommits: wantedCommits.map((c) => {
-				// const ref: Git.Reference = await Git.Reference.lookup(repo, c.);
-				noop();
-
-				// Git.Reference.lookup(repo, c);
-
-				return `${c.sha()}: ${c.summary()} ${c.parentcount()}`;
-			}),
+			wantedCommits: wantedCommits.map((c) =>
+				[
+					c.sha(), //
+					c.summary(),
+					c.parentcount(),
+				].join(" ")
+			),
 		});
 
 		const commitsByBranch = Object.fromEntries<Git.Commit | null>(branches.map((b) => [b.name(), null]));
@@ -145,6 +145,22 @@ export const gitStackedRebase = async (
 							// // 	commit: commit.id().tostrS(),
 							// // });
 							// commitsByBranch[branch.name()].push(commit);
+
+							// if (commitsByBranch[branch.name()]) {
+							if ((commit as any).meta.branchEnd) {
+								console.error({
+									commit: commit?.summary(),
+									branchOld: (commit as any).meta.branchEnd.name(),
+									branchNew: branch.name(),
+								});
+								/**
+								 * TODO FIXME BFS (starting from beginningBranch? since child only has 1 parent?)
+								 */
+								throw new Error(
+									"2 (or more) branches for the same commit, both in the same path - cannot continue (until explicit branch specifying is implemented)."
+								);
+							}
+
 							commitsByBranch[branch.name()] = commit;
 							(commit as any).meta.branchEnd = branch;
 
