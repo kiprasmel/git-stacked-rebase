@@ -164,9 +164,9 @@ export const gitStackedRebase = async (
 				.flat()
 		);
 
-		const wantedCommitsByBranch = Object.fromEntries(
+		const wantedCommitByBranch = Object.fromEntries(
 			// Object.entries(commitsByBranch).filter(([_branchName, commits]) => commits.length)
-			Object.entries(commitsByBranch).filter(([_branchName, commit]) => !!commit)
+			Object.entries(commitsByBranch).filter(([_, commit]) => !!commit)
 		);
 		// const wantedCommitsByBranch = commitsByBranch;
 
@@ -174,8 +174,8 @@ export const gitStackedRebase = async (
 		// 	assert(commits.length === 1);
 		// });
 
-		const wantedCommitsByBranchStr = Object.fromEntries(
-			Object.entries(wantedCommitsByBranch).map(([branchName, commit]) => [
+		const wantedCommitByBranchStr = Object.fromEntries(
+			Object.entries(wantedCommitByBranch).map(([branchName, commit]) => [
 				branchName, //
 				// commits.map((c) => c.summary()),
 				commit?.sha(),
@@ -185,11 +185,12 @@ export const gitStackedRebase = async (
 		);
 
 		console.log({
-			wantedCommitsByBranch: wantedCommitsByBranchStr,
+			wantedCommitByBranch: wantedCommitByBranchStr,
 			// wantedCommitsByBranch.map(([branchName, commits]) => [
 			// 	branchName,
 			// 	commits.map((c) => c),
 			// ]),
+			wantedBranchByCommit: swapKeyVal(wantedCommitByBranch),
 		});
 
 		// const branchesWithCommits = await Promise.all(
@@ -304,6 +305,17 @@ function callAll(keyToFunctionMap: KeyToFunctionMap) {
 		(acc, [k, v]) => ({ ...acc, [k]: v instanceof Function ? v() : v }),
 		{}
 	);
+}
+
+function swapKeyVal(obj: {}) {
+	return Object.entries(obj) //
+		.reduce(
+			(
+				acc, //
+				[k, v]
+			) => Object.assign(acc, { [(v as unknown) as string]: k }),
+			{}
+		);
 }
 
 if (!module.parent) {
