@@ -141,6 +141,8 @@ export const gitStackedRebase = async (
 					wantedCommits.map((commit) => {
 						const matches = !commitOfBranch.id().cmp(commit.id());
 
+						(commit as any).meta = (commit as any).meta || { branch: { name: () => "" } };
+
 						if (matches) {
 							// // console.log({
 							// // 	matches, //
@@ -149,6 +151,8 @@ export const gitStackedRebase = async (
 							// // });
 							// commitsByBranch[branch.name()].push(commit);
 							commitsByBranch[branch.name()] = commit;
+							(commit as any).meta.branch = branch;
+
 							// // return {
 							// // 	commit,
 							// // 	branch,
@@ -191,6 +195,15 @@ export const gitStackedRebase = async (
 			// 	commits.map((c) => c),
 			// ]),
 			wantedBranchByCommit: swapKeyVal(wantedCommitByBranch),
+		});
+
+		console.log({
+			wantedCommits: wantedCommits.map(
+				(c) =>
+					c.sha() + //
+					" " +
+					((c as any).meta?.branch as Git.Reference)?.name()
+			),
 		});
 
 		// const branchesWithCommits = await Promise.all(
