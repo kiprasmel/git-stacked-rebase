@@ -103,30 +103,6 @@ export const gitStackedRebase = async (
 
 		const commitsByBranch = Object.fromEntries<Git.Commit | null>(branches.map((b) => [b.name(), null]));
 
-		// // const _commitsAndBranches = await Promise.all(
-		// await Promise.all(
-		// 	wantedCommits
-		// 		.map((commit) =>
-		// 			branches.map(async (branch) => {
-		// 				const someCommit = await branch.peel(Git.Object.TYPE.COMMIT);
-		// 				const matches = someCommit.id().cmp(commit.id());
-		// 				if (matches) {
-		// 					// commitsByBranch.set(branch.name());
-		// 					commitsByBranch[branch.name()].push(commit);
-		// 					return {
-		// 						commit,
-		// 						branch,
-		// 					};
-		// 				} else
-		// 					return {
-		// 						commit,
-		// 						branch: null,
-		// 					};
-		// 			})
-		// 		)
-		// 		.flat()
-		// );
-
 		await Promise.all(
 			branches
 				.map(async (branch) => {
@@ -216,61 +192,6 @@ export const gitStackedRebase = async (
 					((c as any).meta?.branchEnd as Git.Reference)?.name()
 			),
 		});
-
-		// const branchesWithCommits = await Promise.all(
-		// 	branches
-		// 		.map(async (branch) => {
-		// 			noop();
-		// 			return {
-		// 				branch,
-		// 				commits: (
-		// 					await Promise.all(
-		// 						wantedCommits.map(async (commit) => {
-		// 							const someCommit = await branch.peel(Git.Object.TYPE.COMMIT);
-		// 							const matches = someCommit.id().cmp(commit.id());
-		// 							return matches ? commit : undefined;
-		// 						})
-		// 					)
-		// 				).filter((c) => !!c) as Git.Commit[],
-		// 			};
-		// 		})
-		// 		.flat()
-		// );
-
-		// console.log({
-		// 	branchesWithCommits: branchesWithCommits
-		// 		.map(({ branch, commits }) => {
-		// 			//
-		// 			noop();
-		// 			return [
-		// 				branch.name(),
-		// 				commits.map((c) => c.summary()), //
-		// 			]
-		// 				.flat()
-		// 				.join("  \n");
-		// 		})
-		// 		.join("\n"),
-		// 	// commitsAndBranches: commitsAndBranches.map(
-		// 	// 	(cwb) => `${cwb.commit.toString()}${!cwb.branch ? "" : " @ " + cwb.branch?.name()}`
-		// 	// ),
-		// });
-
-		// , (commit) => {
-		// 	// if (commit.) {
-		// 	// 	// commitOfBB.cmp()
-		// 	// }
-		// });
-
-		// console.log({ commits });
-		// commits.map(async (c) => {
-		// 	console.log({
-		// 		// commitAll: callAll((c as unknown) as KeyToFunctionMap), //
-		// 		title: c.message(),
-		// 		// body: c.body(),
-		// 		sha: c.sha(),
-		// 		parents: c.parents().map((p) => p.tostrS()),
-		// 	});
-		// });
 
 		// const rebase = await Git.Rebase.init()
 	} catch (e) {
