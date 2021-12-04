@@ -4,6 +4,7 @@ import Git from "nodegit";
 import fs from "fs";
 import path from "path";
 import assert from "assert";
+import { execSyncP } from "pipestdio";
 
 export const noop = (..._xs: any[]): void => {
 	//
@@ -12,6 +13,11 @@ export const noop = (..._xs: any[]): void => {
 export type OptionsForGitStackedRebase = {
 	repoPath: string;
 	addNewlineAfterBranchEnd: boolean;
+	/**
+	 * editor name, or a function that opens the file inside some editor.
+	 * defaults to process.env.EDITOR, otherwise "vi"
+	 */
+	editor: string | ((ctx: { filePath: string }) => void);
 };
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
@@ -36,6 +42,7 @@ export const gitStackedRebase = async (
 		const defaultOptions: OptionsForGitStackedRebase = {
 			repoPath: ".", //
 			addNewlineAfterBranchEnd: false,
+			editor: process.env.EDITOR ?? "vi",
 		};
 
 		const options: OptionsForGitStackedRebase = Object.assign(
@@ -117,6 +124,12 @@ export const gitStackedRebase = async (
 
 		const pathToRebaseTodoFile = path.join(pathToDirInsideDotGit, "git-rebase-todo");
 		fs.writeFileSync(pathToRebaseTodoFile, rebaseTodo.join("\n"));
+
+		if (options.editor instanceof Function) {
+			options.editor({ filePath: pathToRebaseTodoFile });
+		} else {
+			execSyncP(`${options.editor} ${pathToRebaseTodoFile}`);
+		}
 
 		// const rebase = await Git.Rebase.init()
 	} catch (e) {
