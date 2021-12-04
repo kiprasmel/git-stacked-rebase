@@ -1007,6 +1007,11 @@ picomatch@^2.0.4, picomatch@^2.2.1:
   resolved "https://registry.yarnpkg.com/picomatch/-/picomatch-2.3.0.tgz#f1f061de8f6a4bf022892e2d128234fb98302972"
   integrity sha512-lY1Q/PiJGC2zOv/z391WOTD+Z02bCgsFfvxoXXf6h7kv9o+WmsmzYqrAwY63sNgOxE4xEdq0WyUnXfKeBrSvYw==
 
+pipestdio@0.1.3:
+  version "0.1.3"
+  resolved "https://registry.yarnpkg.com/pipestdio/-/pipestdio-0.1.3.tgz#99176aa66b5381b97f1ec006e4b1f33f6631d993"
+  integrity sha512-snYIF5la6pe/oZGRi7Pn/o4xqvDiM2fvMmX+x6L4xi+2dUOLqy0TkR6HaB3A4yyN6AzvJ6zVl2SimGDRthZdpg==
+
 process-nextick-args@~2.0.0:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/process-nextick-args/-/process-nextick-args-2.0.1.tgz#7820d9b16120cc55ca9ae7792680ae7dba6d7fe2"
