@@ -1,8 +1,9 @@
 #!/usr/bin/env ts-node-dev
 
 import Git from "nodegit";
-// import assert from "assert";
+import fs from "fs";
 import path from "path";
+import assert from "assert";
 
 export const noop = (..._xs: any[]): void => {
 	//
@@ -34,12 +35,61 @@ export const gitStackedRebase = async (
 		// 	return;
 		// }
 
-		const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = await getWantedCommitsWithBranchBoundaries(
-			repo, //
-			beginningBranch
-		);
+		const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = (
+			await getWantedCommitsWithBranchBoundaries(
+				repo, //
+				beginningBranch
+			)
+		).reverse();
+
 		noop(commitsWithBranchBoundaries);
-		// console.log({ commitsWithBranchBoundaries });
+		console.log({ commitsWithBranchBoundaries });
+
+		const rebaseTodo = commitsWithBranchBoundaries
+			.map(({ commit, branchEnd }, i) => {
+				if (i === 0) {
+					assert(!!branchEnd, "very first commit has a branch.");
+
+					// return [];
+					return [
+						// `pick ${commit.sha()} ${commit.summary()}`,
+						/**
+						 * TODO refs/REMOTES/* instead of refs/HEADS/*
+						 */
+						`branch-end-initial ${branchEnd.name()}`, //
+					];
+				}
+
+				if (i === commitsWithBranchBoundaries.length - 1) {
+					assert(!!branchEnd, "very last commit has a branch.");
+
+					return [
+						`pick ${commit.sha()} ${commit.summary()}`,
+						`branch-end-last ${branchEnd.name()}`, //
+					];
+				}
+
+				if (branchEnd) {
+					return [
+						`pick ${commit.sha()} ${commit.summary()}`,
+						`branch-end ${branchEnd.name()}`, //
+					];
+				}
+
+				return [
+					`pick ${commit.sha()} ${commit.summary()}`, //
+				];
+			})
+			.filter((xs) => xs.length)
+			.flat();
+
+		console.log({ rebaseTodo });
+
+		const pathToDirInsideDotGit = path.join(repo.path(), "stacked-rebase");
+		fs.mkdirSync(pathToDirInsideDotGit, { recursive: true });
+
+		const pathToRebaseTodoFile = path.join(pathToDirInsideDotGit, "git-rebase-todo");
+		fs.writeFileSync(pathToRebaseTodoFile, rebaseTodo.join("\n"));
 
 		// const rebase = await Git.Rebase.init()
 	} catch (e) {
