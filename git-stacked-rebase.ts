@@ -8,7 +8,6 @@ import { execSyncP } from "pipestdio";
 
 export type OptionsForGitStackedRebase = {
 	repoPath: string;
-	addNewlineAfterBranchEnd: boolean;
 	/**
 	 * editor name, or a function that opens the file inside some editor.
 	 * defaults to process.env.EDITOR, otherwise "vi"
@@ -25,7 +24,6 @@ export const gitStackedRebase = async (
 	try {
 		const defaultOptions: OptionsForGitStackedRebase = {
 			repoPath: ".", //
-			addNewlineAfterBranchEnd: false,
 			editor: process.env.EDITOR ?? "vi",
 		};
 
@@ -63,8 +61,6 @@ export const gitStackedRebase = async (
 
 		const rebaseTodo = commitsWithBranchBoundaries
 			.map(({ commit, branchEnd }, i) => {
-				const branchEndSuffix = options.addNewlineAfterBranchEnd ? "\n" : "";
-
 				if (i === 0) {
 					assert(!!branchEnd, "very first commit has a branch.");
 
@@ -74,7 +70,7 @@ export const gitStackedRebase = async (
 						/**
 						 * TODO refs/REMOTES/* instead of refs/HEADS/*
 						 */
-						`branch-end-initial ${branchEnd.name()}` + branchEndSuffix, //
+						`branch-end-initial ${branchEnd.name()}`, //
 					];
 				}
 
@@ -83,14 +79,14 @@ export const gitStackedRebase = async (
 
 					return [
 						`pick ${commit.sha()} ${commit.summary()}`,
-						`branch-end-last ${branchEnd.name()}` + branchEndSuffix.repeat(2), //
+						`branch-end-last ${branchEnd.name()}`, //
 					];
 				}
 
 				if (branchEnd) {
 					return [
 						`pick ${commit.sha()} ${commit.summary()}`,
-						`branch-end ${branchEnd.name()}` + branchEndSuffix, //
+						`branch-end ${branchEnd.name()}`, //
 					];
 				}
 
@@ -391,7 +387,7 @@ export function noop(..._xs: any[]): void {
 if (!module.parent) {
 	process.argv.splice(0, 2);
 
-	const peakNextArg = (): string | undefined => process.argv[0];
+	// const _peakNextArg = (): string | undefined => process.argv[0];
 	const eatNextArg = (): string | undefined => process.argv.shift();
 
 	const eatNextArgOrExit = (): string | never =>
@@ -402,11 +398,9 @@ if (!module.parent) {
 	const beginningBranchName = eatNextArgOrExit();
 
 	const repoPath = eatNextArg();
-	const addNewlineAfterBranchEnd = peakNextArg() ? Boolean(eatNextArg() as string) : undefined;
 
 	const options: SomeOptionsForGitStackedRebase = {
 		repoPath,
-		addNewlineAfterBranchEnd,
 	};
 
 	gitStackedRebase(beginningBranchName, options);
