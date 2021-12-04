@@ -88,12 +88,7 @@ export const gitStackedRebase = async (
 
 		const commitOfBB: Git.Oid = (await bb.peel(Git.Object.TYPE.COMMIT)).id();
 
-		const wantedCommits: Git.Commit[] = await getCommitHistory(repo, (commit, collectAndStop) => {
-			const matched = !commit.id().cmp(commitOfBB);
-			if (matched) {
-				collectAndStop();
-			}
-		});
+		const wantedCommits: Git.Commit[] = await getCommitHistoryUntilIncl(repo, commitOfBB);
 
 		console.log({
 			wantedCommits: wantedCommits.map((c) => {
@@ -141,7 +136,7 @@ export const gitStackedRebase = async (
 					wantedCommits.map((commit) => {
 						const matches = !commitOfBranch.id().cmp(commit.id());
 
-						(commit as any).meta = (commit as any).meta || { branch: { name: () => "" } };
+						(commit as any).meta = (commit as any).meta || { branchEnd: null };
 
 						if (matches) {
 							// // console.log({
@@ -151,7 +146,7 @@ export const gitStackedRebase = async (
 							// // });
 							// commitsByBranch[branch.name()].push(commit);
 							commitsByBranch[branch.name()] = commit;
-							(commit as any).meta.branch = branch;
+							(commit as any).meta.branchEnd = branch;
 
 							// // return {
 							// // 	commit,
@@ -202,7 +197,7 @@ export const gitStackedRebase = async (
 				(c) =>
 					c.sha() + //
 					" " +
-					((c as any).meta?.branch as Git.Reference)?.name()
+					((c as any).meta?.branchEnd as Git.Reference)?.name()
 			),
 		});
 
@@ -296,6 +291,15 @@ export async function getCommitHistory(
 			console.error("error", { c });
 			reject(c);
 		});
+	});
+}
+
+async function getCommitHistoryUntilIncl(repo: Git.Repository, untilOid: Git.Oid): Promise<Git.Commit[]> {
+	return getCommitHistory(repo, (commit, collectAndStop) => {
+		const matched = !commit.id().cmp(untilOid);
+		if (matched) {
+			collectAndStop();
+		}
 	});
 }
 
