@@ -9,19 +9,44 @@ export const noop = (..._xs: any[]): void => {
 	//
 };
 
-export type GitStackedRebaseOptions = {
-	// begginingBranchName: string;
+export type OptionsForGitStackedRebase = {
+	repoPath: string;
+	addNewlineAfterBranchEnd: boolean;
 };
+
+export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
 
 export const logErr = (err: any) => (console.error(err), err);
 
+const removeUndefinedValues = <T, K extends keyof Partial<T>>(defaults: Partial<T>): Partial<T> => (
+	Object.keys(defaults).forEach(
+		(k) =>
+			k in defaults && //
+			defaults[k as K] === undefined &&
+			delete defaults[k as K]
+	),
+	defaults
+);
+
 export const gitStackedRebase = async (
-	beginningBranchName: string = "origin/fork" // TODO
-	// _options: GitStackedRebaseOptions = {}
-) => {
+	beginningBranchName: string,
+	specifiedOptions: SomeOptionsForGitStackedRebase = {}
+): Promise<void> => {
 	try {
-		// const repo = await Git.Repository.open("."); // TODO
-		const repo = await Git.Repository.open(path.join(process.env.HOME!, "forkprojects", "codeshiftcommunity")); // TODO FIXME - only testing
+		const defaultOptions: OptionsForGitStackedRebase = {
+			repoPath: ".", //
+			addNewlineAfterBranchEnd: false,
+		};
+
+		const options: OptionsForGitStackedRebase = Object.assign(
+			{},
+			defaultOptions,
+			removeUndefinedValues(specifiedOptions)
+		);
+
+		console.log({ options });
+
+		const repo = await Git.Repository.open(options.repoPath);
 
 		const beginningBranch: Git.Reference | void = await Git.Branch.lookup(
 			repo, //
@@ -47,6 +72,8 @@ export const gitStackedRebase = async (
 
 		const rebaseTodo = commitsWithBranchBoundaries
 			.map(({ commit, branchEnd }, i) => {
+				const branchEndSuffix = options.addNewlineAfterBranchEnd ? "\n" : "";
+
 				if (i === 0) {
 					assert(!!branchEnd, "very first commit has a branch.");
 
@@ -56,7 +83,7 @@ export const gitStackedRebase = async (
 						/**
 						 * TODO refs/REMOTES/* instead of refs/HEADS/*
 						 */
-						`branch-end-initial ${branchEnd.name()}`, //
+						`branch-end-initial ${branchEnd.name()}` + branchEndSuffix, //
 					];
 				}
 
@@ -65,14 +92,14 @@ export const gitStackedRebase = async (
 
 					return [
 						`pick ${commit.sha()} ${commit.summary()}`,
-						`branch-end-last ${branchEnd.name()}`, //
+						`branch-end-last ${branchEnd.name()}` + branchEndSuffix.repeat(2), //
 					];
 				}
 
 				if (branchEnd) {
 					return [
 						`pick ${commit.sha()} ${commit.summary()}`,
-						`branch-end ${branchEnd.name()}`, //
+						`branch-end ${branchEnd.name()}` + branchEndSuffix, //
 					];
 				}
 
@@ -347,5 +374,25 @@ function swapKeyVal(obj: {}) {
 }
 
 if (!module.parent) {
-	gitStackedRebase();
+	process.argv.splice(0, 2);
+
+	const peakNextArg = (): string | undefined => process.argv[0];
+	const eatNextArg = (): string | undefined => process.argv.shift();
+
+	const eatNextArgOrExit = (): string | never =>
+		eatNextArg() ||
+		(process.stderr.write("\ngit-stacked-rebase <branch> [<repo_path=.>]\n\n"), //
+		process.exit(1));
+
+	const beginningBranchName = eatNextArgOrExit();
+
+	const repoPath = eatNextArg();
+	const addNewlineAfterBranchEnd = peakNextArg() ? Boolean(eatNextArg() as string) : undefined;
+
+	const options: SomeOptionsForGitStackedRebase = {
+		repoPath,
+		addNewlineAfterBranchEnd,
+	};
+
+	gitStackedRebase(beginningBranchName, options);
 }
