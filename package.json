@@ -7,6 +7,11 @@
   "license": "UNLICENSED",
   "devDependencies": {
     "@types/node": "16.11.11",
+    "@types/nodegit": "0.27.6",
+    "ts-node-dev": "1.1.8",
     "typescript": "4.5.2"
+  },
+  "dependencies": {
+    "nodegit": "0.27.0"
   }
 }
