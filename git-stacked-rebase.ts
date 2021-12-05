@@ -132,7 +132,7 @@ export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
 
 export async function getCommitHistory(
 	repo: Git.Repository, //
-	onCommit: (
+	handleCommit: (
 		commit: Git.Commit, //
 		collectAndStop: () => void
 	) => void = () => {
@@ -149,7 +149,7 @@ export async function getCommitHistory(
 		commitEmitter.on("commit", (c) => {
 			if (!locked) {
 				collectedCommits.push(c);
-				onCommit(c, () => {
+				handleCommit(c, () => {
 					locked = true;
 					commitEmitter.emit("end", collectedCommits);
 				});
