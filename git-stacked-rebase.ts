@@ -12,6 +12,7 @@ export type OptionsForGitStackedRebase = {
 	 * editor name, or a function that opens the file inside some editor.
 	 */
 	editor: string | ((ctx: { filePath: string }) => void);
+	editTodo: boolean;
 };
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
@@ -19,6 +20,7 @@ export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>
 const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	repoPath: ".", //
 	editor: process.env.EDITOR ?? "vi",
+	editTodo: false,
 });
 
 export const gitStackedRebase = async (
@@ -35,73 +37,14 @@ export const gitStackedRebase = async (
 
 		const repo = await Git.Repository.open(options.repoPath);
 
-		const beginningBranch: Git.Reference | void = await Git.Branch.lookup(
-			repo, //
-			nameOfInitialBranch,
-			Git.Branch.BRANCH.ALL
-		); //
-		// .catch(logErr);
-
-		// if (!bb) {
-		// 	console.error();
-		// 	return;
-		// }
-
-		const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = (
-			await getWantedCommitsWithBranchBoundaries(
-				repo, //
-				beginningBranch
-			)
-		).reverse();
-
-		noop(commitsWithBranchBoundaries);
-		console.log({ commitsWithBranchBoundaries });
-
-		const rebaseTodo = commitsWithBranchBoundaries
-			.map(({ commit, branchEnd }, i) => {
-				if (i === 0) {
-					assert(!!branchEnd, "very first commit has a branch.");
-
-					// return [];
-					return [
-						// `pick ${commit.sha()} ${commit.summary()}`,
-						/**
-						 * TODO refs/REMOTES/* instead of refs/HEADS/*
-						 */
-						`branch-end-initial ${branchEnd.name()}`, //
-					];
-				}
-
-				if (i === commitsWithBranchBoundaries.length - 1) {
-					assert(!!branchEnd, "very last commit has a branch.");
-
-					return [
-						`pick ${commit.sha()} ${commit.summary()}`,
-						`branch-end-last ${branchEnd.name()}`, //
-					];
-				}
-
-				if (branchEnd) {
-					return [
-						`pick ${commit.sha()} ${commit.summary()}`,
-						`branch-end ${branchEnd.name()}`, //
-					];
-				}
-
-				return [
-					`pick ${commit.sha()} ${commit.summary()}`, //
-				];
-			})
-			.filter((xs) => xs.length)
-			.flat();
-
-		console.log({ rebaseTodo });
-
 		const pathToDirInsideDotGit = path.join(repo.path(), "stacked-rebase");
+		const pathToRebaseTodoFile = path.join(pathToDirInsideDotGit, "git-rebase-todo");
+
 		fs.mkdirSync(pathToDirInsideDotGit, { recursive: true });
 
-		const pathToRebaseTodoFile = path.join(pathToDirInsideDotGit, "git-rebase-todo");
-		fs.writeFileSync(pathToRebaseTodoFile, rebaseTodo.join("\n"));
+		if (!options.editTodo) {
+			await createInitialEditTodoOfGitStackedRebase(repo, nameOfInitialBranch, pathToRebaseTodoFile);
+		}
 
 		if (options.editor instanceof Function) {
 			options.editor({ filePath: pathToRebaseTodoFile });
@@ -128,6 +71,78 @@ export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
 		),
 		object
 	);
+}
+
+async function createInitialEditTodoOfGitStackedRebase(
+	repo: Git.Repository, //
+	nameOfInitialBranch: string,
+	pathToRebaseTodoFile: string
+): Promise<void> {
+	const beginningBranch: Git.Reference | void = await Git.Branch.lookup(
+		repo, //
+		nameOfInitialBranch,
+		Git.Branch.BRANCH.ALL
+	); //
+	// .catch(logErr);
+
+	// if (!bb) {
+	// 	console.error();
+	// 	return;
+	// }
+
+	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = (
+		await getWantedCommitsWithBranchBoundaries(
+			repo, //
+			beginningBranch
+		)
+	).reverse();
+
+	noop(commitsWithBranchBoundaries);
+	console.log({ commitsWithBranchBoundaries });
+
+	const rebaseTodo = commitsWithBranchBoundaries
+		.map(({ commit, branchEnd }, i) => {
+			if (i === 0) {
+				assert(!!branchEnd, "very first commit has a branch.");
+
+				// return [];
+				return [
+					// `pick ${commit.sha()} ${commit.summary()}`,
+					/**
+					 * TODO refs/REMOTES/* instead of refs/HEADS/*
+					 */
+					`branch-end-initial ${branchEnd.name()}`, //
+				];
+			}
+
+			if (i === commitsWithBranchBoundaries.length - 1) {
+				assert(!!branchEnd, "very last commit has a branch.");
+
+				return [
+					`pick ${commit.sha()} ${commit.summary()}`,
+					`branch-end-last ${branchEnd.name()}`, //
+				];
+			}
+
+			if (branchEnd) {
+				return [
+					`pick ${commit.sha()} ${commit.summary()}`,
+					`branch-end ${branchEnd.name()}`, //
+				];
+			}
+
+			return [
+				`pick ${commit.sha()} ${commit.summary()}`, //
+			];
+		})
+		.filter((xs) => xs.length)
+		.flat();
+
+	console.log({ rebaseTodo });
+
+	fs.writeFileSync(pathToRebaseTodoFile, rebaseTodo.join("\n"));
+
+	return;
 }
 
 export async function getCommitHistory(
@@ -395,15 +410,26 @@ if (!module.parent) {
 
 	const eatNextArgOrExit = (): string | never =>
 		eatNextArg() ||
-		(process.stderr.write("\ngit-stacked-rebase <branch> [<repo_path=.>]\n\n"), //
+		(process.stderr.write("\ngit-stacked-rebase <branch> [<repo_path=.> [-e|--edit-todo]] \n\n"), //
 		process.exit(1));
 
 	const nameOfInitialBranch: string = eatNextArgOrExit();
 
 	const repoPath = eatNextArg();
 
+	/**
+	 * TODO: improve arg parsing, lmao
+	 */
+	const _editTodo = eatNextArg();
+	const isEditTodo = !!_editTodo && ["--edit-todo", "-e"].includes(_editTodo as string);
+
+	if (_editTodo && !isEditTodo) {
+		process.exit(1);
+	}
+
 	const options: SomeOptionsForGitStackedRebase = {
 		repoPath,
+		editTodo: isEditTodo,
 	};
 
 	gitStackedRebase(nameOfInitialBranch, options);
