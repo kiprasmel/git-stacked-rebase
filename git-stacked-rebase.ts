@@ -6,6 +6,8 @@ import path from "path";
 import assert from "assert";
 import { execSyncP } from "pipestdio";
 
+import { createLockableArray, lock } from "./util/lockableArray";
+
 export type OptionsForGitStackedRebase = {
 	repoPath: string;
 	/**
@@ -142,30 +144,20 @@ export async function getCommitHistory(
 	const commit: Git.Commit = await repo.getHeadCommit();
 	const commitEmitter = commit.history();
 
-	const collectedCommits: Git.Commit[] = [];
-	let locked: boolean = false;
+	const collectedCommits = createLockableArray<Git.Commit>();
 
 	return new Promise((resolve, reject) => {
+		const resolveCommits = (commits: Git.Commit[]): void => {
+			lock(collectedCommits);
+			resolve(commits);
+		};
+
 		commitEmitter.on("commit", (c) => {
-			if (!locked) {
-				collectedCommits.push(c);
-				handleCommit(c, () => {
-					locked = true;
-					commitEmitter.emit("end", collectedCommits);
-				});
-			}
+			collectedCommits.push(c);
+			handleCommit(c, () => resolveCommits(collectedCommits));
 		});
 
-		/**
-		 * `end`, if not called by the `handleCommit`,
-		 * will be called by `Git`s commit.history()
-		 * when the full history gets traversed,
-		 * i.e. all commits from the specified one are found.
-		 */
-		commitEmitter.on("end", (cs) => {
-			locked = true;
-			resolve(cs);
-		});
+		commitEmitter.on("end", (allCommits) => resolveCommits(allCommits));
 
 		commitEmitter.on("error", (c) => {
 			console.error("error", { c });
