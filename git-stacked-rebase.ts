@@ -149,6 +149,7 @@ export async function getCommitHistory(
 	return new Promise((resolve, reject) => {
 		const resolveCommits = (commits: Git.Commit[]): void => {
 			lock(collectedCommits);
+			commitEmitter.removeAllListeners();
 			resolve(commits);
 		};
 
