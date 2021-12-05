@@ -11,7 +11,8 @@
 	"scripts": {
 		"prebuild": "node ./script/prebuild.js",
 		"build": "yarn tsc -b",
-		"postbuild": "node ./script/postbuild.js"
+		"postbuild": "node ./script/postbuild.js",
+		"prepack": "yarn build"
 	},
 	"devDependencies": {
 		"@types/node": "16.11.11",
