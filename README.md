@@ -1,6 +1,6 @@
 # git-stacked-rebase
 
-stacked diffs, seamlessly.
+stacked diffs in git, seamlessly.
 
 why jump through branches manually, when we can extend `git rebase -i` instead?
 
