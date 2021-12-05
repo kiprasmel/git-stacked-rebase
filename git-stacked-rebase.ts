@@ -155,10 +155,18 @@ export async function getCommitHistory(
 				});
 			}
 		});
+
+		/**
+		 * `end`, if not called by the `handleCommit`,
+		 * will be called by `Git`s commit.history()
+		 * when the full history gets traversed,
+		 * i.e. all commits from the specified one are found.
+		 */
 		commitEmitter.on("end", (cs) => {
 			locked = true;
 			resolve(cs);
 		});
+
 		commitEmitter.on("error", (c) => {
 			console.error("error", { c });
 			reject(c);
