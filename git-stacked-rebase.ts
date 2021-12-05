@@ -143,15 +143,22 @@ export async function getCommitHistory(
 	const commitEmitter = commit.history();
 
 	const collectedCommits: Git.Commit[] = [];
+	let locked: boolean = false;
 
 	commitEmitter.start();
 
 	return new Promise((resolve, reject) => {
 		commitEmitter.on("commit", (c) => {
-			collectedCommits.push(c);
-			onCommit(c, () => commitEmitter.emit("end", collectedCommits));
+			if (!locked) {
+				collectedCommits.push(c);
+				onCommit(c, () => {
+					locked = true;
+					commitEmitter.emit("end", collectedCommits);
+				});
+			}
 		});
 		commitEmitter.on("end", (cs) => {
+			locked = true;
 			resolve(cs);
 		});
 		commitEmitter.on("error", (c) => {
