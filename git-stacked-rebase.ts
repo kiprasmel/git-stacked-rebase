@@ -145,8 +145,6 @@ export async function getCommitHistory(
 	const collectedCommits: Git.Commit[] = [];
 	let locked: boolean = false;
 
-	commitEmitter.start();
-
 	return new Promise((resolve, reject) => {
 		commitEmitter.on("commit", (c) => {
 			if (!locked) {
@@ -165,6 +163,8 @@ export async function getCommitHistory(
 			console.error("error", { c });
 			reject(c);
 		});
+
+		commitEmitter.start();
 	});
 }
 
