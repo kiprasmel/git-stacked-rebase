@@ -6,8 +6,6 @@ import path from "path";
 import assert from "assert";
 import { execSyncP } from "pipestdio";
 
-import { createLockableArray, lock } from "./util/lockableArray";
-
 export type OptionsForGitStackedRebase = {
 	repoPath: string;
 	/**
@@ -144,11 +142,10 @@ export async function getCommitHistory(
 	const commit: Git.Commit = await repo.getHeadCommit();
 	const commitEmitter = commit.history();
 
-	const collectedCommits = createLockableArray<Git.Commit>();
+	const collectedCommits: Git.Commit[] = [];
 
 	return new Promise((resolve, reject) => {
 		const resolveCommits = (commits: Git.Commit[]): void => {
-			lock(collectedCommits);
 			commitEmitter.removeAllListeners();
 			resolve(commits);
 		};
