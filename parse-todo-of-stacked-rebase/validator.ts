@@ -7,7 +7,13 @@ import { bullets, joinWith, joinWithIncludingFirstLast, tick } from "nice-commen
 /**
  * if invalid, should fill the array with reasons why not valid.
  */
-type Validator = (rest: string, reasonsWhyInvalid: string[]) => boolean;
+type Validator = (ctx: { rest: string; reasonsIfBad: string[] }) => boolean;
+
+type ParseTargets = (ctx: {
+	line: string; //
+	split: string[];
+	rest: string;
+}) => string[] | null;
 
 type Command = {
 	/**
@@ -17,63 +23,94 @@ type Command = {
 	isRestValid: Validator;
 	// alwaysHasSha: boolean; // TODO: parseTarget (everyone has except `break`)
 	nameOrAlias: EitherRebaseEitherCommandOrAlias;
-	parseTarget: (ctx: {
-		line: string; //
-		split: string[];
-		rest: string;
-	}) => string | null;
+	parseTargets: ParseTargets;
 };
 
-const standardCommand = (
-	nameOrAlias: EitherRebaseEitherCommandOrAlias, //
-	parseTarget: Command["parseTarget"] = ({ split }) => {
-		assert(
-			split.length >= 2,
-			"command must contain at least 2 words. otherwise, implement a custom target parser."
-		);
+const createCommand = (
+	nameOrAlias: string,
+	{
+		parseTargets = ({ split }) => {
+			assert(
+				split.length >= 2,
+				"command must contain at least 2 words. otherwise, implement a custom target parser."
+			);
 
-		return split[1];
-	}
+			return [split[1]];
+		},
+		maxUseCount = Infinity,
+		isRestValid = () => true,
+	}: {
+		// nameOrAlias: EitherRebaseEitherCommandOrAlias, //
+		parseTargets?: Command["parseTargets"];
+		maxUseCount?: number;
+		isRestValid?: Validator;
+	} = {}
 ): Command => ({
-	maxUseCount: Infinity,
-	isRestValid: () => true,
-	nameOrAlias,
-	parseTarget,
+	maxUseCount,
+	isRestValid,
+	// nameOrAlias: nameOrAlias,
+	nameOrAlias: nameOrAlias as EitherRebaseEitherCommandOrAlias, // TODO: TS
+	parseTargets,
 });
 
-const regularRebaseCommands = {
-	pick: standardCommand("pick"),
+export const regularRebaseCommands = {
+	pick: createCommand("pick"),
 	// p: standardCommand,
-	reword: standardCommand("reword"),
+	reword: createCommand("reword"),
 	// r: standardCommand,
-	edit: standardCommand("edit"),
+	edit: createCommand("edit"),
 	// e: standardCommand,
-	squash: standardCommand("squash"),
+	squash: createCommand("squash"),
 	// s: standardCommand,
-	fixup: standardCommand("fixup", ({ split }) => {
-		/**
-		 * TODO: add metadata about -C|-c
-		 */
-		if (["-C", "-c"].includes(split[1])) {
-			assert(split.length >= 4);
-			return split[2];
-		}
+	fixup: createCommand("fixup", {
+		parseTargets: ({ split }) => {
+			/**
+			 * TODO: add metadata about -C|-c
+			 */
+			if (["-C", "-c"].includes(split[1])) {
+				assert(split.length >= 4);
+				return [split[2]];
+			}
 
-		assert(split.length >= 3);
-		return split[1];
+			assert(split.length >= 3);
+			return [split[1]];
+		},
 	}),
 	// f: standardCommand,
-	exec: standardCommand("exec", ({ rest }) => rest),
+	exec: createCommand("exec", { parseTargets: ({ rest }) => [rest] }),
 	// x: standardCommand,
-	break: standardCommand("break"),
+	break: createCommand("break", { parseTargets: () => null }),
 	// b: standardCommand,
-	drop: standardCommand("drop"),
+	drop: createCommand("drop"),
 	// d: standardCommand,
-	label: standardCommand("label"),
+	label: createCommand("label"),
 	// l: standardCommand,
-	reset: standardCommand("reset"),
+	reset: createCommand("reset"),
 	// t: standardCommand,
-	merge: standardCommand("merge"),
+	merge: createCommand("merge", {
+		parseTargets: ({ split }) => {
+			if (["-C", "-c"].includes(split[1])) {
+				assert(split.length >= 4 /** not sure if 5 */);
+				if (split.length >= 5) {
+					/** commit, label, oneline */
+					return [split[2], split[3], split[4]];
+				} else {
+					/** commit, label */
+					return [split[2], split[3]];
+				}
+			} else {
+				assert(split.length >= 2);
+
+				if (split.length >= 3) {
+					/** label, oneline */
+					return [split[1], split[2]];
+				} else {
+					/** label */
+					return [split[1]];
+				}
+			}
+		},
+	}),
 	// m: standardCommand,
 } as const;
 
@@ -99,7 +136,7 @@ const regularRebaseCommandAliases = {
 
 type RegularRebaseCommandAlias = keyof typeof regularRebaseCommandAliases;
 
-const branchValidator: Validator = (rest, reasonsWhyInvalid) => {
+const branchValidator: Validator = ({ rest, reasonsIfBad: reasonsWhyInvalid }) => {
 	const origLen = reasonsWhyInvalid.length;
 
 	const isSpaceless = rest.split(" ").filter((word) => !!word).length === 1;
@@ -118,27 +155,27 @@ const branchValidator: Validator = (rest, reasonsWhyInvalid) => {
 	return !(reasonsWhyInvalid.length - origLen);
 };
 
-const stackedRebaseCommands = {
-	"branch-end": {
+export const stackedRebaseCommands = {
+	"branch-end": createCommand("branch-end", {
 		maxUseCount: Infinity,
 		isRestValid: branchValidator,
-		alwaysHasSha: false,
-	},
-	"branch-end-new": {
+		parseTargets: ({ rest }) => [rest],
+	}),
+	"branch-end-new": createCommand("branch-end-new", {
 		maxUseCount: Infinity,
 		isRestValid: branchValidator,
-		alwaysHasSha: false,
-	},
-	"branch-end-initial": {
+		parseTargets: ({ rest }) => [rest],
+	}),
+	"branch-end-initial": createCommand("branch-end-initial", {
 		maxUseCount: 1,
 		isRestValid: branchValidator,
-		alwaysHasSha: false,
-	},
-	"branch-end-last": {
+		parseTargets: ({ rest }) => [rest],
+	}),
+	"branch-end-last": createCommand("branch-end-last", {
 		maxUseCount: 1,
 		isRestValid: branchValidator,
-		alwaysHasSha: false,
-	},
+		parseTargets: ({ rest }) => [rest],
+	}),
 } as const;
 
 type StackedRebaseCommand = keyof typeof stackedRebaseCommands;
@@ -190,7 +227,8 @@ export type GoodCommand = {
 	 * SHA or branch or label (all commands, except `break`, have >=1)
 	 * TODO: handle >1
 	 */
-	target: string;
+	targets: string[] | null;
+	index: number;
 
 	// commandName: EitherRebaseCommand;
 } & (
@@ -283,9 +321,9 @@ export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] | nev
 
 		const command: Command = allEitherRebaseCommands[commandName];
 
-		command.isRestValid(rest, reasonsIfBad);
+		command.isRestValid({ rest, reasonsIfBad });
 
-		const target: string | null = command.parseTarget({
+		const targets: string[] | null = command.parseTargets({
 			line: fullLine, //
 			split: fullLine.split(" ").filter((word) => !!word),
 			rest,
@@ -301,6 +339,8 @@ export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] | nev
 		} else {
 			goodCommands.push({
 				commandOrAliasName,
+				targets,
+				index,
 				lineNumber,
 				fullLine,
 				rest,

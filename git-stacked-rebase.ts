@@ -10,6 +10,7 @@ import { array } from "nice-comment";
 
 import { noop } from "./util/noop";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
+import { GoodCommand, stackedRebaseCommands } from "./parse-todo-of-stacked-rebase/validator";
 
 // console.log = () => {};
 
@@ -18,7 +19,7 @@ export type OptionsForGitStackedRebase = {
 	/**
 	 * editor name, or a function that opens the file inside some editor.
 	 */
-	editor: string | ((ctx: { filePath: string }) => void);
+	editor: string | ((ctx: { filePath: string }) => Promise<void>);
 	editTodo: boolean;
 	apply: boolean;
 };
@@ -53,14 +54,27 @@ export const gitStackedRebase = async (
 		const pathToStackedRebaseTodoFile = path.join(pathToStackedRebaseDirInsideDotGit, "git-rebase-todo");
 		const pathToRegularRebaseTodoFile = path.join(pathToRegularRebaseDirInsideDotGit, "git-rebase-todo");
 
-		const goodCommands = parseTodoOfStackedRebase({
-			pathToStackedRebaseTodoFile, //
-			// pathToRegularRebaseTodoFile,
-		});
+		let goodCommands: GoodCommand[];
 
-		console.log({ goodCommands });
+		const logGoodCmds = () => {
+			console.log({
+				goodCommands: goodCommands.map((c) => ({
+					...c,
+					targets: c.targets?.length === 1 ? c.targets[0] : array(c.targets ?? []),
+				})),
+			});
+
+			console.log({
+				goodCommands: goodCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
+			});
+		};
 
 		if (options.apply) {
+			goodCommands = parseTodoOfStackedRebase({
+				pathToStackedRebaseTodoFile,
+			});
+			logGoodCmds();
+
 			const pathOfRewrittenList: string = path.join(repo.workdir(), ".git", "stacked-rebase", "rewritten-list");
 			const rewrittenList: string = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
 			const rewrittenListLines: string[] = rewrittenList.split("\n").filter((line) => !!line);
@@ -68,6 +82,9 @@ export const gitStackedRebase = async (
 			console.log({ rewrittenListLines });
 
 			const newCommits: { newSHA: string; oldSHAs: string[] }[] = [];
+
+			type OldCommit = { oldSHA: string; newSHA: string; changed: boolean };
+			const oldCommits: OldCommit[] = [];
 
 			rewrittenListLines.map((line) => {
 				const fromToSHA = line.split(" ");
@@ -77,6 +94,8 @@ export const gitStackedRebase = async (
 				);
 
 				const [oldSHA, newSHA] = fromToSHA;
+
+				oldCommits.push({ oldSHA, newSHA, changed: oldSHA !== newSHA });
 
 				const last = newCommits.length - 1;
 
@@ -93,11 +112,86 @@ export const gitStackedRebase = async (
 			});
 
 			console.log({ newCommits: newCommits.map((c) => c.newSHA + ": " + array(c.oldSHAs)) });
+			console.log({ oldCommits });
 
-			// goodCommands[0].
+			/**
+			 * match oldCommits & goodCommands
+			 */
+			const goodNewCommands: GoodCommand[] = [];
+
+			goodNewCommands.push(goodCommands[0]);
+
+			let goodCommandMinIndex = 1;
+			for (let i = 0; i < oldCommits.length; i++) {
+				const oldCommit: OldCommit = oldCommits[i];
+
+				const oldCommandAtIdx = goodCommands[goodCommandMinIndex];
+				if (oldCommandAtIdx.commandName in stackedRebaseCommands) {
+					goodNewCommands.push(oldCommandAtIdx);
+					goodCommandMinIndex++;
+				}
+
+				const goodOldCommand = goodCommands.find((cmd) => cmd.targets?.[0] === oldCommit.oldSHA);
+
+				if (!goodOldCommand) {
+					throw new Error("TODO: goodCommandOld not found");
+				}
+
+				const update = () => {
+					if (goodOldCommand.commandName in stackedRebaseCommands) {
+						// do not modify
+						goodNewCommands.push(goodOldCommand);
+						// goodCommandMinIndex++;
+					} else {
+						goodNewCommands.push({ ...goodOldCommand, targets: [oldCommit.newSHA] /** TODO VERIFY */ });
+						goodCommandMinIndex++;
+					}
+				};
+
+				if (goodOldCommand.index < goodCommandMinIndex) {
+					// TODO VERIFY
+					console.warn(
+						`goodCommandOld.index (${goodOldCommand.index}) < goodCommandMinIndex (${goodCommandMinIndex}), continue'ing.`
+					);
+
+					// goodCommandMinIndex++;
+
+					continue;
+				} else if (goodOldCommand.index === goodCommandMinIndex) {
+					// perfect?
+					// TODO VERIFY
+					console.info(`index match`);
+
+					update();
+				} else {
+					// jump?
+					// TODO VERIFY
+					console.warn(`jump, continue'ing`);
+
+					// update(); // TODO VERIFY
+					continue;
+				}
+
+				//
+			}
+
+			goodNewCommands.push(goodCommands[goodCommands.length - 1]);
+
+			// console.log({ goodNewCommands });
+			console.log({
+				len: goodCommands.length,
+				goodCommands: goodCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
+			});
+
+			console.log({
+				len: goodNewCommands.length,
+				goodNewCommands: goodNewCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
+			});
+
+			//
 
 			process.exit(0);
-		}
+		} // options.apply
 
 		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
 
@@ -108,7 +202,11 @@ export const gitStackedRebase = async (
 		);
 		const currentBranch: Git.Reference = await repo.getCurrentBranch();
 
-		if (!options.editTodo) {
+		const wasRebaseInProgress: boolean = fs.existsSync(pathToRegularRebaseDirInsideDotGit);
+
+		console.log({ wasRebaseInProgress });
+
+		if (!wasRebaseInProgress) {
 			await createInitialEditTodoOfGitStackedRebase(
 				repo, //
 				initialBranch,
@@ -116,13 +214,19 @@ export const gitStackedRebase = async (
 			);
 		}
 
-		if (options.editor instanceof Function) {
-			options.editor({ filePath: pathToStackedRebaseTodoFile });
-		} else {
-			execSync(`${options.editor} ${pathToStackedRebaseTodoFile}`, { ...pipestdio() });
+		if (!wasRebaseInProgress || options.editTodo) {
+			if (options.editor instanceof Function) {
+				await options.editor({ filePath: pathToStackedRebaseTodoFile });
+			} else {
+				execSync(`${options.editor} ${pathToStackedRebaseTodoFile}`, { ...pipestdio() });
+			}
 		}
 
 		const regularRebaseTodoLines: string[] = [];
+
+		goodCommands = parseTodoOfStackedRebase({
+			pathToStackedRebaseTodoFile,
+		});
 
 		goodCommands.map((cmd) => {
 			if (cmd.rebaseKind === "regular") {
@@ -309,12 +413,7 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 			for (let i = 1; ; i++) {
 				const backupPath = `${pathOfPostRewriteScript}.backup.${i}`;
 
-				let isSafe: boolean;
-				try {
-					isSafe = !fs.statSync(backupPath);
-				} catch (_e) {
-					isSafe = true;
-				}
+				const isSafe: boolean = !fs.existsSync(backupPath);
 
 				if (isSafe) {
 					if (i > 1) {
