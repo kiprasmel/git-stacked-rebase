@@ -335,11 +335,12 @@ export const gitStackedRebase = async (
 		);
 		const currentBranch: Git.Reference = await repo.getCurrentBranch();
 
-		const wasRebaseInProgress: boolean = fs.existsSync(pathToRegularRebaseDirInsideDotGit);
+		const wasRegularRebaseInProgress: boolean = fs.existsSync(pathToRegularRebaseDirInsideDotGit);
+		// const
 
-		console.log({ wasRebaseInProgress });
+		console.log({ wasRegularRebaseInProgress });
 
-		if (!wasRebaseInProgress) {
+		if (!wasRegularRebaseInProgress) {
 			await createInitialEditTodoOfGitStackedRebase(
 				repo, //
 				initialBranch,
@@ -347,7 +348,7 @@ export const gitStackedRebase = async (
 			);
 		}
 
-		if (!wasRebaseInProgress || options.editTodo) {
+		if (!wasRegularRebaseInProgress || options.editTodo) {
 			if (options.editor instanceof Function) {
 				await options.editor({ filePath: pathToStackedRebaseTodoFile });
 			} else {
