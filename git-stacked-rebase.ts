@@ -1,5 +1,7 @@
 #!/usr/bin/env ts-node-dev
 
+/* eslint-disable indent */
+
 import Git from "nodegit";
 import fs from "fs";
 import path from "path";
@@ -121,13 +123,19 @@ export const gitStackedRebase = async (
 
 			goodNewCommands.push(goodCommands[0]);
 
+			let lastNewCommit: OldCommit | null = null;
+
 			let goodCommandMinIndex = 1;
 			for (let i = 0; i < oldCommits.length; i++) {
 				const oldCommit: OldCommit = oldCommits[i];
 
 				const oldCommandAtIdx = goodCommands[goodCommandMinIndex];
+
 				if (oldCommandAtIdx.commandName in stackedRebaseCommands) {
-					goodNewCommands.push(oldCommandAtIdx);
+					goodNewCommands.push({
+						...oldCommandAtIdx,
+						commitSHAThatBranchPointsTo: (lastNewCommit as OldCommit | null)?.newSHA ?? null, // TODO TS
+					} as any); // TODO TS
 					goodCommandMinIndex++;
 				}
 
@@ -140,9 +148,12 @@ export const gitStackedRebase = async (
 				const update = () => {
 					if (goodOldCommand.commandName in stackedRebaseCommands) {
 						// do not modify
+						/** TODO FIXME CLEANUP: this actually never happens: (add `assert(false)`) */
 						goodNewCommands.push(goodOldCommand);
 						// goodCommandMinIndex++;
 					} else {
+						// goodNewCommands.push({ ...goodOldCommand, targets: [oldCommit.newSHA] /** TODO VERIFY */ });
+						lastNewCommit = oldCommit;
 						goodNewCommands.push({ ...goodOldCommand, targets: [oldCommit.newSHA] /** TODO VERIFY */ });
 						goodCommandMinIndex++;
 					}
@@ -188,6 +199,112 @@ export const gitStackedRebase = async (
 				goodNewCommands: goodNewCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
 			});
 
+			const stackedRebaseCommandsOld = goodCommands.filter((cmd) => cmd.commandName in stackedRebaseCommands);
+			const stackedRebaseCommandsNew = goodNewCommands
+				.map((cmd, i) =>
+					cmd.commandName in stackedRebaseCommands
+						? {
+								...cmd,
+								commitSHAThatBranchPointsTo: i > 0 ? goodNewCommands[i - 1].targets?.[0] ?? null : null,
+						  }
+						: false
+				)
+				.filter((cmd) => !!cmd);
+
+			assert(stackedRebaseCommandsOld.length === stackedRebaseCommandsNew.length);
+
+			// const remotes: Git.Remote[] = await repo.getRemotes();
+			// const remote: Git.Remote | undefined = remotes.find((r) =>
+			// 	stackedRebaseCommandsOld.find((cmd) => cmd.targets && cmd.targets[0].includes(r.name()))
+			// );
+
+			// const diffCommands: string[] = stackedRebaseCommandsOld
+			// 	.map((cmd, idx) => {
+			// 		const otherCmd: GoodCommand = stackedRebaseCommandsNew[idx];
+			// 		assert(cmd.commandName === otherCmd.commandName);
+			// 		assert(cmd.targets?.length);
+			// 		assert(otherCmd.targets?.length);
+			// 		assert(cmd.targets.every((t) => otherCmd.targets?.every((otherT) => t === otherT)));
+
+			// 		const trim = (str: string): string => str.replace("refs/heads/", "").replace("refs/remotes/", "");
+
+			// 		return !remote || idx === 0 // || idx === stackedRebaseCommandsOld.length - 1
+			// 			? ""
+			// 			: `git -c core.pager='' diff -u ${remote.name()}/${trim(cmd.targets[0])} ${trim(
+			// 					otherCmd.targets[0]
+			// 			  )}`;
+			// 	})
+			// 	.filter((cmd) => !!cmd);
+
+			/**
+			 * first actually reset, only then diff
+			 */
+
+			// const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = (
+			// 	await getWantedCommitsWithBranchBoundaries(
+			// 		repo, //
+			// 		initialBranch
+			// 	)
+			// ).reverse();
+
+			const previousTargetBranchName: string = stackedRebaseCommandsNew[0]
+				? stackedRebaseCommandsNew[0].targets?.[0] ?? ""
+				: "";
+
+			const checkout = async (cmds: GoodCommand[]): Promise<void> => {
+				console.log("checkout", cmds.length);
+				if (!cmds.length) {
+					return;
+				}
+
+				const goNext = () =>
+					new Promise<void>((r) => {
+						setTimeout(() => {
+							checkout(cmds.slice(1)).then(() => r());
+						}, 100);
+					});
+
+				const cmd = cmds[0];
+				assert(cmd.rebaseKind === "stacked");
+
+				const targetCommitSHA: string | null = cmd.commitSHAThatBranchPointsTo;
+
+				if (!targetCommitSHA) {
+					return goNext();
+				}
+
+				assert(cmd.targets?.length);
+
+				const targetBranch = cmd.targets[0].replace("refs/heads/", "");
+				assert(targetBranch && typeof targetBranch === "string");
+
+				// console.log({ targetCommitSHA, target: targetBranch });
+
+				// await Git.Checkout.tree(repo, targetBranch as any); // TODO TS FIXME
+				execSync(`git checkout ${targetBranch}`, pipestdio()); // f this
+
+				const commit: Git.Commit = await Git.Commit.lookup(repo, targetCommitSHA);
+
+				console.log("will reset because", cmd.commandOrAliasName, "to commit", commit.summary(), commit.sha());
+
+				await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
+
+				if (previousTargetBranchName) {
+					execSync(`git rebase ${previousTargetBranchName}`);
+				}
+
+				return goNext();
+
+				// for (const cmd of stackedRebaseCommandsNew) {
+				// 	};
+			};
+
+			await checkout(stackedRebaseCommandsNew.slice(1) as any); // TODO TS
+
+			// diffCommands.forEach((cmd) => {
+			// 	console.log({ cmd });
+			// 	execSync(cmd, { ...pipestdio(repo.workdir()) });
+			// });
 			//
 
 			process.exit(0);
@@ -431,6 +548,7 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		}
 
 		fs.writeFileSync(pathOfPostRewriteScript, postRewriteScript);
+		fs.chmodSync(pathOfPostRewriteScript, "755");
 		if (!isSafeToOverwrite) {
 			process.stdout.write("\nwarning - overwrote post-rewrite script in .git/hooks/, saved backup.\n\n");
 		}

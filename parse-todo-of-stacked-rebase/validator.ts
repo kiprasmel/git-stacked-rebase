@@ -239,6 +239,7 @@ export type GoodCommand = {
 	| {
 			rebaseKind: "stacked";
 			commandName: StackedRebaseCommand;
+			commitSHAThatBranchPointsTo: string | null;
 	  }
 );
 
@@ -264,6 +265,7 @@ export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] | nev
 		return command in allEitherRebaseCommands || command in allEitherRebaseCommandAliases;
 	}
 
+	let previousCommitSHA: string | null;
 	/**
 	 * we're not processing command-by-command, we're processing line-by-line.
 	 */
@@ -353,11 +355,16 @@ export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] | nev
 					? {
 							rebaseKind: "stacked",
 							commandName: commandName as StackedRebaseCommand,
+							commitSHAThatBranchPointsTo: previousCommitSHA,
 					  }
 					: (() => {
 							throw new Error("never");
 					  })()),
 			});
+
+			if (commandName in regularRebaseCommands) {
+				previousCommitSHA = targets?.[0] ?? null;
+			}
 		}
 	});
 
