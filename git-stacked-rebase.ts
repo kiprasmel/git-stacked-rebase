@@ -6,6 +6,7 @@ import path from "path";
 import assert from "assert";
 import { execSync } from "child_process";
 import { pipestdio } from "pipestdio";
+import { array } from "nice-comment";
 
 import { noop } from "./util/noop";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
@@ -19,6 +20,7 @@ export type OptionsForGitStackedRebase = {
 	 */
 	editor: string | ((ctx: { filePath: string }) => void);
 	editTodo: boolean;
+	apply: boolean;
 };
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
@@ -27,6 +29,7 @@ const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	repoPath: ".", //
 	editor: process.env.EDITOR ?? "vi",
 	editTodo: false,
+	apply: false,
 });
 
 export const gitStackedRebase = async (
@@ -50,6 +53,52 @@ export const gitStackedRebase = async (
 		const pathToStackedRebaseTodoFile = path.join(pathToStackedRebaseDirInsideDotGit, "git-rebase-todo");
 		const pathToRegularRebaseTodoFile = path.join(pathToRegularRebaseDirInsideDotGit, "git-rebase-todo");
 
+		const goodCommands = parseTodoOfStackedRebase({
+			pathToStackedRebaseTodoFile, //
+			// pathToRegularRebaseTodoFile,
+		});
+
+		console.log({ goodCommands });
+
+		if (options.apply) {
+			const pathOfRewrittenList: string = path.join(repo.workdir(), ".git", "stacked-rebase", "rewritten-list");
+			const rewrittenList: string = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
+			const rewrittenListLines: string[] = rewrittenList.split("\n").filter((line) => !!line);
+
+			console.log({ rewrittenListLines });
+
+			const newCommits: { newSHA: string; oldSHAs: string[] }[] = [];
+
+			rewrittenListLines.map((line) => {
+				const fromToSHA = line.split(" ");
+				assert(
+					fromToSHA.length === 2,
+					"from and to SHAs, coming from rewritten-list, are written properly (1 space total)."
+				);
+
+				const [oldSHA, newSHA] = fromToSHA;
+
+				const last = newCommits.length - 1;
+
+				if (newCommits.length && newSHA === newCommits[last].newSHA) {
+					newCommits[last].oldSHAs.push(oldSHA);
+				} else {
+					newCommits.push({
+						newSHA,
+						oldSHAs: [oldSHA],
+					});
+				}
+
+				//
+			});
+
+			console.log({ newCommits: newCommits.map((c) => c.newSHA + ": " + array(c.oldSHAs)) });
+
+			// goodCommands[0].
+
+			process.exit(0);
+		}
+
 		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
 
 		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
@@ -72,13 +121,6 @@ export const gitStackedRebase = async (
 		} else {
 			execSync(`${options.editor} ${pathToStackedRebaseTodoFile}`, { ...pipestdio() });
 		}
-
-		const goodCommands = parseTodoOfStackedRebase({
-			pathToStackedRebaseTodoFile, //
-			// pathToRegularRebaseTodoFile,
-		});
-
-		console.log({ goodCommands });
 
 		const regularRebaseTodoLines: string[] = [];
 
@@ -682,7 +724,7 @@ async function getCommitOfBranch(repo: Git.Repository, branchReference: Git.Refe
 if (!module.parent) {
 	process.argv.splice(0, 2);
 
-	// const _peakNextArg = (): string | undefined => process.argv[0];
+	const peakNextArg = (): string | undefined => process.argv[0];
 	const eatNextArg = (): string | undefined => process.argv.shift();
 
 	const eatNextArgOrExit = (): string | never =>
@@ -697,17 +739,29 @@ if (!module.parent) {
 	/**
 	 * TODO: improve arg parsing, lmao
 	 */
-	const _editTodo = eatNextArg();
-	const isEditTodo = !!_editTodo && ["--edit-todo", "-e"].includes(_editTodo as string);
+	const third = peakNextArg();
 
-	if (_editTodo && !isEditTodo) {
+	const isEditTodo: boolean = !!third && ["--edit-todo", "-e"].includes(third as string);
+	const isApply: boolean = !!third && ["--apply", "-a"].includes(third);
+
+	let parsedThird = !third;
+	if (!isEditTodo && !isApply) {
+		parsedThird = false;
+	} else {
+		parsedThird = true;
+		eatNextArg();
+	}
+
+	if (!parsedThird) {
 		process.exit(1);
 	}
 
 	const options: SomeOptionsForGitStackedRebase = {
 		repoPath,
 		editTodo: isEditTodo,
+		apply: isApply,
 	};
 
+	// await
 	gitStackedRebase(nameOfInitialBranch, options);
 }

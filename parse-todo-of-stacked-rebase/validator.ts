@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/consistent-type-assertions */
 /* eslint-disable indent */
 
+import { assert } from "console";
 import { bullets, joinWith, joinWithIncludingFirstLast, tick } from "nice-comment";
 
 /**
@@ -14,35 +15,65 @@ type Command = {
 	 */
 	maxUseCount: number;
 	isRestValid: Validator;
+	// alwaysHasSha: boolean; // TODO: parseTarget (everyone has except `break`)
+	nameOrAlias: EitherRebaseEitherCommandOrAlias;
+	parseTarget: (ctx: {
+		line: string; //
+		split: string[];
+		rest: string;
+	}) => string | null;
 };
 
-const standardCommand: Command = {
+const standardCommand = (
+	nameOrAlias: EitherRebaseEitherCommandOrAlias, //
+	parseTarget: Command["parseTarget"] = ({ split }) => {
+		assert(
+			split.length >= 2,
+			"command must contain at least 2 words. otherwise, implement a custom target parser."
+		);
+
+		return split[1];
+	}
+): Command => ({
 	maxUseCount: Infinity,
 	isRestValid: () => true,
-};
+	nameOrAlias,
+	parseTarget,
+});
 
 const regularRebaseCommands = {
-	pick: standardCommand,
+	pick: standardCommand("pick"),
 	// p: standardCommand,
-	reword: standardCommand,
+	reword: standardCommand("reword"),
 	// r: standardCommand,
-	edit: standardCommand,
+	edit: standardCommand("edit"),
 	// e: standardCommand,
-	squash: standardCommand,
+	squash: standardCommand("squash"),
 	// s: standardCommand,
-	fixup: standardCommand,
+	fixup: standardCommand("fixup", ({ split }) => {
+		/**
+		 * TODO: add metadata about -C|-c
+		 */
+		if (["-C", "-c"].includes(split[1])) {
+			assert(split.length >= 4);
+			return split[2];
+		}
+
+		assert(split.length >= 3);
+		return split[1];
+	}),
 	// f: standardCommand,
-	exec: standardCommand,
+	exec: standardCommand("exec", ({ rest }) => rest),
 	// x: standardCommand,
-	break: standardCommand,
+	break: standardCommand("break"),
 	// b: standardCommand,
-	drop: standardCommand,
+	drop: standardCommand("drop"),
 	// d: standardCommand,
-	label: standardCommand,
+	label: standardCommand("label"),
 	// l: standardCommand,
-	reset: standardCommand,
+	reset: standardCommand("reset"),
 	// t: standardCommand,
-	merge: standardCommand,
+	merge: standardCommand("merge"),
 	// m: standardCommand,
 } as const;
 
@@ -91,18 +122,22 @@ const stackedRebaseCommands = {
 	"branch-end": {
 		maxUseCount: Infinity,
 		isRestValid: branchValidator,
+		alwaysHasSha: false,
 	},
 	"branch-end-new": {
 		maxUseCount: Infinity,
 		isRestValid: branchValidator,
+		alwaysHasSha: false,
 	},
 	"branch-end-initial": {
 		maxUseCount: 1,
 		isRestValid: branchValidator,
+		alwaysHasSha: false,
 	},
 	"branch-end-last": {
 		maxUseCount: 1,
 		isRestValid: branchValidator,
+		alwaysHasSha: false,
 	},
 } as const;
 
@@ -151,6 +186,11 @@ export type GoodCommand = {
 	lineNumber: number;
 	fullLine: string;
 	rest: string;
+	/**
+	 * SHA or branch or label (all commands, except `break`, have >=1)
+	 * TODO: handle >1
+	 */
+	target: string;
 
 	// commandName: EitherRebaseCommand;
 } & (
@@ -244,6 +284,12 @@ export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] | nev
 		const command: Command = allEitherRebaseCommands[commandName];
 
 		command.isRestValid(rest, reasonsIfBad);
+
+		const target: string | null = command.parseTarget({
+			line: fullLine, //
+			split: fullLine.split(" ").filter((word) => !!word),
+			rest,
+		});
 
 		if (reasonsIfBad.length) {
 			badCommands.push({
