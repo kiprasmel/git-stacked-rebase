@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+# works when git calls it.
+# supposed to be placed in .git/hooks/ as post-rewrite
+
+#printf "post-rewrite $REPO_ROOT; \n"
+#
+#ls -la .git/rebase-merge
+#
+#command -v notify-send &>/dev/null && {
+#	notify-send "post-rewrite"
+#}
+
+#DIR="${BASH_SOURCE[0]}"
+#REBASE_MERGE_DIR="$(realpath "$DIR/../rebase-merge")"
+REBASE_MERGE_DIR="$(pwd)/.git/rebase-merge"
+REWRITTEN_LIST_FILE_PATH="$REBASE_MERGE_DIR/rewritten-list"
+
+STACKED_REBASE_DIR="$(pwd)/.git/stacked-rebase"
+REWRITTEN_LIST_BACKUP_FILE_PATH="$STACKED_REBASE_DIR/rewritten-list"
+
+#echo "REBASE_MERGE_DIR $REBASE_MERGE_DIR; STACKED_REBASE_DIR $STACKED_REBASE_DIR;"
+
+cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
