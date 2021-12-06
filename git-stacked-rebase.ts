@@ -72,6 +72,11 @@ export const gitStackedRebase = async (
 		};
 
 		if (options.apply) {
+			if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) {
+				process.stderr.write("\n\nno stacked-rebase in progress? (nothing to --apply)\n\n");
+				process.exit(1);
+			}
+
 			goodCommands = parseTodoOfStackedRebase({
 				pathToStackedRebaseTodoFile,
 			});
@@ -300,6 +305,17 @@ export const gitStackedRebase = async (
 			};
 
 			await checkout(stackedRebaseCommandsNew.slice(1) as any); // TODO TS
+
+			const backupPath: string = pathToStackedRebaseDirInsideDotGit + ".previous";
+
+			/**
+			 * backup dir just in case, but in inactive path
+			 * (so e.g --apply won't go off again accidently)
+			 */
+			if (fs.existsSync(backupPath)) {
+				fs.rmdirSync(backupPath, { recursive: true });
+			}
+			fs.renameSync(pathToStackedRebaseDirInsideDotGit, backupPath);
 
 			// diffCommands.forEach((cmd) => {
 			// 	console.log({ cmd });
