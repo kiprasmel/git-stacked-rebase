@@ -4,7 +4,8 @@ import Git from "nodegit";
 import fs from "fs";
 import path from "path";
 import assert from "assert";
-import { execSyncP } from "pipestdio";
+import { execSync } from "child_process";
+import { pipestdio } from "pipestdio";
 
 import { noop } from "./util/noop";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
@@ -69,7 +70,7 @@ export const gitStackedRebase = async (
 		if (options.editor instanceof Function) {
 			options.editor({ filePath: pathToStackedRebaseTodoFile });
 		} else {
-			execSyncP(`${options.editor} ${pathToStackedRebaseTodoFile}`);
+			execSync(`${options.editor} ${pathToStackedRebaseTodoFile}`, { ...pipestdio() });
 		}
 
 		const goodCommands = parseTodoOfStackedRebase({
@@ -120,14 +121,6 @@ export const gitStackedRebase = async (
 		// console.log({ rebase, currentOp });
 
 		/** END LIBGIT2 REBASE ATTEMPT */
-
-		/**
-		 * TODO: FIXME HACK
-		 * break at the very end,
-		 * so that we can do some stuff,
-		 * e.g. read the `rewritten-list` file
-		 */
-		regularRebaseTodoLines.push("break \n");
 
 		const regularRebaseTodo: string = regularRebaseTodoLines.join("\n") + "\n";
 
@@ -203,6 +196,114 @@ export const gitStackedRebase = async (
 		);
 
 		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "msgnum"), "1");
+
+		/**
+		 * end rebase initial setup.
+		 * begin setup to handle post-rebase shenanigans.
+		 */
+
+		/**
+		 * goal is to save the rewritten-list file,
+		 * which git deletes once the rebase is done,
+		 *
+		 * and when git-stacked-rebase gets called again
+		 * with `--apply` or whatever - to recover the commits.
+		 *
+		 */
+		const stackedRebaseNeedle = "__ADDED_BY_GIT_STACKED_REBASE";
+		const version = "V0";
+
+		const postRewriteScript: string = `\
+#!/usr/bin/env bash
+
+#${stackedRebaseNeedle}__${version}
+
+# works when git calls it.
+# supposed to be placed in .git/hooks/ as post-rewrite
+
+
+#printf "post-rewrite $REPO_ROOT; \\n"
+#
+#ls -la .git/rebase-merge
+#
+#command -v notify-send &>/dev/null && {
+#	notify-send "post-rewrite"
+#}
+
+#DIR="\${BASH_SOURCE[0]}"
+#REBASE_MERGE_DIR="$(realpath "$DIR/../rebase-merge")"
+REBASE_MERGE_DIR="$(pwd)/.git/rebase-merge"
+REWRITTEN_LIST_FILE_PATH="$REBASE_MERGE_DIR/rewritten-list"
+
+STACKED_REBASE_DIR="$(pwd)/.git/stacked-rebase"
+REWRITTEN_LIST_BACKUP_FILE_PATH="$STACKED_REBASE_DIR/rewritten-list"
+
+#echo "REBASE_MERGE_DIR $REBASE_MERGE_DIR; STACKED_REBASE_DIR $STACKED_REBASE_DIR;"
+
+cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
+
+		`;
+
+		/**
+		 * TODO: safety measures to make sure one does not already have
+		 * their own custom post-rewrite script lol
+		 */
+		const hooksDir: string = path.join(dotGitDirPath, "hooks");
+		const pathOfPostRewriteScript: string = path.join(hooksDir, "post-rewrite");
+
+		fs.mkdirSync(hooksDir, { recursive: true });
+
+		let isSafeToOverwrite: boolean;
+
+		try {
+			isSafeToOverwrite =
+				!fs.statSync(pathOfPostRewriteScript).isFile() ||
+				fs.readFileSync(pathOfPostRewriteScript, { encoding: "utf-8" }).includes(stackedRebaseNeedle);
+		} catch (_e) {
+			isSafeToOverwrite = true;
+		}
+
+		if (!isSafeToOverwrite) {
+			for (let i = 1; ; i++) {
+				const backupPath = `${pathOfPostRewriteScript}.backup.${i}`;
+
+				let isSafe: boolean;
+				try {
+					isSafe = !fs.statSync(backupPath);
+				} catch (_e) {
+					isSafe = true;
+				}
+
+				if (isSafe) {
+					if (i > 1) {
+						process.stdout.write(
+							`\nwarning - multiple backups (${i - 1}) of post-rewrite hook exist, creating ${i -
+								1} + 1.\n\n`
+						);
+					}
+
+					fs.copyFileSync(pathOfPostRewriteScript, backupPath);
+
+					break;
+				}
+			}
+		}
+
+		fs.writeFileSync(pathOfPostRewriteScript, postRewriteScript);
+		if (!isSafeToOverwrite) {
+			process.stdout.write("\nwarning - overwrote post-rewrite script in .git/hooks/, saved backup.\n\n");
+		}
+
+		/**
+		 * too bad libgit2 is limited. oh well, i've seen worse.
+		 *
+		 * this passes it off to the user.
+		 *
+		 * they'll come back to us once they're done,
+		 * with --apply or whatever.
+		 *
+		 */
+		execSync("/usr/bin/env git rebase --continue", { ...pipestdio(), cwd: repo.workdir() });
 
 		// await repo.continueRebase(undefined as any, () => {
 		// 	//
