@@ -645,7 +645,7 @@ async function getWantedCommitsWithBranchBoundaries(
 	// .replace(name.includes(beginningBranchName) ? "refs/remotes/" : "", "");
 
 	const refs = await Git.Reference.list(repo);
-	const branches: Git.Reference[] = (
+	const branches: Git.Reference[] = ((
 		await Promise.all(
 			refs.map(
 				(ref: string): Promise<Git.Reference | undefined> =>
@@ -656,7 +656,9 @@ async function getWantedCommitsWithBranchBoundaries(
 					).catch(() => undefined)
 			)
 		)
-	).filter((branch) => !!branch) as Git.Reference[];
+	).filter((branch) => !!branch) as Git.Reference[]).map(
+		(branch) => (!branch.cmp(bb) ? bb : branch) //
+	);
 
 	console.log({ refs, branches: branches.map((b) => fixBranchName(b?.name())) });
 
