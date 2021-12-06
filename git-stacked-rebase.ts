@@ -252,9 +252,9 @@ export const gitStackedRebase = async (
 			// 	)
 			// ).reverse();
 
-			const previousTargetBranchName: string = stackedRebaseCommandsNew[0]
-				? stackedRebaseCommandsNew[0].targets?.[0] ?? ""
-				: "";
+			// const previousTargetBranchName: string = stackedRebaseCommandsNew[0]
+			// 	? stackedRebaseCommandsNew[0].targets?.[0] ?? ""
+			// 	: "";
 
 			const checkout = async (cmds: GoodCommand[]): Promise<void> => {
 				console.log("checkout", cmds.length);
@@ -292,10 +292,19 @@ export const gitStackedRebase = async (
 
 				console.log("will reset because", cmd.commandOrAliasName, "to commit", commit.summary(), commit.sha());
 
-				await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
+				/**
+				 * meaning we're on the latest branch
+				 */
+				const isFinalCheckout: boolean = cmds.length === 1;
 
-				if (previousTargetBranchName) {
-					execSync(`git rebase ${previousTargetBranchName}`);
+				console.log({ isFinalCheckout });
+
+				if (!isFinalCheckout) {
+					await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
+
+					// if (previousTargetBranchName) {
+					// execSync(`/usr/bin/env git rebase ${previousTargetBranchName}`);
+					// }
 				}
 
 				return goNext();
