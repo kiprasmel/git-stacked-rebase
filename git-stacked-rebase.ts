@@ -88,6 +88,40 @@ export const gitStackedRebase = async (
 		});
 
 		/**
+		 * libgit2's git rebase is sadly not very powerful
+		 * and quite outdated...
+		 * (checked C version too - same story).
+		 *
+		 * thus, looks like we'll have to reverse-engineer git itself.
+		 *
+		 */
+
+		/** BEGIN LIBGIT2 REBASE ATTEMPT */
+
+		// const annotatedCommitOfCurrentBranch: Git.AnnotatedCommit = await Git.AnnotatedCommit.fromRef(
+		// 	repo,
+		// 	currentBranch
+		// );
+		// const annotatedCommitOfInitialBranch: Git.AnnotatedCommit = await Git.AnnotatedCommit.fromRef(
+		// 	repo,
+		// 	initialBranch
+		// );
+
+		// const rebase: Git.Rebase = await Git.Rebase.init(
+		// 	repo, //
+		// 	annotatedCommitOfCurrentBranch,
+		// 	annotatedCommitOfInitialBranch,
+		// 	annotatedCommitOfInitialBranch // TODO VERIFY
+		// 	// (null as unknown) as Git.AnnotatedCommit // TODO TS
+		// 	// Git.Rebase.initOptions()
+		// );
+
+		// const currentOp: number = rebase.operationCurrent();
+		// console.log({ rebase, currentOp });
+
+		/** END LIBGIT2 REBASE ATTEMPT */
+
+		/**
 		 * TODO: FIXME HACK
 		 * break at the very end,
 		 * so that we can do some stuff,
@@ -224,15 +258,15 @@ async function createInitialEditTodoOfGitStackedRebase(
 		)
 	).reverse();
 
-	/**
-	 * TODO: FIXME HACK for nodegit rebase
-	 */
-	const p = path.join(repo.path(), "rebase-merge");
-	fs.mkdirSync(p, { recursive: true });
-	commitsWithBranchBoundaries.map((c, i) => {
-		const f = path.join(p, `cmt.${i + 2}`);
-		fs.writeFileSync(f, c.commit.sha() + "\n");
-	});
+	// /**
+	//  * TODO: FIXME HACK for nodegit rebase
+	//  */
+	// const p = path.join(repo.path(), "rebase-merge");
+	// fs.mkdirSync(p, { recursive: true });
+	// commitsWithBranchBoundaries.map((c, i) => {
+	// 	const f = path.join(p, `cmt.${i + 2}`);
+	// 	fs.writeFileSync(f, c.commit.sha() + "\n");
+	// });
 	// const last = commitsWithBranchBoundaries.length - 1;
 	// const ff = path.join(p, `cmt.${last + 2}`);
 	// fs.writeFileSync(ff, `${commitsWithBranchBoundaries[last].commit.sha()}`);
@@ -538,6 +572,7 @@ function swapKeyVal(obj: {}) {
 		);
 }
 
+noop(getCommitOfBranch);
 async function getCommitOfBranch(repo: Git.Repository, branchReference: Git.Reference) {
 	const branchOid: Git.Oid = await (await branchReference.peel(Git.Object.TYPE.COMMIT)).id();
 	return await Git.Commit.lookup(repo, branchOid);
