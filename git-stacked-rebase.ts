@@ -6,6 +6,11 @@ import path from "path";
 import assert from "assert";
 import { execSyncP } from "pipestdio";
 
+import { noop } from "./util/noop";
+import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
+
+// console.log = () => {};
+
 export type OptionsForGitStackedRebase = {
 	repoPath: string;
 	/**
@@ -37,20 +42,109 @@ export const gitStackedRebase = async (
 
 		const repo = await Git.Repository.open(options.repoPath);
 
-		const pathToDirInsideDotGit = path.join(repo.path(), "stacked-rebase");
-		const pathToRebaseTodoFile = path.join(pathToDirInsideDotGit, "git-rebase-todo");
+		const dotGitDirPath: string = repo.path();
+		const pathToStackedRebaseDirInsideDotGit = path.join(dotGitDirPath, "stacked-rebase");
+		const pathToRegularRebaseDirInsideDotGit = path.join(dotGitDirPath, "rebase-merge");
 
-		fs.mkdirSync(pathToDirInsideDotGit, { recursive: true });
+		const pathToStackedRebaseTodoFile = path.join(pathToStackedRebaseDirInsideDotGit, "git-rebase-todo");
+		const pathToRegularRebaseTodoFile = path.join(pathToRegularRebaseDirInsideDotGit, "git-rebase-todo");
+
+		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
+
+		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
+			repo, //
+			nameOfInitialBranch,
+			Git.Branch.BRANCH.ALL
+		);
+		const currentBranch: Git.Reference = await repo.getCurrentBranch();
 
 		if (!options.editTodo) {
-			await createInitialEditTodoOfGitStackedRebase(repo, nameOfInitialBranch, pathToRebaseTodoFile);
+			await createInitialEditTodoOfGitStackedRebase(
+				repo, //
+				initialBranch,
+				pathToStackedRebaseTodoFile
+			);
 		}
 
 		if (options.editor instanceof Function) {
-			options.editor({ filePath: pathToRebaseTodoFile });
+			options.editor({ filePath: pathToStackedRebaseTodoFile });
 		} else {
-			execSyncP(`${options.editor} ${pathToRebaseTodoFile}`);
+			execSyncP(`${options.editor} ${pathToStackedRebaseTodoFile}`);
 		}
+
+		const goodCommands = parseTodoOfStackedRebase({
+			pathToStackedRebaseTodoFile, //
+			// pathToRegularRebaseTodoFile,
+		});
+
+		console.log({ goodCommands });
+
+		const regularRebaseTodoLines: string[] = [];
+
+		goodCommands.map((cmd) => {
+			if (cmd.rebaseKind === "regular") {
+				regularRebaseTodoLines.push(cmd.fullLine);
+			}
+		});
+
+		const regularRebaseTodo: string = regularRebaseTodoLines.join("\n") + "\n";
+
+		console.log({
+			regularRebaseTodo,
+			pathToRegularRebaseTodoFile,
+		});
+
+		fs.mkdirSync(pathToRegularRebaseDirInsideDotGit, { recursive: true });
+
+		fs.writeFileSync(pathToRegularRebaseTodoFile, regularRebaseTodo);
+		fs.writeFileSync(pathToRegularRebaseTodoFile + ".backup", regularRebaseTodo);
+
+		/**
+		 * writing the rebase todo is not enough.
+		 * follow https://github.com/git/git/blob/abe6bb3905392d5eb6b01fa6e54d7e784e0522aa/sequencer.c#L53-L170
+		 */
+
+		// (await initialBranch.peel(Git.Object.TYPE.COMMIT))
+		const commitShaOfInitialBranch: string = (await (await getCommitOfBranch(repo, initialBranch)).sha()) + "\n";
+
+		const commitShaOfCurrentCommit: string = (await (await repo.getHeadCommit()).sha()) + "\n";
+
+		console.log({ commitShaOfInitialBranch });
+
+		await repo.checkoutRef(initialBranch);
+		// repo.rebaseBranches()
+
+		// const headName: string = (await (await repo.getHeadCommit()).sha()) + "\n";
+		// const headName: string = initialBranch.name() + "\n";
+		const headName: string = currentBranch.name() + "\n";
+		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "head-name"), headName);
+
+		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-name"), commitShaOfInitialBranch);
+
+		fs.writeFileSync(
+			path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
+			commitShaOfInitialBranch
+		);
+
+		fs.writeFileSync(
+			// path.join(dotGitDirPath, "HEAD"), //
+			path.join(pathToRegularRebaseDirInsideDotGit, "head"),
+			commitShaOfInitialBranch
+		);
+
+		// fs.writeFileSync(path.join(dotGitDirPath, "ORIG_HEAD"), commitShaOfInitialBranch);
+		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-head"), commitShaOfCurrentCommit);
+
+		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "interactive"), "");
+
+		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "done"), "");
+
+		fs.writeFileSync(
+			path.join(pathToRegularRebaseDirInsideDotGit, "end"), //
+			(regularRebaseTodoLines.length + 1).toString() + "\n"
+		);
+
+		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "msgnum"), "1");
 
 		// const rebase = await Git.Rebase.init()
 	} catch (e) {
@@ -75,14 +169,9 @@ export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
 
 async function createInitialEditTodoOfGitStackedRebase(
 	repo: Git.Repository, //
-	nameOfInitialBranch: string,
+	initialBranch: Git.Reference,
 	pathToRebaseTodoFile: string
 ): Promise<void> {
-	const beginningBranch: Git.Reference | void = await Git.Branch.lookup(
-		repo, //
-		nameOfInitialBranch,
-		Git.Branch.BRANCH.ALL
-	); //
 	// .catch(logErr);
 
 	// if (!bb) {
@@ -93,7 +182,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = (
 		await getWantedCommitsWithBranchBoundaries(
 			repo, //
-			beginningBranch
+			initialBranch
 		)
 	).reverse();
 
@@ -398,8 +487,9 @@ function swapKeyVal(obj: {}) {
 		);
 }
 
-export function noop(..._xs: any[]): void {
-	//
+async function getCommitOfBranch(repo: Git.Repository, branchReference: Git.Reference) {
+	const branchOid: Git.Oid = await (await branchReference.peel(Git.Object.TYPE.COMMIT)).id();
+	return await Git.Commit.lookup(repo, branchOid);
 }
 
 if (!module.parent) {

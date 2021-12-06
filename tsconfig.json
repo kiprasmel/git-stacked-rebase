@@ -36,11 +36,33 @@
 	},
 	"exclude": [
 		//
-		"node_modules"
+		/**
+		 * do not exclude node_modules
+		 */
+		// "node_modules"
 	],
 	"include": [
 		//
 		"./src/**/*.ts",
-		"./**/*.ts"
-	]
+		"./**/*.ts",
+		/**
+		 * my own package, exported w/ typescript,
+		 * thus we can edit directly.
+		 *
+		 * see also the `ts-node` config below.
+		 *
+		 */
+		"node_modules/nice-comment"
+	],
+	"ts-node": {
+		"files": true,
+		"ignore": [
+			/**
+			 * same as ts-node's default, except does not ignore nice-comment
+			 */
+			// "(?:^|/)node_modules/" //
+			"(?:^|/)node_modules/(?!nice-comment)"
+		]
+	}
+	// TODO: test project references
 }
