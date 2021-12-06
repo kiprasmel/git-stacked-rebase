@@ -745,7 +745,7 @@ if (!module.parent) {
 	const isApply: boolean = !!third && ["--apply", "-a"].includes(third);
 
 	let parsedThird = !third;
-	if (!isEditTodo && !isApply) {
+	if (third && !isEditTodo && !isApply) {
 		parsedThird = false;
 	} else {
 		parsedThird = true;
