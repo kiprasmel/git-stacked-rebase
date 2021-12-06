@@ -87,6 +87,14 @@ export const gitStackedRebase = async (
 			}
 		});
 
+		/**
+		 * TODO: FIXME HACK
+		 * break at the very end,
+		 * so that we can do some stuff,
+		 * e.g. read the `rewritten-list` file
+		 */
+		regularRebaseTodoLines.push("break \n");
+
 		const regularRebaseTodo: string = regularRebaseTodoLines.join("\n") + "\n";
 
 		console.log({
@@ -127,6 +135,22 @@ export const gitStackedRebase = async (
 		);
 
 		fs.writeFileSync(
+			path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
+			commitShaOfInitialBranch
+		);
+		/**
+		 * TODO - is this even needed? seems only a nodegit thing
+		 */
+		fs.writeFileSync(
+			path.join(pathToRegularRebaseDirInsideDotGit, "onto_name"), //
+			initialBranch.name() + "\n"
+		);
+		fs.writeFileSync(
+			path.join(pathToRegularRebaseDirInsideDotGit, "cmt.1"), //
+			commitShaOfInitialBranch
+		);
+
+		fs.writeFileSync(
 			// path.join(dotGitDirPath, "HEAD"), //
 			path.join(pathToRegularRebaseDirInsideDotGit, "head"),
 			commitShaOfInitialBranch
@@ -145,6 +169,20 @@ export const gitStackedRebase = async (
 		);
 
 		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "msgnum"), "1");
+
+		// await repo.continueRebase(undefined as any, () => {
+		// 	//
+		// });
+		// await repo.continueRebase(Git.Signature.create(Git.CredUsername.name(), (await Git));
+		// const rebase: Git.Rebase = await Git.Rebase.open(repo);
+
+		// console.log({ rebase });
+
+		// let i = 0;
+		// while (++i < 30) {
+		// 	const gitOp: Git.RebaseOperation = await rebase.next();
+		// 	noop(gitOp);
+		// }
 
 		// const rebase = await Git.Rebase.init()
 	} catch (e) {
@@ -185,6 +223,19 @@ async function createInitialEditTodoOfGitStackedRebase(
 			initialBranch
 		)
 	).reverse();
+
+	/**
+	 * TODO: FIXME HACK for nodegit rebase
+	 */
+	const p = path.join(repo.path(), "rebase-merge");
+	fs.mkdirSync(p, { recursive: true });
+	commitsWithBranchBoundaries.map((c, i) => {
+		const f = path.join(p, `cmt.${i + 2}`);
+		fs.writeFileSync(f, c.commit.sha() + "\n");
+	});
+	// const last = commitsWithBranchBoundaries.length - 1;
+	// const ff = path.join(p, `cmt.${last + 2}`);
+	// fs.writeFileSync(ff, `${commitsWithBranchBoundaries[last].commit.sha()}`);
 
 	noop(commitsWithBranchBoundaries);
 	console.log({ commitsWithBranchBoundaries });
