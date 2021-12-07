@@ -1070,11 +1070,25 @@ git-stacked-rebase <branch> [<repo_path=.> [-a|--apply]]        (will apply the 
                                                                  from the latest branch
                                                                  to all partial branches
                                                                  (currently, using 'git reset --hard')).
-git-stacked-rebase -V|--version
+git-stacked-rebase [...] -V|--version [...]
+git-stacked-rebase [...] -h|--help    [...]
 
+
+note: 'repo_path' will soon become optional (w/ a flag)
+       when we fix the arg parsing.
 
 git-stacked-rebase ${gitStackedRebaseVersionStr}
                 ` as const;
+
+	if (process.argv.some((arg) => ["-h", "--help"].includes(arg))) {
+		process.stdout.write(helpMsg);
+		process.exit(0);
+	}
+
+	if (process.argv.some((arg) => ["-V", "--version"].includes(arg))) {
+		process.stdout.write(`\ngit-stacked-rebase ${gitStackedRebaseVersionStr}\n\n`);
+		process.exit(0);
+	}
 
 	process.argv.splice(0, 2);
 
@@ -1087,11 +1101,6 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 		process.exit(1));
 
 	const nameOfInitialBranch: string = eatNextArgOrExit();
-
-	if (["-V", "--version"].includes(nameOfInitialBranch)) {
-		process.stdout.write(`\ngit-stacked-rebase ${gitStackedRebaseVersionStr}\n\n`);
-		process.exit(0);
-	}
 
 	const repoPath = eatNextArg();
 
