@@ -1090,6 +1090,9 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 		process.exit(0);
 	}
 
+	// const isViewTodoOnly: boolean = !!third && ["--view-todo", "-v"].includes(third);
+	const isViewTodoOnly: boolean = process.argv.some((arg) => ["--view-todo", "-v"].includes(arg));
+
 	process.argv.splice(0, 2);
 
 	const peakNextArg = (): string | undefined => process.argv[0];
@@ -1110,18 +1113,17 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	const third = peakNextArg();
 
 	const isEditTodo: boolean = !!third && ["--edit-todo", "-e"].includes(third as string);
-	const isViewTodoOnly: boolean = !!third && ["--view-todo", "-v"].includes(third);
 	const isApply: boolean = !!third && ["--apply", "-a"].includes(third);
 
 	let parsedThird = !third;
-	if (third && !isEditTodo && !isViewTodoOnly && !isApply) {
+	if (third && !isEditTodo && !isApply) {
 		parsedThird = false;
 	} else {
 		parsedThird = true;
 		eatNextArg();
 	}
 
-	if (!parsedThird) {
+	if (!parsedThird && !isViewTodoOnly) {
 		process.stdout.write("\nunrecognized 3rd option\n\n");
 		process.exit(1);
 	}
