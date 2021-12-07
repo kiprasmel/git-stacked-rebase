@@ -762,7 +762,7 @@ export async function getFileStatuses(repo: Git.Repository) {
 	return receivedStatuses;
 }
 
-type KeyToFunctionMap = { [key: string | number | symbol]: Function };
+type KeyToFunctionMap = { [key in string | number | symbol]: Function };
 
 function callAll(keyToFunctionMap: KeyToFunctionMap) {
 	return Object.entries(keyToFunctionMap).reduce(
