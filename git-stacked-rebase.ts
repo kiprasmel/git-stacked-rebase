@@ -49,6 +49,26 @@ export const gitStackedRebase = async (
 
 		const repo = await Git.Repository.open(options.repoPath);
 
+		/**
+		 * always use this when doing git commands,
+		 * because if user is in a different directory
+		 * & is running git-stacked-rebase w/ a different path,
+		 * then the git commands, without the repo.workdir() as cwd,
+		 * would act on the current directory that the user is in (their cwd),
+		 * as opposted to the actual target repo (would be very bad!)
+		 */
+		const execSyncInRepo = (command: string, extraOptions: Parameters<typeof execSync>[1] = {}) =>
+			execSync(command, {
+				...pipestdio(),
+				...extraOptions,
+				/**
+				 * the `cwd` must be the last param here
+				 * to avoid accidentally overwriting it.
+				 * TODO TS - enforce
+				 */
+				cwd: repo.workdir(),
+			});
+
 		const dotGitDirPath: string = repo.path();
 		const pathToStackedRebaseDirInsideDotGit = path.join(dotGitDirPath, "stacked-rebase");
 		const pathToRegularRebaseDirInsideDotGit = path.join(dotGitDirPath, "rebase-merge");
@@ -286,7 +306,7 @@ export const gitStackedRebase = async (
 				// console.log({ targetCommitSHA, target: targetBranch });
 
 				// await Git.Checkout.tree(repo, targetBranch as any); // TODO TS FIXME
-				execSync(`git checkout ${targetBranch}`, pipestdio()); // f this
+				execSyncInRepo(`git checkout ${targetBranch}`); // f this
 
 				const commit: Git.Commit = await Git.Commit.lookup(repo, targetCommitSHA);
 
@@ -303,7 +323,7 @@ export const gitStackedRebase = async (
 					await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
 
 					// if (previousTargetBranchName) {
-					// execSync(`/usr/bin/env git rebase ${previousTargetBranchName}`);
+					// execSyncInRepo(`/usr/bin/env git rebase ${previousTargetBranchName}`);
 					// }
 				}
 
@@ -328,7 +348,7 @@ export const gitStackedRebase = async (
 
 			// diffCommands.forEach((cmd) => {
 			// 	console.log({ cmd });
-			// 	execSync(cmd, { ...pipestdio(repo.workdir()) });
+			// 	execSyncInRepo(cmd, { ...pipestdio(repo.workdir()) });
 			// });
 			//
 
@@ -361,7 +381,7 @@ export const gitStackedRebase = async (
 			if (options.editor instanceof Function) {
 				await options.editor({ filePath: pathToStackedRebaseTodoFile });
 			} else {
-				execSync(`${options.editor} ${pathToStackedRebaseTodoFile}`, { ...pipestdio() });
+				execSyncInRepo(`${options.editor} ${pathToStackedRebaseTodoFile}`);
 			}
 		}
 
@@ -590,7 +610,7 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		 * with --apply or whatever.
 		 *
 		 */
-		execSync("/usr/bin/env git rebase --continue", { ...pipestdio(), cwd: repo.workdir() });
+		execSyncInRepo("/usr/bin/env git rebase --continue");
 
 		// await repo.continueRebase(undefined as any, () => {
 		// 	//
