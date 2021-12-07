@@ -550,15 +550,9 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 
 		fs.mkdirSync(hooksDir, { recursive: true });
 
-		let isSafeToOverwrite: boolean;
-
-		try {
-			isSafeToOverwrite =
-				!fs.statSync(pathOfPostRewriteScript).isFile() ||
-				fs.readFileSync(pathOfPostRewriteScript, { encoding: "utf-8" }).includes(stackedRebaseNeedle);
-		} catch (_e) {
-			isSafeToOverwrite = true;
-		}
+		const isSafeToOverwrite: boolean =
+			!fs.existsSync(pathOfPostRewriteScript) || //
+			fs.readFileSync(pathOfPostRewriteScript, { encoding: "utf-8" }).includes(stackedRebaseNeedle);
 
 		if (!isSafeToOverwrite) {
 			for (let i = 1; ; i++) {
