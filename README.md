@@ -41,29 +41,8 @@ git config --global alias.rr             git-stacked-rebase
 ```sh
 cd repo/
 
-# checkout your remote branches locally (until we automate it w/ a command?)
-
-# checkout the latest one
-
-git-stacked-rebase origin/master .
-
-# edit & write the rebase-todo file
-#
-# when done, optionally inspect the latest branch
-# (not everything will look right just yet).
-#
+# checkout your remote branches locally (until we automate it w/ a command?). 
+# then, checkout to the latest one.
 # then:
 
-git-stacked-rebase origin/master . --apply
-
-# will apply the changes from your latest branch
-# into all partial branches up until origin/master.
-
-# now, you can checkout & inspect each branch
-# to verify everything looks good.
-# if so, you can now manually (until we, again, implement a command for this)
-# push each branch to the remote (origin in this case)
-
-# and then, optionally repeat the process
-# (ofc can do many rebase + --apply's before pushing)
-```
+git-stacked-rebase --help
