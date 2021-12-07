@@ -10,22 +10,11 @@ from those partial branches, you can create pull requests. with this workflow, y
 
 ---
 
-`git-stacked-rebase` is not specific to any host like github or gitlab. it's specific to `git` itself.
+`git-stacked-rebase` is not specific to any host like github or gitlab. it's "specific" to `git` itself.
 
-in the future, we could create host-specific adapters. they could be used to automate some simple tasks, such as changing the base branch of a pull request.
+it's not only a CLI either - it's first and foremost a javascript library, and the CLI is just a tool that builds on top of the library.
 
----
-
-the mindset of `git-stacked-rebase` is important if you're trying to understand it / extend it / build on top of it. there are 2 things:
-
-1. `git-stacked-rebase` (rather, `gitStackedRebase` (!)), is, first and foremost, a javascript library/module.
-2. this library/module is `git`-first (i.e., it's core functionality is not specific to any git host). 
-
-from the 2 above, we can reason that:
-
-components, such as the CLI (`git-stacked-rebase`), or, in the future - the adapters for host-specific improvements, - are things that should be built _on top_ of the library's core, non within it.
-i.e., we want to keep the core functionality `git`-specific, and if one wants to build a component that would require modifying the core to work for only that specific component (or for some components, but not git itself), then that's the wrong approach.
-
+in the future, we could create host-specific adapters. they could be used to automate some simple tasks, such as creating a pull request, or changing the base branch of a pull request, etc.
 
 ## Progress
 
