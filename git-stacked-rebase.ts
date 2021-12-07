@@ -9,7 +9,7 @@ import path from "path";
 import assert from "assert";
 import { execSync } from "child_process";
 import { pipestdio } from "pipestdio";
-import { array } from "nice-comment";
+import { array, bullets } from "nice-comment";
 
 import { noop } from "./util/noop";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
@@ -1123,6 +1123,11 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 
 	if (!parsedThird) {
 		process.stdout.write("\nunrecognized 3rd option\n\n");
+		process.exit(1);
+	}
+
+	if (process.argv.length) {
+		process.stderr.write(bullets("\nerror - leftover arguments: ", process.argv, "  ") + "\n\n");
 		process.exit(1);
 	}
 
