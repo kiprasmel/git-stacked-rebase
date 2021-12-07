@@ -1,6 +1,7 @@
 #!/usr/bin/env ts-node-dev
 
 /* eslint-disable indent */
+/* eslint-disable @typescript-eslint/camelcase */
 
 import Git from "nodegit";
 import fs from "fs";
@@ -23,6 +24,7 @@ export type OptionsForGitStackedRebase = {
 	 */
 	editor: string | ((ctx: { filePath: string }) => Promise<void>);
 	editTodo: boolean;
+	viewTodoOnly: boolean;
 	apply: boolean;
 };
 
@@ -32,6 +34,7 @@ const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	repoPath: ".", //
 	editor: process.env.EDITOR ?? "vi",
 	editTodo: false,
+	viewTodoOnly: false,
 	apply: false,
 });
 
@@ -70,11 +73,41 @@ export const gitStackedRebase = async (
 			});
 
 		const dotGitDirPath: string = repo.path();
-		const pathToStackedRebaseDirInsideDotGit = path.join(dotGitDirPath, "stacked-rebase");
-		const pathToRegularRebaseDirInsideDotGit = path.join(dotGitDirPath, "rebase-merge");
 
-		const pathToStackedRebaseTodoFile = path.join(pathToStackedRebaseDirInsideDotGit, "git-rebase-todo");
+		const pathToRegularRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "rebase-merge");
 		const pathToRegularRebaseTodoFile = path.join(pathToRegularRebaseDirInsideDotGit, "git-rebase-todo");
+
+		const __default__pathToStackedRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "stacked-rebase");
+		const __default__pathToStackedRebaseTodoFile = path.join(
+			__default__pathToStackedRebaseDirInsideDotGit,
+			"git-rebase-todo"
+		);
+
+		let parsed: {
+			pathToStackedRebaseDirInsideDotGit: string;
+			pathToStackedRebaseTodoFile: string;
+		};
+
+		if (options.viewTodoOnly) {
+			/**
+			 * would've been in stacked-rebase/
+			 * now will be   in stacked-rebase/tmp/
+			 */
+			const insideDir: string = path.join(__default__pathToStackedRebaseDirInsideDotGit, "tmp");
+
+			parsed = {
+				pathToStackedRebaseDirInsideDotGit: insideDir,
+				pathToStackedRebaseTodoFile: path.join(insideDir, "git-rebase-todo"),
+			};
+		} else {
+			parsed = {
+				pathToStackedRebaseDirInsideDotGit: __default__pathToStackedRebaseDirInsideDotGit,
+				pathToStackedRebaseTodoFile: __default__pathToStackedRebaseTodoFile,
+			};
+		}
+
+		const pathToStackedRebaseDirInsideDotGit: string = parsed.pathToStackedRebaseDirInsideDotGit;
+		const pathToStackedRebaseTodoFile: string = parsed.pathToStackedRebaseTodoFile;
 
 		let goodCommands: GoodCommand[];
 
@@ -377,12 +410,24 @@ export const gitStackedRebase = async (
 			);
 		}
 
-		if (!wasRegularRebaseInProgress || options.editTodo) {
+		if (options.viewTodoOnly) {
+			/**
+			 * copy the proper file (from non-view-only runs) into the tmp/ file
+			 */
+			fs.copyFileSync(__default__pathToStackedRebaseTodoFile, pathToStackedRebaseTodoFile);
+		}
+
+		if (!wasRegularRebaseInProgress || options.editTodo || options.viewTodoOnly) {
 			if (options.editor instanceof Function) {
 				await options.editor({ filePath: pathToStackedRebaseTodoFile });
 			} else {
 				execSyncInRepo(`${options.editor} ${pathToStackedRebaseTodoFile}`);
 			}
+		}
+
+		if (options.viewTodoOnly) {
+			fs.rmdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
+			process.exit(0);
 		}
 
 		const regularRebaseTodoLines: string[] = [];
@@ -1009,10 +1054,11 @@ if (!module.parent) {
 	const third = peakNextArg();
 
 	const isEditTodo: boolean = !!third && ["--edit-todo", "-e"].includes(third as string);
+	const isViewTodoOnly: boolean = !!third && ["--view-todo", "-v"].includes(third);
 	const isApply: boolean = !!third && ["--apply", "-a"].includes(third);
 
 	let parsedThird = !third;
-	if (third && !isEditTodo && !isApply) {
+	if (third && !isEditTodo && !isViewTodoOnly && !isApply) {
 		parsedThird = false;
 	} else {
 		parsedThird = true;
@@ -1027,6 +1073,7 @@ if (!module.parent) {
 	const options: SomeOptionsForGitStackedRebase = {
 		repoPath,
 		editTodo: isEditTodo,
+		viewTodoOnly: isViewTodoOnly,
 		apply: isApply,
 	};
 
