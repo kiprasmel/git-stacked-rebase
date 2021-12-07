@@ -38,6 +38,22 @@ const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	apply: false,
 });
 
+function areOptionsIncompetible(
+	options: OptionsForGitStackedRebase, //
+	reasons: string[] = []
+): boolean {
+	if (options.viewTodoOnly) {
+		if (options.editTodo) reasons.push("--edit-todo cannot be used together with --view-todo");
+		if (options.apply) reasons.push("--apply cannot be used together with --view-todo");
+	}
+
+	/**
+	 * TODO HANDLE ALL CASES
+	 */
+
+	return reasons.length > 0;
+}
+
 export const gitStackedRebase = async (
 	nameOfInitialBranch: string,
 	specifiedOptions: SomeOptionsForGitStackedRebase = {}
@@ -47,8 +63,24 @@ export const gitStackedRebase = async (
 			...getDefaultOptions(), //
 			...removeUndefinedProperties(specifiedOptions),
 		};
-
 		console.log({ options });
+
+		const reasonsWhatWhyIncompatible: string[] = [];
+
+		if (areOptionsIncompetible(options, reasonsWhatWhyIncompatible)) {
+			process.stderr.write(
+				"" + //
+					"\n" +
+					bullets(
+						"error - incompatible options:", //
+						reasonsWhatWhyIncompatible,
+						"  "
+					) +
+					"\n\n"
+			);
+
+			process.exit(1);
+		}
 
 		const repo = await Git.Repository.open(options.repoPath);
 
@@ -77,7 +109,9 @@ export const gitStackedRebase = async (
 		const pathToRegularRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "rebase-merge");
 		const pathToRegularRebaseTodoFile = path.join(pathToRegularRebaseDirInsideDotGit, "git-rebase-todo");
 
-		const __default__pathToStackedRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "stacked-rebase");
+		const createPathForStackedRebase = (withName: string): string => path.join(dotGitDirPath, withName); // "stacked-rebase"
+
+		const __default__pathToStackedRebaseDirInsideDotGit: string = createPathForStackedRebase("stacked-rebase");
 		const __default__pathToStackedRebaseTodoFile = path.join(
 			__default__pathToStackedRebaseDirInsideDotGit,
 			"git-rebase-todo"
@@ -93,7 +127,7 @@ export const gitStackedRebase = async (
 			 * would've been in stacked-rebase/
 			 * now will be   in stacked-rebase/tmp/
 			 */
-			const insideDir: string = path.join(__default__pathToStackedRebaseDirInsideDotGit, "tmp");
+			const insideDir: string = createPathForStackedRebase("stacked-rebase.tmp");
 
 			parsed = {
 				pathToStackedRebaseDirInsideDotGit: insideDir,
@@ -106,6 +140,16 @@ export const gitStackedRebase = async (
 			};
 		}
 
+		/**
+		 * TODO v1: FIXME update usage of this to use the `__default__` instead (in most places except --view-todo)
+		 * EDIT: oh but this is what's actually proctecting from e.g. --apply together w/ --view-todo...
+		 *
+		 * TODO v2.1: instead, extract the `--view-todo` logic & exit early
+		 * TODO v2.2: though, also consider we'll want `--dry-run` in the future & the current approach might be better.
+		 *
+		 * TODO v3: okay nevermind re: v1, and yes v2.2 -- now that we're completely isolating into a separate dir
+		 * if it's --view-todo,
+		 */
 		const pathToStackedRebaseDirInsideDotGit: string = parsed.pathToStackedRebaseDirInsideDotGit;
 		const pathToStackedRebaseTodoFile: string = parsed.pathToStackedRebaseTodoFile;
 
@@ -406,15 +450,9 @@ export const gitStackedRebase = async (
 			await createInitialEditTodoOfGitStackedRebase(
 				repo, //
 				initialBranch,
+				// __default__pathToStackedRebaseTodoFile
 				pathToStackedRebaseTodoFile
 			);
-		}
-
-		if (options.viewTodoOnly) {
-			/**
-			 * copy the proper file (from non-view-only runs) into the tmp/ file
-			 */
-			fs.copyFileSync(__default__pathToStackedRebaseTodoFile, pathToStackedRebaseTodoFile);
 		}
 
 		if (!wasRegularRebaseInProgress || options.editTodo || options.viewTodoOnly) {
@@ -427,6 +465,10 @@ export const gitStackedRebase = async (
 
 		if (options.viewTodoOnly) {
 			fs.rmdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
+
+			const dirname = path.basename(pathToStackedRebaseDirInsideDotGit);
+
+			process.stdout.write(`removed ${dirname}/\n`);
 			process.exit(0);
 		}
 
@@ -1061,10 +1103,27 @@ git-stacked-rebase <branch> [<repo_path=.> [-e|--edit-todo]]    (1. will edit th
                                                                  2. but will not apply the changes to partial branches
                                                                     until --apply is used).
 
-git-stacked-rebase <branch> [<repo_path=.> [-v|--view-todo]]    (1. will copy the actual todo into a tmp/ directory
-                                                                    to allow viewing/editing (w/o affecting the actual todo),
-                                                                 2. but will NOT execute the rebase.
-                                                                 3. after viewing/editing, will remove the tmp/ todo).
+git-stacked-rebase <branch> [<repo_path=.> [-v|--view-todo|--view-only]]
+                                                                (1. will make git-stacked-rebase work inside a separate, .tmp directory,
+                                                                    to allow viewing/editing (w/o affecting the actual todo
+                                                                    nor any subsequent runs that might happen later),
+                                                                 2. will NOT execute the rebase.
+                                                                 3. after viewing/editing, will remove the .tmp directory
+
+                                                                 this is safe because the decision of using the .tmp directory or not
+                                                                 is decided purely by this option,
+                                                                 and **it's impossible to have more options** that would 
+                                                                 have side effects for the git repository
+                                                                 (because git-stacked-rebase would be working in the same .tmp directory).
+
+                                                                 i.e. if --view-todo is specified, then another option,
+                                                                 such as --edit-todo, or --apply, cannot be specified,
+                                                                 because all of these options are positional
+                                                                 & are the 3rd argument.
+                                                                 additionally, gitStackedRebase checks for these incompatible options
+                                                                 in the library code as well (TODO check all incompatible options)
+                                                                 ).
+
 
 git-stacked-rebase <branch> [<repo_path=.> [-a|--apply]]        (will apply the changes
                                                                  from the latest branch
@@ -1110,7 +1169,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	const third = peakNextArg();
 
 	const isEditTodo: boolean = !!third && ["--edit-todo", "-e"].includes(third as string);
-	const isViewTodoOnly: boolean = !!third && ["--view-todo", "-v"].includes(third);
+	const isViewTodoOnly: boolean = !!third && ["--view-todo", "-v", "--view-only", "--view-todo-only"].includes(third);
 	const isApply: boolean = !!third && ["--apply", "-a"].includes(third);
 
 	let parsedThird = !third;
@@ -1127,7 +1186,12 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	}
 
 	if (process.argv.length) {
-		process.stderr.write(bullets("\nerror - leftover arguments: ", process.argv, "  ") + "\n\n");
+		process.stderr.write(
+			"" + //
+				"\n" +
+				bullets("\nerror - leftover arguments: ", process.argv, "  ") +
+				"\n\n"
+		);
 		process.exit(1);
 	}
 
