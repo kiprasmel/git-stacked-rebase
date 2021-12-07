@@ -1034,6 +1034,48 @@ async function getCommitOfBranch(repo: Git.Repository, branchReference: Git.Refe
 }
 
 if (!module.parent) {
+	const pkgFromSrc = path.join(__dirname, "package.json");
+	const pkgFromDist = path.join(__dirname, "../", "package.json");
+	let pkg;
+
+	// eslint-disable-next-line import/no-dynamic-require
+	if (fs.existsSync(pkgFromSrc)) pkg = require(pkgFromSrc);
+	// eslint-disable-next-line import/no-dynamic-require
+	else if (fs.existsSync(pkgFromDist)) pkg = require(pkgFromDist);
+	else pkg = {};
+
+	const gitStackedRebaseVersion = pkg.version;
+
+	const gitStackedRebaseVersionStr: string = !gitStackedRebaseVersion ? "" : "v" + gitStackedRebaseVersion;
+
+	const helpMsg = `\
+
+git-stacked-rebase <branch> [<repo_path=.>                      (~~if first invocation,~~ acts the same as --edit-todo).
+                                                                    TODO FIXME:
+                                                                    --edit-todo should not re-generate the todo
+                                                                    (only if no rebase in progress? seems bad for the mental model)
+                                                                    (perhaps --apply should not exist).
+
+git-stacked-rebase <branch> [<repo_path=.> [-e|--edit-todo]]    (1. will edit the todo & will execute the rebase
+                                                                    (in the latest branch),
+                                                                 2. but will not apply the changes to partial branches
+                                                                    until --apply is used).
+
+git-stacked-rebase <branch> [<repo_path=.> [-v|--view-todo]]    (1. will copy the actual todo into a tmp/ directory
+                                                                    to allow viewing/editing (w/o affecting the actual todo),
+                                                                 2. but will NOT execute the rebase.
+                                                                 3. after viewing/editing, will remove the tmp/ todo).
+
+git-stacked-rebase <branch> [<repo_path=.> [-a|--apply]]        (will apply the changes
+                                                                 from the latest branch
+                                                                 to all partial branches
+                                                                 (currently, using 'git reset --hard')).
+git-stacked-rebase -V|--version
+
+
+git-stacked-rebase ${gitStackedRebaseVersionStr}
+                ` as const;
+
 	process.argv.splice(0, 2);
 
 	const peakNextArg = (): string | undefined => process.argv[0];
@@ -1041,10 +1083,15 @@ if (!module.parent) {
 
 	const eatNextArgOrExit = (): string | never =>
 		eatNextArg() ||
-		(process.stderr.write("\ngit-stacked-rebase <branch> [<repo_path=.> [-e|--edit-todo|-a|--apply]] \n\n"), //
+		(process.stderr.write(helpMsg), //
 		process.exit(1));
 
 	const nameOfInitialBranch: string = eatNextArgOrExit();
+
+	if (["-V", "--version"].includes(nameOfInitialBranch)) {
+		process.stdout.write(`\ngit-stacked-rebase ${gitStackedRebaseVersionStr}\n\n`);
+		process.exit(0);
+	}
 
 	const repoPath = eatNextArg();
 
