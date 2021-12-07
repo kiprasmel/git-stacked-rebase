@@ -996,7 +996,7 @@ if (!module.parent) {
 
 	const eatNextArgOrExit = (): string | never =>
 		eatNextArg() ||
-		(process.stderr.write("\ngit-stacked-rebase <branch> [<repo_path=.> [-e|--edit-todo]] \n\n"), //
+		(process.stderr.write("\ngit-stacked-rebase <branch> [<repo_path=.> [-e|--edit-todo|-a|--apply]] \n\n"), //
 		process.exit(1));
 
 	const nameOfInitialBranch: string = eatNextArgOrExit();
@@ -1020,6 +1020,7 @@ if (!module.parent) {
 	}
 
 	if (!parsedThird) {
+		process.stdout.write("\nunrecognized 3rd option\n\n");
 		process.exit(1);
 	}
 
