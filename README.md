@@ -19,3 +19,51 @@ in the future, we could create host-specific adapters. they could be used to aut
 ## Progress
 
 follow [http://kiprasmel.github.io/notes/git-stacked-rebase.html](http://kiprasmel.github.io/notes/git-stacked-rebase.html)
+
+## Setup
+
+dependencies:
+
+- [node.js](https://nodejs.org/en/)
+- git
+- something else i probably forgot
+
+```sh
+npm i -g git-stacked-rebase
+
+# optional:
+git config --global alias.stacked-rebase git-stacked-rebase
+git config --global alias.rr             git-stacked-rebase
+```
+
+## Usage
+
+```sh
+cd repo/
+
+# checkout your remote branches locally (until we automate it w/ a command?)
+
+# checkout the latest one
+
+git-stacked-rebase origin/master .
+
+# edit & write the rebase-todo file
+#
+# when done, optionally inspect the latest branch
+# (not everything will look right just yet).
+#
+# then:
+
+git-stacked-rebase origin/master . --apply
+
+# will apply the changes from your latest branch
+# into all partial branches up until origin/master.
+
+# now, you can checkout & inspect each branch
+# to verify everything looks good.
+# if so, you can now manually (until we, again, implement a command for this)
+# push each branch to the remote (origin in this case)
+
+# and then, optionally repeat the process
+# (ofc can do many rebase + --apply's before pushing)
+```
