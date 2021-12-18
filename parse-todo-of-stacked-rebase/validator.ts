@@ -3,6 +3,7 @@
 
 import { assert } from "console";
 import { bullets, joinWith, joinWithIncludingFirstLast, tick } from "nice-comment";
+import { Exitable, fail, succ } from "../util/Exitable";
 
 /**
  * if invalid, should fill the array with reasons why not valid.
@@ -243,7 +244,7 @@ export type GoodCommand = {
 	  }
 );
 
-export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] | never {
+export function validate(linesOfEditedRebaseTodo: string[]): Exitable<GoodCommand[]> {
 	const badCommands: BadCommand[] = [];
 	const goodCommands: GoodCommand[] = [];
 
@@ -369,7 +370,7 @@ export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] | nev
 	});
 
 	if (badCommands.length) {
-		process.stderr.write(
+		return fail(
 			joinWithIncludingFirstLast("\n\n")([
 				"found errors in rebase commands:",
 				...badCommands.map((cmd) =>
@@ -379,9 +380,7 @@ export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] | nev
 				"  git-stacked-rebase -e|--edit-todo\n",
 			]).slice(1)
 		);
-
-		process.exit(1);
 	}
 
-	return goodCommands;
+	return succ(goodCommands);
 }

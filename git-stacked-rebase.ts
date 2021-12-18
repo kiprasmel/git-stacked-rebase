@@ -15,6 +15,7 @@ import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
 import { GoodCommand } from "./parse-todo-of-stacked-rebase/validator";
+import { Exitable, ExitCode, fail, processWriteAndExit, succ } from "./util/Exitable";
 
 // console.log = () => {};
 
@@ -58,7 +59,7 @@ function areOptionsIncompetible(
 export const gitStackedRebase = async (
 	nameOfInitialBranch: string,
 	specifiedOptions: SomeOptionsForGitStackedRebase = {}
-): Promise<void> => {
+): Promise<Exitable> => {
 	try {
 		const options: OptionsForGitStackedRebase = {
 			...getDefaultOptions(), //
@@ -69,9 +70,8 @@ export const gitStackedRebase = async (
 		const reasonsWhatWhyIncompatible: string[] = [];
 
 		if (areOptionsIncompetible(options, reasonsWhatWhyIncompatible)) {
-			process.stderr.write(
-				"" + //
-					"\n" +
+			return fail(
+				"\n" +
 					bullets(
 						"error - incompatible options:", //
 						reasonsWhatWhyIncompatible,
@@ -79,8 +79,6 @@ export const gitStackedRebase = async (
 					) +
 					"\n\n"
 			);
-
-			process.exit(1);
 		}
 
 		const repo = await Git.Repository.open(options.repoPath);
@@ -139,7 +137,7 @@ export const gitStackedRebase = async (
 		let goodCommands: GoodCommand[];
 
 		if (options.apply) {
-			apply({
+			return await apply({
 				pathToStackedRebaseDirInsideDotGit, //
 				// goodCommands,
 				pathToStackedRebaseTodoFile,
@@ -183,8 +181,7 @@ export const gitStackedRebase = async (
 
 			const dirname = path.basename(pathToStackedRebaseDirInsideDotGit);
 
-			process.stdout.write(`removed ${dirname}/\n`);
-			process.exit(0);
+			return succ(undefined, `removed ${dirname}/\n`);
 		}
 
 		const regularRebaseTodoLines: string[] = [];
@@ -430,9 +427,11 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		// }
 
 		// const rebase = await Git.Rebase.init()
+
+		return succ();
 	} catch (e) {
 		console.error(e);
-		process.exit(1);
+		return fail(e);
 	}
 };
 
@@ -857,12 +856,12 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 
 	if (process.argv.some((arg) => ["-h", "--help"].includes(arg))) {
 		process.stdout.write(helpMsg);
-		process.exit(0);
+		process.exit(ExitCode.SUCC);
 	}
 
 	if (process.argv.some((arg) => ["-V", "--version"].includes(arg))) {
 		process.stdout.write(`\ngit-stacked-rebase ${gitStackedRebaseVersionStr}\n\n`);
-		process.exit(0);
+		process.exit(ExitCode.SUCC);
 	}
 
 	process.argv.splice(0, 2);
@@ -873,7 +872,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	const eatNextArgOrExit = (): string | never =>
 		eatNextArg() ||
 		(process.stderr.write(helpMsg), //
-		process.exit(1));
+		process.exit(ExitCode.FAIL));
 
 	const nameOfInitialBranch: string = eatNextArgOrExit();
 
@@ -898,7 +897,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 
 	if (!parsedThird) {
 		process.stdout.write("\nunrecognized 3rd option\n\n");
-		process.exit(1);
+		process.exit(ExitCode.FAIL);
 	}
 
 	if (process.argv.length) {
@@ -908,7 +907,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 				bullets("\nerror - leftover arguments: ", process.argv, "  ") +
 				"\n\n"
 		);
-		process.exit(1);
+		process.exit(ExitCode.FAIL);
 	}
 
 	const options: SomeOptionsForGitStackedRebase = {
@@ -919,5 +918,6 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	};
 
 	// await
-	gitStackedRebase(nameOfInitialBranch, options);
+	gitStackedRebase(nameOfInitialBranch, options) //
+		.then(processWriteAndExit);
 }
