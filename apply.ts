@@ -10,6 +10,7 @@ import { array } from "nice-comment";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
 import { GoodCommand, stackedRebaseCommands } from "./parse-todo-of-stacked-rebase/validator";
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
+import { EitherExitFinal, fail } from "./util/Exitable";
 
 export type ApplyArgs = {
 	pathToStackedRebaseDirInsideDotGit: string; //
@@ -23,15 +24,14 @@ export async function apply({
 	// goodCommands,
 	pathToStackedRebaseTodoFile,
 	repo,
-}: ApplyArgs) {
+}: ApplyArgs): Promise<EitherExitFinal> {
 	if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) {
-		process.stderr.write("\n\nno stacked-rebase in progress? (nothing to --apply)\n\n");
-		process.exit(1);
+		return fail("\n\nno stacked-rebase in progress? (nothing to --apply)\n\n");
 	}
 
-	const goodCommands: GoodCommand[] = parseTodoOfStackedRebase({
-		pathToStackedRebaseTodoFile,
-	});
+	const [exit, goodCommands] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
+	if (!goodCommands) return fail(exit);
+
 	logGoodCmds(goodCommands);
 
 	const pathOfRewrittenList: string = path.join(repo.workdir(), ".git", "stacked-rebase", "rewritten-list");
@@ -86,7 +86,7 @@ export async function apply({
 	for (let i = 0; i < oldCommits.length; i++) {
 		const oldCommit: OldCommit = oldCommits[i];
 
-		const oldCommandAtIdx = goodCommands[goodCommandMinIndex];
+		const oldCommandAtIdx: GoodCommand = goodCommands[goodCommandMinIndex];
 
 		if (oldCommandAtIdx.commandName in stackedRebaseCommands) {
 			goodNewCommands.push({
@@ -286,10 +286,10 @@ export async function apply({
 	// });
 	//
 
-	process.exit(0);
+	return;
 }
 
-const logGoodCmds = (goodCommands: GoodCommand[]) => {
+const logGoodCmds = (goodCommands: GoodCommand[]): void => {
 	console.log({
 		goodCommands: goodCommands.map((c) => ({
 			...c,

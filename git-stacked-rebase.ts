@@ -14,7 +14,7 @@ import { apply } from "./apply";
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
-import { GoodCommand } from "./parse-todo-of-stacked-rebase/validator";
+import { processWriteAndOrExit, fail, EitherExitFinal } from "./util/Exitable";
 
 // console.log = () => {};
 
@@ -58,7 +58,7 @@ function areOptionsIncompetible(
 export const gitStackedRebase = async (
 	nameOfInitialBranch: string,
 	specifiedOptions: SomeOptionsForGitStackedRebase = {}
-): Promise<void> => {
+): Promise<EitherExitFinal> => {
 	try {
 		const options: OptionsForGitStackedRebase = {
 			...getDefaultOptions(), //
@@ -69,9 +69,8 @@ export const gitStackedRebase = async (
 		const reasonsWhatWhyIncompatible: string[] = [];
 
 		if (areOptionsIncompetible(options, reasonsWhatWhyIncompatible)) {
-			process.stderr.write(
-				"" + //
-					"\n" +
+			return fail(
+				"\n" +
 					bullets(
 						"error - incompatible options:", //
 						reasonsWhatWhyIncompatible,
@@ -79,8 +78,6 @@ export const gitStackedRebase = async (
 					) +
 					"\n\n"
 			);
-
-			process.exit(1);
 		}
 
 		const repo = await Git.Repository.open(options.repoPath);
@@ -136,10 +133,8 @@ export const gitStackedRebase = async (
 		const pathToStackedRebaseDirInsideDotGit: string = parsed.pathToStackedRebaseDirInsideDotGit;
 		const pathToStackedRebaseTodoFile: string = parsed.pathToStackedRebaseTodoFile;
 
-		let goodCommands: GoodCommand[];
-
 		if (options.apply) {
-			apply({
+			return await apply({
 				pathToStackedRebaseDirInsideDotGit, //
 				// goodCommands,
 				pathToStackedRebaseTodoFile,
@@ -184,15 +179,14 @@ export const gitStackedRebase = async (
 			const dirname = path.basename(pathToStackedRebaseDirInsideDotGit);
 
 			process.stdout.write(`removed ${dirname}/\n`);
-			process.exit(0);
+
+			return;
 		}
 
 		const regularRebaseTodoLines: string[] = [];
 
-		// eslint-disable-next-line prefer-const
-		goodCommands = parseTodoOfStackedRebase({
-			pathToStackedRebaseTodoFile,
-		});
+		const [exit, goodCommands] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
+		if (!goodCommands) return fail(exit);
 
 		goodCommands.map((cmd) => {
 			if (cmd.rebaseKind === "regular") {
@@ -430,9 +424,10 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		// }
 
 		// const rebase = await Git.Rebase.init()
+
+		return;
 	} catch (e) {
-		console.error(e);
-		process.exit(1);
+		return fail(e);
 	}
 };
 
@@ -897,7 +892,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	}
 
 	if (!parsedThird) {
-		process.stdout.write("\nunrecognized 3rd option\n\n");
+		process.stderr.write("\nunrecognized 3rd option\n\n");
 		process.exit(1);
 	}
 
@@ -919,5 +914,6 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	};
 
 	// await
-	gitStackedRebase(nameOfInitialBranch, options);
+	gitStackedRebase(nameOfInitialBranch, options) //
+		.then(processWriteAndOrExit);
 }
