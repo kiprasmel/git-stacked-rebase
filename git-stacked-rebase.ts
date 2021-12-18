@@ -786,7 +786,10 @@ async function getCommitOfBranch(repo: Git.Repository, branchReference: Git.Refe
 	return await Git.Commit.lookup(repo, branchOid);
 }
 
-if (!module.parent) {
+/**
+ * the CLI
+ */
+export async function git_stacked_rebase(): Promise<EitherExitFinal> {
 	const pkgFromSrc = path.join(__dirname, "package.json");
 	const pkgFromDist = path.join(__dirname, "../", "package.json");
 	let pkg;
@@ -840,6 +843,13 @@ git-stacked-rebase <branch> [<repo_path=.> [-a|--apply]]        (will apply the 
                                                                  from the latest branch
                                                                  to all partial branches
                                                                  (currently, using 'git reset --hard')).
+
+git-stacked-rebase <branch> [<repo_path=.> [--push -f]]         (will checkout each branch
+                                                                 and will push --force.
+
+																 will NOT have any effect
+																 if --apply was not used yet).
+
 git-stacked-rebase [...] -V|--version [...]
 git-stacked-rebase [...] -h|--help    [...]
 
@@ -852,12 +862,12 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 
 	if (process.argv.some((arg) => ["-h", "--help"].includes(arg))) {
 		process.stdout.write(helpMsg);
-		process.exit(0);
+		return;
 	}
 
 	if (process.argv.some((arg) => ["-V", "--version"].includes(arg))) {
 		process.stdout.write(`\ngit-stacked-rebase ${gitStackedRebaseVersionStr}\n\n`);
-		process.exit(0);
+		return;
 	}
 
 	process.argv.splice(0, 2);
@@ -865,12 +875,8 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	const peakNextArg = (): string | undefined => process.argv[0];
 	const eatNextArg = (): string | undefined => process.argv.shift();
 
-	const eatNextArgOrExit = (): string | never =>
-		eatNextArg() ||
-		(process.stderr.write(helpMsg), //
-		process.exit(1));
-
-	const nameOfInitialBranch: string = eatNextArgOrExit();
+	const nameOfInitialBranch: string | undefined = eatNextArg();
+	if (!nameOfInitialBranch) return fail(helpMsg);
 
 	const repoPath = eatNextArg();
 
@@ -892,18 +898,16 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	}
 
 	if (!parsedThird) {
-		process.stderr.write("\nunrecognized 3rd option\n\n");
-		process.exit(1);
+		return fail("\nunrecognized 3rd option\n\n");
 	}
 
 	if (process.argv.length) {
-		process.stderr.write(
+		return fail(
 			"" + //
 				"\n" +
 				bullets("\nerror - leftover arguments: ", process.argv, "  ") +
 				"\n\n"
 		);
-		process.exit(1);
 	}
 
 	const options: SomeOptionsForGitStackedRebase = {
@@ -914,6 +918,10 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	};
 
 	// await
-	gitStackedRebase(nameOfInitialBranch, options) //
+	return gitStackedRebase(nameOfInitialBranch, options); //
+}
+
+if (!module.parent) {
+	git_stacked_rebase() //
 		.then(processWriteAndOrExit);
 }

@@ -75,21 +75,25 @@
 // export type MaybeFail = { code: 1; stderr?: string };
 
 // export const neutral = Symbol("neutral")
-export const neutral = null
-export type Neutral = typeof neutral
+export const neutral = null;
+export type Neutral = typeof neutral;
 
+// export type MaybeFail = string;
+// export type MaybeFail = string | Neutral;
 // export type MaybeFail = string;
 export type MaybeFail = string | Neutral;
 
 // const emptySucc = Symbol("success")
 
 export type ExitFail = readonly [MaybeFail, Neutral] // TODO ESLINT
-export type ExitSucc<Succ = Neutral> = readonly [Neutral, Succ] // TODO ESLINT
+// export type ExitSucc<Succ = Neutral> = readonly [Neutral, Succ] // TODO ESLINT
+export type ExitSucc<Succ> = readonly [Neutral, Succ] // TODO ESLINT
 
 // export type MaybeExit<T = undefined> = Exit | T;
 export type EitherExit<Succ = void> = ExitFail | ExitSucc<Succ>;
 
-export type EitherExitFinal = void | EitherExit<Neutral>;
+// export type EitherExitFinal = void | EitherExit<Neutral>;
+export type EitherExitFinal = void | ExitFail;
 
 // export const fail = <T>(args: Exclude<ExitFail<T>, "code"> = { code: "fail" }): ExitFail<T> => ({
 // export const fail = (stderr: string = ""): ExitFail => [
@@ -148,11 +152,19 @@ export const succ = <T>(ret: T): ExitSucc<T> => [neutral, ret];
 /**
  *
  */
+// export const processWriteAndOrExit = <T>(exit: EitherExit<T> | EitherExitFinal): void => (
+// 	// !exit || exit[0] === neutral //
+// 	!exit || (exit[1] || exit[1] === neutral) //
+// 		? process.exit(0)
+// 		: (exit[0] && process.stderr.write(exit[0]), //
+// 		  process.exit(1)),
+// 	void 0
+// );
+
 export const processWriteAndOrExit = <T>(exit: EitherExit<T> | EitherExitFinal): void => (
-	// !exit || exit[0] === neutral //
-	!exit || (exit[1] || exit[1] === neutral) //
-		? process.exit(0)
-		: (exit[0] && process.stderr.write(exit[0]), //
-		  process.exit(1)),
+	exit && !exit[1] && exit[1] !== neutral //
+		? (exit[0] && process.stderr.write(exit[0]), //
+		  process.exit(1))
+		: process.exit(0),
 	void 0
 );
