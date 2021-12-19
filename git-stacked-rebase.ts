@@ -867,8 +867,8 @@ git-stacked-rebase <branch> [<repo_path=.> [-a|--apply]]        (will apply the 
 git-stacked-rebase <branch> [<repo_path=.> [--push -f]]         (will checkout each branch
                                                                  and will push --force.
 
-																 will NOT have any effect
-																 if --apply was not used yet).
+                                                                 will NOT have any effect
+                                                                 if --apply was not used yet).
 
 git-stacked-rebase [...] -V|--version [...]
 git-stacked-rebase [...] -h|--help    [...]
