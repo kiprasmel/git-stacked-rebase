@@ -9,7 +9,7 @@ import path from "path";
 import assert from "assert";
 import { bullets } from "nice-comment";
 
-import { apply } from "./apply";
+import { apply, applyIfNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
@@ -147,7 +147,18 @@ export const gitStackedRebase = async (
 				pathToStackedRebaseDirInsideDotGit, //
 				rootLevelCommandName: "--apply",
 			});
-		} // options.apply
+		}
+
+		const { neededToApply, userAllowedToApply, markThatNeedsToApply } = await applyIfNeedsToApply({
+			repo,
+			pathToStackedRebaseTodoFile,
+			pathToStackedRebaseDirInsideDotGit, //
+			rootLevelCommandName: "--apply",
+		});
+
+		if (neededToApply && !userAllowedToApply) {
+			return;
+		}
 
 		if (options.push) {
 			if (!options.forcePush) {
@@ -444,6 +455,8 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		// }
 
 		// const rebase = await Git.Rebase.init()
+
+		markThatNeedsToApply!(); // TODO TS infer auto
 
 		return;
 	} catch (e) {

@@ -1,7 +1,9 @@
 import fs from "fs";
+import path from "path";
 
 import Git from "nodegit";
 
+import { createQuestion } from "./util/createQuestion";
 import { noop } from "./util/noop";
 
 import {
@@ -9,6 +11,7 @@ import {
 	branchSequencer,
 	ActionInsideEachCheckedOutBranch,
 	CallbackAfterDone,
+	BranchSequencerArgsBase,
 } from "./branchSequencer";
 
 export const apply: BranchSequencerBase = (args) =>
@@ -74,3 +77,80 @@ const defaultApplyCallback__disabled: CallbackAfterDone = ({
 	//
 };
 noop(defaultApplyCallback__disabled);
+
+export type ReturnOfApplyIfNeedsToApply =
+	| {
+			neededToApply: false;
+			userAllowedToApply?: never;
+			markThatNeedsToApply?: never;
+	  }
+	| {
+			neededToApply: true;
+			userAllowedToApply: false;
+			markThatNeedsToApply?: never;
+	  }
+	| {
+			neededToApply: true;
+			userAllowedToApply: true;
+			markThatNeedsToApply: () => void;
+	  };
+
+export async function applyIfNeedsToApply({
+	repo,
+	pathToStackedRebaseTodoFile,
+	pathToStackedRebaseDirInsideDotGit, //
+	...rest
+}: BranchSequencerArgsBase): Promise<ReturnOfApplyIfNeedsToApply> {
+	/**
+	 * currently we're not saving the branch names
+	 * & where they point to etc.,
+	 * so doing rebase after rebase without --apply
+	 * will break the workflow after the 1st one.
+	 *
+	 * thus, until we have a more sophisticated solution,
+	 * automatically --apply'ing (when needed) should do just fine.
+	 *
+	 */
+	const pathToFileIndicatingThatNeedsToApply = path.join(pathToStackedRebaseDirInsideDotGit, "needs-to-apply");
+	const needsToApply: boolean = fs.existsSync(pathToFileIndicatingThatNeedsToApply);
+
+	const markThatNeedsToApply = (): void => fs.writeFileSync(pathToFileIndicatingThatNeedsToApply, "");
+
+	if (!needsToApply) {
+		return {
+			neededToApply: false,
+		};
+	}
+
+	if (needsToApply) {
+		const question = createQuestion();
+
+		const answerRaw: string = await question("\nneed to --apply before continuing. proceed? [Y/n] ");
+		console.log({ answerRaw });
+
+		const userAllowedToApply: boolean = ["y", "yes", ""].includes(answerRaw.trim().toLowerCase());
+		console.log({ userAllowedToApply });
+
+		if (!userAllowedToApply) {
+			return {
+				neededToApply: true,
+				userAllowedToApply: false,
+			};
+		}
+
+		await apply({
+			repo,
+			pathToStackedRebaseTodoFile,
+			pathToStackedRebaseDirInsideDotGit, //
+			...rest,
+		});
+
+		fs.unlinkSync(pathToFileIndicatingThatNeedsToApply);
+	}
+
+	return {
+		neededToApply: true,
+		userAllowedToApply: true, //
+		markThatNeedsToApply,
+	};
+}
