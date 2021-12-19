@@ -162,7 +162,8 @@ export const succ = <T>(ret: T): ExitSucc<T> => [neutral, ret];
 // );
 
 export const processWriteAndOrExit = <T>(exit: EitherExit<T> | EitherExitFinal): void => (
-	exit && !exit[1] && exit[1] !== neutral //
+	// console.log({exit}),
+	exit && (!exit[1] || exit[1] === neutral) //
 		? (exit[0] && process.stderr.write(exit[0]), //
 		  process.exit(1))
 		: process.exit(0),
