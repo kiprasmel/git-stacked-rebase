@@ -44,6 +44,7 @@ export type BranchSequencerArgsBase = {
 	pathToStackedRebaseTodoFile: string;
 	repo: Git.Repository;
 	rootLevelCommandName: string;
+	gitCmd: string;
 };
 
 export type BranchSequencerArgs = BranchSequencerArgsBase & {

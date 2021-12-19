@@ -21,10 +21,18 @@ import { processWriteAndOrExit, fail, EitherExitFinal } from "./util/Exitable";
 
 export type OptionsForGitStackedRebase = {
 	repoPath: string;
+
 	/**
 	 * editor name, or a function that opens the file inside some editor.
 	 */
 	editor: string | ((ctx: { filePath: string }) => Promise<void>);
+
+	/**
+	 * for executing raw git commands
+	 * that aren't natively supported by `nodegit` (libgit2)
+	 */
+	gitCmd: string;
+
 	editTodo: boolean;
 	viewTodoOnly: boolean;
 	apply: boolean;
@@ -37,6 +45,7 @@ export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>
 const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	repoPath: ".", //
 	editor: process.env.EDITOR ?? "vi",
+	gitCmd: process.env.GIT_CMD ?? "/usr/bin/env git",
 	editTodo: false,
 	viewTodoOnly: false,
 	apply: false,
@@ -146,6 +155,7 @@ export const gitStackedRebase = async (
 				pathToStackedRebaseTodoFile,
 				pathToStackedRebaseDirInsideDotGit, //
 				rootLevelCommandName: "--apply",
+				gitCmd: options.gitCmd,
 			});
 		}
 
@@ -154,6 +164,7 @@ export const gitStackedRebase = async (
 			pathToStackedRebaseTodoFile,
 			pathToStackedRebaseDirInsideDotGit, //
 			rootLevelCommandName: "--apply",
+			gitCmd: options.gitCmd,
 		});
 
 		if (neededToApply && !userAllowedToApply) {
@@ -170,6 +181,7 @@ export const gitStackedRebase = async (
 				pathToStackedRebaseTodoFile,
 				pathToStackedRebaseDirInsideDotGit,
 				rootLevelCommandName: "--push --force",
+				gitCmd: options.gitCmd,
 			});
 		}
 
@@ -438,7 +450,7 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		 * with --apply or whatever.
 		 *
 		 */
-		execSyncInRepo("/usr/bin/env git rebase --continue");
+		execSyncInRepo(`${options.gitCmd} rebase --continue`);
 
 		// await repo.continueRebase(undefined as any, () => {
 		// 	//

@@ -35,7 +35,7 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 		...argsBase,
 		// pathToStackedRebaseDirInsideDotGit,
 		actionInsideEachCheckedOutBranch: ({ execSyncInRepo }) => {
-			execSyncInRepo(`/usr/bin/env git push --force`);
+			execSyncInRepo(`${argsBase.gitCmd} push --force`);
 		},
 		delayMsBetweenCheckouts: 0,
 	});
