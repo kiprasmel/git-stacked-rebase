@@ -10,6 +10,7 @@ import assert from "assert";
 import { bullets } from "nice-comment";
 
 import { apply } from "./apply";
+import { forcePush } from "./forcePush";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -27,6 +28,8 @@ export type OptionsForGitStackedRebase = {
 	editTodo: boolean;
 	viewTodoOnly: boolean;
 	apply: boolean;
+	push: boolean;
+	forcePush: boolean;
 };
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
@@ -37,6 +40,8 @@ const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	editTodo: false,
 	viewTodoOnly: false,
 	apply: false,
+	push: false,
+	forcePush: false,
 });
 
 function areOptionsIncompetible(
@@ -46,6 +51,8 @@ function areOptionsIncompetible(
 	if (options.viewTodoOnly) {
 		if (options.editTodo) reasons.push("--edit-todo cannot be used together with --view-todo");
 		if (options.apply) reasons.push("--apply cannot be used together with --view-todo");
+		if (options.push) reasons.push("--apply cannot be used together with --push");
+		if (options.forcePush) reasons.push("--apply cannot be used together with --push -f");
 	}
 
 	/**
@@ -135,12 +142,25 @@ export const gitStackedRebase = async (
 
 		if (options.apply) {
 			return await apply({
-				pathToStackedRebaseDirInsideDotGit, //
-				// goodCommands,
-				pathToStackedRebaseTodoFile,
 				repo,
+				pathToStackedRebaseTodoFile,
+				pathToStackedRebaseDirInsideDotGit, //
+				rootLevelCommandName: "--apply",
 			});
 		} // options.apply
+
+		if (options.push) {
+			if (!options.forcePush) {
+				return fail("\npush without --force will fail (since git rebase overrides history).\n\n");
+			}
+
+			return await forcePush({
+				repo, //
+				pathToStackedRebaseTodoFile,
+				pathToStackedRebaseDirInsideDotGit,
+				rootLevelCommandName: "--push --force",
+			});
+		}
 
 		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
 
@@ -888,9 +908,10 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	const isEditTodo: boolean = !!third && ["--edit-todo", "-e"].includes(third as string);
 	const isViewTodoOnly: boolean = !!third && ["--view-todo", "-v", "--view-only", "--view-todo-only"].includes(third);
 	const isApply: boolean = !!third && ["--apply", "-a"].includes(third);
+	const isPush: boolean = !!third && ["--push", "-p"].includes(third);
 
 	let parsedThird = !third;
-	if (third && !isEditTodo && !isViewTodoOnly && !isApply) {
+	if (third && !isEditTodo && !isViewTodoOnly && !isApply && !isPush) {
 		parsedThird = false;
 	} else {
 		parsedThird = true;
@@ -899,6 +920,17 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 
 	if (!parsedThird) {
 		return fail("\nunrecognized 3rd option\n\n");
+	}
+
+	let isForcePush: boolean = false;
+	if (isPush && peakNextArg()) {
+		const fourth = eatNextArg() || "";
+
+		isForcePush = ["--force", "-f"].includes(fourth);
+
+		if (!isForcePush) {
+			return fail(`\nunrecognized 4th option (after --push) (got "${fourth}")\n\n`);
+		}
 	}
 
 	if (process.argv.length) {
@@ -915,6 +947,8 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 		editTodo: isEditTodo,
 		viewTodoOnly: isViewTodoOnly,
 		apply: isApply,
+		push: isPush,
+		forcePush: isForcePush,
 	};
 
 	// await
