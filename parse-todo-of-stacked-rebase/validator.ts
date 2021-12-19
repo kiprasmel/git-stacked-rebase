@@ -2,7 +2,7 @@
 /* eslint-disable indent */
 
 import { assert } from "console";
-import { bullets, joinWith, joinWithIncludingFirstLast, tick } from "nice-comment";
+import { bullets, joinWith, tick } from "nice-comment";
 import { EitherExit, fail, succ } from "../util/Exitable";
 
 /**
@@ -371,14 +371,16 @@ export function validate(linesOfEditedRebaseTodo: string[]): EitherExit<GoodComm
 
 	if (badCommands.length) {
 		return fail(
-			joinWithIncludingFirstLast("\n\n")([
-				"found errors in rebase commands:",
-				...badCommands.map((cmd) =>
-					bullets(`  line ${cmd.lineNumber}: ${tick(cmd.command)}`, cmd.reasons, "     - ")
-				),
-				"to edit & fix, use:",
-				"  git-stacked-rebase -e|--edit-todo\n",
-			]).slice(1)
+			"\n" +
+				joinWith("\n\n")([
+					"found errors in rebase commands:",
+					...badCommands.map((cmd) =>
+						bullets(`  line ${cmd.lineNumber}: ${tick(cmd.command)}`, cmd.reasons, "     - ")
+					),
+					"to edit & fix, use:",
+					"  git-stacked-rebase -e|--edit-todo\n",
+				]).slice(1) +
+				"\n\n"
 		);
 	}
 
