@@ -456,10 +456,11 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 
 		// const rebase = await Git.Rebase.init()
 
-		markThatNeedsToApply!(); // TODO TS infer auto
+		markThatNeedsToApply();
 
 		return;
 	} catch (e) {
+		console.error(e);
 		return fail(e);
 	}
 };

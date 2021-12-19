@@ -82,12 +82,13 @@ export type ReturnOfApplyIfNeedsToApply =
 	| {
 			neededToApply: false;
 			userAllowedToApply?: never;
-			markThatNeedsToApply?: never;
+			markThatNeedsToApply: () => void;
 	  }
 	| {
 			neededToApply: true;
 			userAllowedToApply: false;
-			markThatNeedsToApply?: never;
+			// markThatNeedsToApply?: never; // TODO TS infer auto - force code owner to exit
+			markThatNeedsToApply: () => void;
 	  }
 	| {
 			neededToApply: true;
@@ -119,6 +120,7 @@ export async function applyIfNeedsToApply({
 	if (!needsToApply) {
 		return {
 			neededToApply: false,
+			markThatNeedsToApply,
 		};
 	}
 
@@ -135,6 +137,7 @@ export async function applyIfNeedsToApply({
 			return {
 				neededToApply: true,
 				userAllowedToApply: false,
+				markThatNeedsToApply,
 			};
 		}
 
