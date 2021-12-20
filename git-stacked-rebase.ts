@@ -308,7 +308,9 @@ export const gitStackedRebase = async (
 		// (await initialBranch.peel(Git.Object.TYPE.COMMIT))
 		const commitShaOfInitialBranch: string = (await (await getCommitOfBranch(repo, initialBranch)).sha()) + "\n";
 
-		const commitShaOfCurrentCommit: string = (await (await repo.getHeadCommit()).sha()) + "\n";
+		const getCurrentCommit = (): Promise<string> => repo.getHeadCommit().then((c) => c.sha());
+
+		const commitShaOfCurrentCommit: string = await getCurrentCommit();
 
 		console.log({ commitShaOfInitialBranch });
 
@@ -350,7 +352,7 @@ export const gitStackedRebase = async (
 		);
 
 		// fs.writeFileSync(path.join(dotGitDirPath, "ORIG_HEAD"), commitShaOfInitialBranch);
-		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-head"), commitShaOfCurrentCommit);
+		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-head"), commitShaOfCurrentCommit + "\n");
 
 		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "interactive"), "");
 
@@ -490,10 +492,20 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 
 		// const rebase = await Git.Rebase.init()
 
-		/**
-		 * TODO do not mark if nothing changed
-		 */
-		markThatNeedsToApply();
+		const commitShaOfNewCurrentCommit = await getCurrentCommit();
+		const rebaseChangedLocalHistory: boolean = commitShaOfCurrentCommit !== commitShaOfNewCurrentCommit;
+
+		console.log("");
+		console.log({
+			rebaseChangedLocalHistory, //
+			commitShaOfOldCurrentCommit: commitShaOfCurrentCommit,
+			commitShaOfNewCurrentCommit,
+		});
+		console.log("");
+
+		if (rebaseChangedLocalHistory) {
+			markThatNeedsToApply();
+		}
 
 		/**
 		 * TODO might need to always enable,
