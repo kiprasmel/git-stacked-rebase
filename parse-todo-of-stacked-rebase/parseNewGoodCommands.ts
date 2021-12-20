@@ -155,6 +155,11 @@ export function parseNewGoodCommands(
 		)
 		.filter((cmd) => !!cmd) as GoodCommand[]; // TODO TS should infer automatically
 
+	console.log({
+		["stackedRebaseCommandsOld.length"]: stackedRebaseCommandsOld.length,
+		["stackedRebaseCommandsNew.length"]: stackedRebaseCommandsNew.length,
+	});
+
 	assert(stackedRebaseCommandsOld.length === stackedRebaseCommandsNew.length);
 
 	return succ(stackedRebaseCommandsNew);

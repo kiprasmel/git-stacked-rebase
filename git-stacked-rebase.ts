@@ -745,6 +745,11 @@ async function getWantedCommitsWithBranchBoundaries(
 							});
 							/**
 							 * TODO FIXME BFS (starting from beginningBranch? since child only has 1 parent?)
+							 *
+							 * UPD: lol this will go off if e.g. we have 2 branches on the same commit,
+							 * even tho one of them has nothing to do w/ this.
+							 *
+							 * but, ofc, we don't know which one should be ignored (yet?)
 							 */
 							throw new Error(
 								"2 (or more) branches for the same commit, both in the same path - cannot continue (until explicit branch specifying is implemented)."
