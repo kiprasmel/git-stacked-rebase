@@ -6,6 +6,7 @@ import Git from "nodegit";
 import { createQuestion } from "./util/createQuestion";
 import { noop } from "./util/noop";
 
+import { configKeys } from "./configKeys";
 import {
 	BranchSequencerBase, //
 	branchSequencer,
@@ -112,8 +113,13 @@ export async function applyIfNeedsToApply({
 	repo,
 	pathToStackedRebaseTodoFile,
 	pathToStackedRebaseDirInsideDotGit, //
+	autoApplyIfNeeded,
+	config,
 	...rest
-}: BranchSequencerArgsBase): Promise<ReturnOfApplyIfNeedsToApply> {
+}: BranchSequencerArgsBase & {
+	autoApplyIfNeeded: boolean; //
+	config: Git.Config;
+}): Promise<ReturnOfApplyIfNeedsToApply> {
 	/**
 	 * currently we're not saving the branch names
 	 * & where they point to etc.,
@@ -137,20 +143,30 @@ export async function applyIfNeedsToApply({
 	}
 
 	if (needsToApply) {
-		const question = createQuestion();
+		if (!autoApplyIfNeeded) {
+			const question = createQuestion();
 
-		const answerRaw: string = await question("\nneed to --apply before continuing. proceed? [Y/n] ");
-		console.log({ answerRaw });
+			const answerRaw: string = await question("\nneed to --apply before continuing. proceed? [Y/n/(a)lways] ");
+			console.log({ answerRaw });
 
-		const userAllowedToApply: boolean = ["y", "yes", ""].includes(answerRaw.trim().toLowerCase());
-		console.log({ userAllowedToApply });
+			const answer: string = answerRaw.trim().toLowerCase();
 
-		if (!userAllowedToApply) {
-			return {
-				neededToApply: true,
-				userAllowedToApply: false,
-				markThatNeedsToApply,
-			};
+			const userAllowedToApply: boolean = ["y", "yes", ""].includes(answer);
+			console.log({ userAllowedToApply });
+
+			const userAllowedToApplyAlways: boolean = ["a", "always"].includes(answer);
+
+			if (!userAllowedToApply && !userAllowedToApplyAlways) {
+				return {
+					neededToApply: true,
+					userAllowedToApply: false,
+					markThatNeedsToApply,
+				};
+			}
+
+			if (userAllowedToApplyAlways) {
+				await config.setBool(configKeys.autoApplyIfNeeded, 1);
+			}
 		}
 
 		await apply({

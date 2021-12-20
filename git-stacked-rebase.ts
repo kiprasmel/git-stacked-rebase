@@ -9,7 +9,7 @@ import path from "path";
 import assert from "assert";
 import { bullets } from "nice-comment";
 
-import { exec } from "child_process";
+import { configKeys } from "./configKeys";
 import { apply, applyIfNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 
@@ -39,68 +39,24 @@ export type OptionsForGitStackedRebase = {
 	apply: boolean;
 	push: boolean;
 	forcePush: boolean;
-
-	gpgSign: boolean | string;
 };
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
 
 /**
  * TODO abstract into additional "getValueFromGitConfigLocalOrGlobal"
+ * TODO v2 - lol nvm just use Git lmao. will need to extract `repoPath`
  */
-const getDefaultOptions = (): Promise<OptionsForGitStackedRebase> =>
-	new Promise((resolve, reject) => {
-		exec(`/usr/bin/env git config --get commit.gpgSign`, (err1, stdout1) => {
-			const base: Omit<OptionsForGitStackedRebase, "gpgSign"> = {
-				repoPath: ".", //
-				editor: process.env.EDITOR ?? "vi",
-				gitCmd: process.env.GIT_CMD ?? "/usr/bin/env git",
-				editTodo: false,
-				viewTodoOnly: false,
-				apply: false,
-				push: false,
-				forcePush: false,
-			};
-
-			const returnBasedOnStdout = (stdout: string /* from: string */) => {
-				if (stdout.trim() === "true") {
-					return resolve({ ...base, gpgSign: true /*, from */ } /* as any */);
-				} else if (stdout.trim() === "false") {
-					return resolve({ ...base, gpgSign: false /*, from */ } /* as any */);
-				} else {
-					reject();
-				}
-			};
-
-			if (!err1) {
-				/**
-				 * upd: apparently, for commit.gpgSign, git always returns
-				 * the value from the global config (if local one isn't present),
-				 * so this is actually the only necessary call
-				 * and the deeper one is not,
-				 * but i'll keep because we'll likely need to get values
-				 * from both local & global configs.
-				 */
-				return returnBasedOnStdout(stdout1);
-			} else {
-				if (err1.code !== 1) {
-					return reject(err1);
-				} else {
-					exec(`/usr/bin/env git config --global --get commit.gpgSign`, (err2, stdout2) => {
-						if (!err2) {
-							return returnBasedOnStdout(stdout2);
-						} else {
-							if (err2.code !== 1) {
-								return reject(err2);
-							} else {
-								return resolve({ ...base, gpgSign: false });
-							}
-						}
-					});
-				}
-			}
-		});
-	});
+const getDefaultOptions = (): OptionsForGitStackedRebase => ({
+	repoPath: ".", //
+	editor: process.env.EDITOR ?? "vi",
+	gitCmd: process.env.GIT_CMD ?? "/usr/bin/env git",
+	editTodo: false,
+	viewTodoOnly: false,
+	apply: false,
+	push: false,
+	forcePush: false,
+});
 
 function areOptionsIncompetible(
 	options: OptionsForGitStackedRebase, //
@@ -126,7 +82,7 @@ export const gitStackedRebase = async (
 ): Promise<EitherExitFinal> => {
 	try {
 		const options: OptionsForGitStackedRebase = {
-			...(await getDefaultOptions()), //
+			...getDefaultOptions(), //
 			...removeUndefinedProperties(specifiedOptions),
 		};
 		console.log({ options });
@@ -146,6 +102,16 @@ export const gitStackedRebase = async (
 		}
 
 		const repo = await Git.Repository.open(options.repoPath);
+		const config = await Git.Config.openDefault();
+
+		const configValues = {
+			gpgSign: !!(await config.getBool(configKeys.gpgSign).catch(() => 0)),
+			autoApplyIfNeeded: !!(await config.getBool(configKeys.autoApplyIfNeeded).catch(() => 0)),
+		} as const;
+
+		console.log({ configValues });
+
+		// if (process.env.QUIT) return;
 
 		const execSyncInRepo = createExecSyncInRepo(repo);
 
@@ -214,6 +180,8 @@ export const gitStackedRebase = async (
 			pathToStackedRebaseDirInsideDotGit, //
 			rootLevelCommandName: "--apply",
 			gitCmd: options.gitCmd,
+			autoApplyIfNeeded: configValues.autoApplyIfNeeded,
+			config,
 		});
 
 		if (neededToApply && !userAllowedToApply) {
@@ -395,8 +363,8 @@ export const gitStackedRebase = async (
 
 		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "msgnum"), "1");
 
-		if (options.gpgSign) {
-			const gpgSignOpt = typeof options.gpgSign === "string" ? options.gpgSign : "-S";
+		if (configValues.gpgSign) {
+			const gpgSignOpt = "-S" as const;
 			fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "gpg_sign_opt"), gpgSignOpt);
 		}
 
@@ -522,7 +490,28 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 
 		// const rebase = await Git.Rebase.init()
 
+		/**
+		 * TODO do not mark if nothing changed
+		 */
 		markThatNeedsToApply();
+
+		/**
+		 * TODO might need to always enable,
+		 * but before more testing,
+		 * optional is good, since we ask anyway
+		 * before proceeding w/ other commands way above.
+		 */
+		if (configValues.autoApplyIfNeeded) {
+			await applyIfNeedsToApply({
+				repo,
+				pathToStackedRebaseTodoFile,
+				pathToStackedRebaseDirInsideDotGit, //
+				rootLevelCommandName: "--apply",
+				gitCmd: options.gitCmd,
+				autoApplyIfNeeded: configValues.autoApplyIfNeeded,
+				config,
+			});
+		}
 
 		return;
 	} catch (e) {
