@@ -20,7 +20,9 @@ export const apply: BranchSequencerBase = (args) =>
 		actionInsideEachCheckedOutBranch: defaultApplyAction,
 		// callbackAfterDone: defaultApplyCallback,
 		delayMsBetweenCheckouts: 0,
-	});
+	}).then(
+		(ret) => (unmarkThatNeedsToApply(args.pathToStackedRebaseDirInsideDotGit), ret) //
+	);
 
 const defaultApplyAction: ActionInsideEachCheckedOutBranch = async ({
 	repo, //
@@ -96,6 +98,16 @@ export type ReturnOfApplyIfNeedsToApply =
 			markThatNeedsToApply: () => void;
 	  };
 
+const filenameOfNeedsToApply = "needs-to-apply" as const;
+
+const getPathOfFilenameOfNeedsToApply = (pathToStackedRebaseDirInsideDotGit: string): string =>
+	path.join(pathToStackedRebaseDirInsideDotGit, filenameOfNeedsToApply);
+
+export const unmarkThatNeedsToApply = (
+	pathToStackedRebaseDirInsideDotGit: string,
+	mark = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit)
+): void => (fs.existsSync(mark) ? fs.unlinkSync(mark) : void 0);
+
 export async function applyIfNeedsToApply({
 	repo,
 	pathToStackedRebaseTodoFile,
@@ -112,7 +124,7 @@ export async function applyIfNeedsToApply({
 	 * automatically --apply'ing (when needed) should do just fine.
 	 *
 	 */
-	const pathToFileIndicatingThatNeedsToApply = path.join(pathToStackedRebaseDirInsideDotGit, "needs-to-apply");
+	const pathToFileIndicatingThatNeedsToApply = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 	const needsToApply: boolean = fs.existsSync(pathToFileIndicatingThatNeedsToApply);
 
 	const markThatNeedsToApply = (): void => fs.writeFileSync(pathToFileIndicatingThatNeedsToApply, "");
@@ -148,7 +160,7 @@ export async function applyIfNeedsToApply({
 			...rest,
 		});
 
-		fs.unlinkSync(pathToFileIndicatingThatNeedsToApply);
+		unmarkThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 	}
 
 	return {
