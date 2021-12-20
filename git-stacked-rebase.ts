@@ -9,6 +9,7 @@ import path from "path";
 import assert from "assert";
 import { bullets } from "nice-comment";
 
+import { exec } from "child_process";
 import { apply, applyIfNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 
@@ -38,20 +39,68 @@ export type OptionsForGitStackedRebase = {
 	apply: boolean;
 	push: boolean;
 	forcePush: boolean;
+
+	gpgSign: boolean | string;
 };
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
 
-const getDefaultOptions = (): OptionsForGitStackedRebase => ({
-	repoPath: ".", //
-	editor: process.env.EDITOR ?? "vi",
-	gitCmd: process.env.GIT_CMD ?? "/usr/bin/env git",
-	editTodo: false,
-	viewTodoOnly: false,
-	apply: false,
-	push: false,
-	forcePush: false,
-});
+/**
+ * TODO abstract into additional "getValueFromGitConfigLocalOrGlobal"
+ */
+const getDefaultOptions = (): Promise<OptionsForGitStackedRebase> =>
+	new Promise((resolve, reject) => {
+		exec(`/usr/bin/env git config --get commit.gpgSign`, (err1, stdout1) => {
+			const base: Omit<OptionsForGitStackedRebase, "gpgSign"> = {
+				repoPath: ".", //
+				editor: process.env.EDITOR ?? "vi",
+				gitCmd: process.env.GIT_CMD ?? "/usr/bin/env git",
+				editTodo: false,
+				viewTodoOnly: false,
+				apply: false,
+				push: false,
+				forcePush: false,
+			};
+
+			const returnBasedOnStdout = (stdout: string /* from: string */) => {
+				if (stdout.trim() === "true") {
+					return resolve({ ...base, gpgSign: true /*, from */ } /* as any */);
+				} else if (stdout.trim() === "false") {
+					return resolve({ ...base, gpgSign: false /*, from */ } /* as any */);
+				} else {
+					reject();
+				}
+			};
+
+			if (!err1) {
+				/**
+				 * upd: apparently, for commit.gpgSign, git always returns
+				 * the value from the global config (if local one isn't present),
+				 * so this is actually the only necessary call
+				 * and the deeper one is not,
+				 * but i'll keep because we'll likely need to get values
+				 * from both local & global configs.
+				 */
+				return returnBasedOnStdout(stdout1);
+			} else {
+				if (err1.code !== 1) {
+					return reject(err1);
+				} else {
+					exec(`/usr/bin/env git config --global --get commit.gpgSign`, (err2, stdout2) => {
+						if (!err2) {
+							return returnBasedOnStdout(stdout2);
+						} else {
+							if (err2.code !== 1) {
+								return reject(err2);
+							} else {
+								return resolve({ ...base, gpgSign: false });
+							}
+						}
+					});
+				}
+			}
+		});
+	});
 
 function areOptionsIncompetible(
 	options: OptionsForGitStackedRebase, //
@@ -77,7 +126,7 @@ export const gitStackedRebase = async (
 ): Promise<EitherExitFinal> => {
 	try {
 		const options: OptionsForGitStackedRebase = {
-			...getDefaultOptions(), //
+			...(await getDefaultOptions()), //
 			...removeUndefinedProperties(specifiedOptions),
 		};
 		console.log({ options });
@@ -345,6 +394,11 @@ export const gitStackedRebase = async (
 		);
 
 		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "msgnum"), "1");
+
+		if (options.gpgSign) {
+			const gpgSignOpt = typeof options.gpgSign === "string" ? options.gpgSign : "-S";
+			fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "gpg_sign_opt"), gpgSignOpt);
+		}
 
 		/**
 		 * end rebase initial setup.
