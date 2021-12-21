@@ -84,18 +84,18 @@ noop(defaultApplyCallback__disabled);
 export type ReturnOfApplyIfNeedsToApply =
 	| {
 			neededToApply: false;
-			userAllowedToApply?: never;
+			userAllowedToApplyAndWeApplied?: never;
 			markThatNeedsToApply: () => void;
 	  }
 	| {
 			neededToApply: true;
-			userAllowedToApply: false;
+			userAllowedToApplyAndWeApplied: false;
 			// markThatNeedsToApply?: never; // TODO TS infer auto - force code owner to exit
 			markThatNeedsToApply: () => void;
 	  }
 	| {
 			neededToApply: true;
-			userAllowedToApply: true;
+			userAllowedToApplyAndWeApplied: true;
 			markThatNeedsToApply: () => void;
 	  };
 
@@ -159,7 +159,7 @@ export async function applyIfNeedsToApply({
 			if (!userAllowedToApply && !userAllowedToApplyAlways) {
 				return {
 					neededToApply: true,
-					userAllowedToApply: false,
+					userAllowedToApplyAndWeApplied: false,
 					markThatNeedsToApply,
 				};
 			}
@@ -181,7 +181,7 @@ export async function applyIfNeedsToApply({
 
 	return {
 		neededToApply: true,
-		userAllowedToApply: true, //
+		userAllowedToApplyAndWeApplied: true, //
 		markThatNeedsToApply,
 	};
 }

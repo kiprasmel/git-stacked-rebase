@@ -174,7 +174,7 @@ export const gitStackedRebase = async (
 			});
 		}
 
-		const { neededToApply, userAllowedToApply, markThatNeedsToApply } = await applyIfNeedsToApply({
+		const { neededToApply, userAllowedToApplyAndWeApplied, markThatNeedsToApply } = await applyIfNeedsToApply({
 			repo,
 			pathToStackedRebaseTodoFile,
 			pathToStackedRebaseDirInsideDotGit, //
@@ -184,7 +184,7 @@ export const gitStackedRebase = async (
 			config,
 		});
 
-		if (neededToApply && !userAllowedToApply) {
+		if (neededToApply && !userAllowedToApplyAndWeApplied) {
 			return;
 		}
 
