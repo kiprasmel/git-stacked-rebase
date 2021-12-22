@@ -23,7 +23,7 @@ import { namesOfRebaseCommandsThatMakeRebaseExitToPause } from "./parse-todo-of-
 // console.log = () => {};
 
 export type OptionsForGitStackedRebase = {
-	repoPath: string;
+	gitDir: string;
 
 	/**
 	 * editor name, or a function that opens the file inside some editor.
@@ -44,12 +44,8 @@ export type OptionsForGitStackedRebase = {
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
 
-/**
- * TODO abstract into additional "getValueFromGitConfigLocalOrGlobal"
- * TODO v2 - lol nvm just use Git lmao. will need to extract `repoPath`
- */
 const getDefaultOptions = (): OptionsForGitStackedRebase => ({
-	repoPath: ".", //
+	gitDir: ".", //
 	editor: process.env.EDITOR ?? "vi",
 	gitCmd: process.env.GIT_CMD ?? "/usr/bin/env git",
 	viewTodoOnly: false,
@@ -100,7 +96,7 @@ export const gitStackedRebase = async (
 			);
 		}
 
-		const repo = await Git.Repository.open(options.repoPath);
+		const repo = await Git.Repository.open(options.gitDir);
 		const config = await Git.Config.openDefault();
 
 		const configValues = {
@@ -981,12 +977,14 @@ git-stacked-rebase <branch> <repo_path=.> [-v|--view-todo|--view-only]
     3. after viewing/editing, will remove the .tmp directory.
 
 
+git-stacked-rebase [...] --git-dir <path/to/git/dir/> [...]
+
+    makes git-stacked-rebase begin operating inside the specified directory.
+
+
 git-stacked-rebase [...] -V|--version [...]
 git-stacked-rebase [...] -h|--help    [...]
 
-
-note: 'repo_path' will soon become optional (w/ a flag)
-       when we fix the arg parsing.
 
 git-stacked-rebase ${gitStackedRebaseVersionStr}
 `.replace(/\t/g, " ".repeat(4));
@@ -1006,15 +1004,47 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	const peakNextArg = (): string | undefined => process.argv[0];
 	const eatNextArg = (): string | undefined => process.argv.shift();
 
+	const eatValueOfNonPositionalArg = (
+		argNameAndAliases: string[],
+		// argName: string | undefined = undefined,
+		indexOfArgVal: number | undefined = undefined,
+		argVal: string | undefined = undefined
+	): typeof argVal => (
+		(process.argv = process.argv
+			.map((arg, i, args) =>
+				i === indexOfArgVal
+					? false
+					: argNameAndAliases.includes(arg)
+					? // ? (((argName = arg), (indexOfArgVal = i + 1), (argVal = args[i + 1])), false)
+					  ((indexOfArgVal = i + 1), (argVal = args[i + 1]), false)
+					: arg
+			)
+			.filter((arg) => arg !== false) as string[]),
+		argVal
+	);
+
+	/**
+	 * need to read & get rid of non-positional args & their values first.
+	 */
+
+	/**
+	 * TODO use value directly from git's `git --git-dir` if possible?
+	 * (to get the default, probably)
+	 */
+	const gitDir: string | undefined = eatValueOfNonPositionalArg(["--git-dir", "--gd"]);
+
+	/**
+	 * and now off to positional args.
+	 */
+	console.log({ "process.argv after non-positional": process.argv });
+
 	const nameOfInitialBranch: string | undefined = eatNextArg();
 	if (!nameOfInitialBranch) return fail(helpMsg);
-
-	const repoPath = eatNextArg();
 
 	/**
 	 * TODO: improve arg parsing, lmao
 	 */
-	const third = peakNextArg();
+	const second = peakNextArg();
 
 	/**
 	 * `isViewTodoOnly` is safe because the decision of using the .tmp directory or not
@@ -1031,20 +1061,13 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	 * in the library code as well (TODO check all incompatible options).
 	 *
 	 */
-	const isViewTodoOnly: boolean = !!third && ["--view-todo", "-v", "--view-only", "--view-todo-only"].includes(third);
-	const isApply: boolean = !!third && ["--apply", "-a"].includes(third);
-	const isPush: boolean = !!third && ["--push", "-p"].includes(third);
+	const isViewTodoOnly: boolean =
+		!!second && ["--view-todo", "-v", "--view-only", "--view-todo-only"].includes(second);
+	const isApply: boolean = !!second && ["--apply", "-a"].includes(second);
+	const isPush: boolean = !!second && ["--push", "-p"].includes(second);
 
-	let parsedThird = !third;
-	if (third && !isViewTodoOnly && !isApply && !isPush) {
-		parsedThird = false;
-	} else {
-		parsedThird = true;
+	if (isViewTodoOnly || isApply || isPush) {
 		eatNextArg();
-	}
-
-	if (!parsedThird) {
-		return fail("\nunrecognized 3rd option\n\n");
 	}
 
 	let isForcePush: boolean = false;
@@ -1068,7 +1091,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	}
 
 	const options: SomeOptionsForGitStackedRebase = {
-		repoPath,
+		gitDir,
 		viewTodoOnly: isViewTodoOnly,
 		apply: isApply,
 		push: isPush,
