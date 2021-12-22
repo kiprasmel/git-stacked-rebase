@@ -36,7 +36,6 @@ export type OptionsForGitStackedRebase = {
 	 */
 	gitCmd: string;
 
-	editTodo: boolean;
 	viewTodoOnly: boolean;
 	apply: boolean;
 	push: boolean;
@@ -53,7 +52,6 @@ const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	repoPath: ".", //
 	editor: process.env.EDITOR ?? "vi",
 	gitCmd: process.env.GIT_CMD ?? "/usr/bin/env git",
-	editTodo: false,
 	viewTodoOnly: false,
 	apply: false,
 	push: false,
@@ -65,7 +63,6 @@ function areOptionsIncompetible(
 	reasons: string[] = []
 ): boolean {
 	if (options.viewTodoOnly) {
-		if (options.editTodo) reasons.push("--edit-todo cannot be used together with --view-todo");
 		if (options.apply) reasons.push("--apply cannot be used together with --view-todo");
 		if (options.push) reasons.push("--apply cannot be used together with --push");
 		if (options.forcePush) reasons.push("--apply cannot be used together with --push -f");
@@ -227,7 +224,7 @@ export const gitStackedRebase = async (
 			);
 		}
 
-		if (!wasRegularRebaseInProgress || options.editTodo || options.viewTodoOnly) {
+		if (!wasRegularRebaseInProgress || options.viewTodoOnly) {
 			if (options.editor instanceof Function) {
 				await options.editor({ filePath: pathToStackedRebaseTodoFile });
 			} else {
@@ -958,26 +955,18 @@ export async function git_stacked_rebase(): Promise<EitherExitFinal> {
 
 git-stacked-rebase <branch> <repo_path=.>
 
-    ~~if first invocation,~~ acts the same as --edit-todo.
-        TODO FIXME:
-        --edit-todo should not re-generate the todo
-        (only if no rebase in progress? seems bad for the mental model)
-        (perhaps --apply should not exist)
-
-
-git-stacked-rebase <branch> <repo_path=.> [-e|--edit-todo]
-
-    1. will edit the todo & will execute the rebase (in the latest branch),
+    1. will edit/create the todo & will execute the interactive rebase (in the latest branch),
     2. but will not apply the changes to partial branches until --apply is used.
 
 
 git-stacked-rebase <branch> <repo_path=.> [-a|--apply]
 
-    will apply the changes from the latest branch
-    to all partial branches (currently, using 'git reset --hard').
+    1. will apply the changes from the latest branch
+       to all partial branches (currently, using 'git reset --hard'),
+	2. but wil not push the partial branches to a remote until --push --force is used.
 
 
-git-stacked-rebase <branch> <repo_path=.> [--push -f]
+git-stacked-rebase <branch> <repo_path=.> [--push|-p --force|-f]
 
     will checkout each branch and will push --force.
     will NOT have any effect if --apply was not used yet.
@@ -1043,12 +1032,11 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	 *
 	 */
 	const isViewTodoOnly: boolean = !!third && ["--view-todo", "-v", "--view-only", "--view-todo-only"].includes(third);
-	const isEditTodo: boolean = !!third && ["--edit-todo", "-e"].includes(third as string);
 	const isApply: boolean = !!third && ["--apply", "-a"].includes(third);
 	const isPush: boolean = !!third && ["--push", "-p"].includes(third);
 
 	let parsedThird = !third;
-	if (third && !isEditTodo && !isViewTodoOnly && !isApply && !isPush) {
+	if (third && !isViewTodoOnly && !isApply && !isPush) {
 		parsedThird = false;
 	} else {
 		parsedThird = true;
@@ -1081,7 +1069,6 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 
 	const options: SomeOptionsForGitStackedRebase = {
 		repoPath,
-		editTodo: isEditTodo,
 		viewTodoOnly: isViewTodoOnly,
 		apply: isApply,
 		push: isPush,
