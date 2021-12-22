@@ -956,49 +956,41 @@ export async function git_stacked_rebase(): Promise<EitherExitFinal> {
 
 	const helpMsg = `\
 
-git-stacked-rebase <branch> [<repo_path=.>                      (~~if first invocation,~~ acts the same as --edit-todo).
-                                                                    TODO FIXME:
-                                                                    --edit-todo should not re-generate the todo
-                                                                    (only if no rebase in progress? seems bad for the mental model)
-                                                                    (perhaps --apply should not exist).
+git-stacked-rebase <branch> <repo_path=.>
 
-git-stacked-rebase <branch> [<repo_path=.> [-e|--edit-todo]]    (1. will edit the todo & will execute the rebase
-                                                                    (in the latest branch),
-                                                                 2. but will not apply the changes to partial branches
-                                                                    until --apply is used).
-
-git-stacked-rebase <branch> [<repo_path=.> [-v|--view-todo|--view-only]]
-                                                                (1. will make git-stacked-rebase work inside a separate, .tmp directory,
-                                                                    to allow viewing/editing (w/o affecting the actual todo
-                                                                    nor any subsequent runs that might happen later),
-                                                                 2. will NOT execute the rebase,
-                                                                 3. after viewing/editing, will remove the .tmp directory).
-
-                                                                 this is safe because the decision of using the .tmp directory or not
-                                                                 is decided purely by this option,
-                                                                 and **it's impossible to have more options** that would 
-                                                                 have side effects for the git repository
-                                                                 (because git-stacked-rebase would be working in the same .tmp directory).
-
-                                                                 i.e. if --view-todo is specified, then another option,
-                                                                 such as --edit-todo, or --apply, cannot be specified,
-                                                                 because all of these options are positional
-                                                                 & are the 3rd argument.
-                                                                 additionally, gitStackedRebase checks for these incompatible options
-                                                                 in the library code as well (TODO check all incompatible options)
-                                                                 ).
+    ~~if first invocation,~~ acts the same as --edit-todo.
+        TODO FIXME:
+        --edit-todo should not re-generate the todo
+        (only if no rebase in progress? seems bad for the mental model)
+        (perhaps --apply should not exist)
 
 
-git-stacked-rebase <branch> [<repo_path=.> [-a|--apply]]        (will apply the changes
-                                                                 from the latest branch
-                                                                 to all partial branches
-                                                                 (currently, using 'git reset --hard')).
+git-stacked-rebase <branch> <repo_path=.> [-e|--edit-todo]
 
-git-stacked-rebase <branch> [<repo_path=.> [--push -f]]         (will checkout each branch
-                                                                 and will push --force.
+    1. will edit the todo & will execute the rebase (in the latest branch),
+    2. but will not apply the changes to partial branches until --apply is used.
 
-                                                                 will NOT have any effect
-                                                                 if --apply was not used yet).
+
+git-stacked-rebase <branch> <repo_path=.> [-a|--apply]
+
+    will apply the changes from the latest branch
+    to all partial branches (currently, using 'git reset --hard').
+
+
+git-stacked-rebase <branch> <repo_path=.> [--push -f]
+
+    will checkout each branch and will push --force.
+    will NOT have any effect if --apply was not used yet.
+
+
+git-stacked-rebase <branch> <repo_path=.> [-v|--view-todo|--view-only]
+
+    1. will make git-stacked-rebase work inside a separate, .tmp directory,
+        to allow viewing/editing (w/o affecting the actual todo
+        nor any subsequent runs that might happen later),
+    2. will NOT execute the rebase,
+    3. after viewing/editing, will remove the .tmp directory.
+
 
 git-stacked-rebase [...] -V|--version [...]
 git-stacked-rebase [...] -h|--help    [...]
@@ -1008,7 +1000,7 @@ note: 'repo_path' will soon become optional (w/ a flag)
        when we fix the arg parsing.
 
 git-stacked-rebase ${gitStackedRebaseVersionStr}
-                ` as const;
+`.replace(/\t/g, " ".repeat(4));
 
 	if (process.argv.some((arg) => ["-h", "--help"].includes(arg))) {
 		process.stdout.write(helpMsg);
@@ -1035,8 +1027,23 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	 */
 	const third = peakNextArg();
 
-	const isEditTodo: boolean = !!third && ["--edit-todo", "-e"].includes(third as string);
+	/**
+	 * `isViewTodoOnly` is safe because the decision of using the .tmp directory or not
+	 * is decided purely by this option,
+	 * and **it's impossible to have more options** that would
+	 * have side effects for the git repository
+	 * (because git-stacked-rebase would be working in the same .tmp directory).
+	 *
+	 * i.e. if --view-todo is specified, then another option,
+	 * such as --edit-todo, or --apply, cannot be specified,
+	 * because all of these options are positional
+	 * & are the 3rd argument.
+	 * additionally, gitStackedRebase checks for these incompatible options
+	 * in the library code as well (TODO check all incompatible options).
+	 *
+	 */
 	const isViewTodoOnly: boolean = !!third && ["--view-todo", "-v", "--view-only", "--view-todo-only"].includes(third);
+	const isEditTodo: boolean = !!third && ["--edit-todo", "-e"].includes(third as string);
 	const isApply: boolean = !!third && ["--apply", "-a"].includes(third);
 	const isPush: boolean = !!third && ["--push", "-p"].includes(third);
 
