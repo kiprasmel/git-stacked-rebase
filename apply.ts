@@ -6,6 +6,7 @@ import Git from "nodegit";
 import { createQuestion } from "./util/createQuestion";
 import { noop } from "./util/noop";
 
+import { filenames } from "./filenames";
 import { configKeys } from "./configKeys";
 import {
 	BranchSequencerBase, //
@@ -107,10 +108,11 @@ const getPathOfFilenameOfNeedsToApply = (pathToStackedRebaseDirInsideDotGit: str
 export const unmarkThatNeedsToApply = (
 	pathToStackedRebaseDirInsideDotGit: string,
 	mark = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit),
-	rewrittenListFile: string = path.join(pathToStackedRebaseDirInsideDotGit, "rewritten-list")
+	rewrittenListFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenList),
+	rewrittenListAppliedFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenListApplied)
 ): void => (
 	fs.existsSync(mark) && fs.unlinkSync(mark),
-	fs.existsSync(rewrittenListFile) && fs.renameSync(rewrittenListFile, rewrittenListFile + ".applied"),
+	fs.existsSync(rewrittenListFile) && fs.renameSync(rewrittenListFile, rewrittenListAppliedFile),
 	void 0
 );
 

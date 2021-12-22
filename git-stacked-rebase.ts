@@ -9,6 +9,7 @@ import path from "path";
 import assert from "assert";
 import { bullets } from "nice-comment";
 
+import { filenames } from "./filenames";
 import { configKeys } from "./configKeys";
 import { apply, applyIfNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
@@ -415,10 +416,10 @@ export const gitStackedRebase = async (
 #DIR="\${BASH_SOURCE[0]}"
 #REBASE_MERGE_DIR="$(realpath "$DIR/../rebase-merge")"
 REBASE_MERGE_DIR="$(pwd)/.git/rebase-merge"
-REWRITTEN_LIST_FILE_PATH="$REBASE_MERGE_DIR/rewritten-list"
+REWRITTEN_LIST_FILE_PATH="$REBASE_MERGE_DIR/${filenames.rewrittenList}"
 
 STACKED_REBASE_DIR="$(pwd)/.git/stacked-rebase"
-REWRITTEN_LIST_BACKUP_FILE_PATH="$STACKED_REBASE_DIR/rewritten-list"
+REWRITTEN_LIST_BACKUP_FILE_PATH="$STACKED_REBASE_DIR/${filenames.rewrittenList}"
 
 #echo "REBASE_MERGE_DIR $REBASE_MERGE_DIR; STACKED_REBASE_DIR $STACKED_REBASE_DIR;"
 
@@ -549,7 +550,7 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 			 *
 			 */
 			const canAndShouldBeApplying: boolean =
-				/** part 1 */ fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, "rewritten-list")) &&
+				/** part 1 */ fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenList)) &&
 				/** part 2 (incomplete?) */ !fs.existsSync(pathToRegularRebaseDirInsideDotGit) &&
 				/** part 2 (complete?) (is this even needed?) */ goodCommands.every(
 					(cmd) => !namesOfRebaseCommandsThatMakeRebaseExitToPause.includes(cmd.commandName)

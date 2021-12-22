@@ -3,6 +3,8 @@ import assert from "assert";
 
 import Git from "nodegit";
 
+import { filenames } from "./filenames";
+
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { EitherExitFinal, fail } from "./util/Exitable";
 
@@ -52,7 +54,7 @@ export type BranchSequencerArgs = BranchSequencerArgsBase & {
 	actionInsideEachCheckedOutBranch: ActionInsideEachCheckedOutBranch;
 	delayMsBetweenCheckouts?: number;
 	callbackAfterDone?: CallbackAfterDone;
-	rewrittenListFile?: "rewritten-list" | "rewritten-list.applied";
+	rewrittenListFile?: typeof filenames.rewrittenList | typeof filenames.rewrittenListApplied;
 };
 
 export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<EitherExitFinal>;
@@ -68,7 +70,7 @@ export const branchSequencer: BranchSequencer = async ({
 	// callbackBeforeBegin,
 	actionInsideEachCheckedOutBranch,
 	callbackAfterDone = (): void => {},
-	rewrittenListFile = "rewritten-list",
+	rewrittenListFile = filenames.rewrittenList,
 }) => {
 	if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) {
 		return fail(`\n\nno stacked-rebase in progress? (nothing to ${rootLevelCommandName})\n\n`);
