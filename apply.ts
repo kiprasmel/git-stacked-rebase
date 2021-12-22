@@ -140,7 +140,16 @@ export async function applyIfNeedsToApply({
 	const pathToFileIndicatingThatNeedsToApply = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 	const needsToApply: boolean = fs.existsSync(pathToFileIndicatingThatNeedsToApply);
 
-	const markThatNeedsToApply = (): void => fs.writeFileSync(pathToFileIndicatingThatNeedsToApply, "");
+	const pathToAppliedRewrittenListFile = path.join(
+		pathToStackedRebaseDirInsideDotGit,
+		filenames.rewrittenListApplied
+	);
+
+	const markThatNeedsToApply = (): void => (
+		fs.writeFileSync(pathToFileIndicatingThatNeedsToApply, ""),
+		fs.existsSync(pathToAppliedRewrittenListFile) && fs.unlinkSync(pathToAppliedRewrittenListFile),
+		void 0
+	);
 
 	if (!needsToApply) {
 		return {
