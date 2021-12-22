@@ -1086,5 +1086,6 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 
 if (!module.parent) {
 	git_stacked_rebase() //
-		.then(processWriteAndOrExit);
+		.then(processWriteAndOrExit)
+		.catch((e) => (console.error(e), process.exit(1)));
 }
