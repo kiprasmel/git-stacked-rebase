@@ -17,6 +17,7 @@ import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
 import { processWriteAndOrExit, fail, EitherExitFinal } from "./util/Exitable";
+import { namesOfRebaseCommandsThatMakeRebaseExitToPause } from "./parse-todo-of-stacked-rebase/validator";
 
 // console.log = () => {};
 
@@ -514,15 +515,57 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		 * before proceeding w/ other commands way above.
 		 */
 		if (configValues.autoApplyIfNeeded) {
-			await applyIfNeedsToApply({
-				repo,
-				pathToStackedRebaseTodoFile,
-				pathToStackedRebaseDirInsideDotGit, //
-				rootLevelCommandName: "--apply",
-				gitCmd: options.gitCmd,
-				autoApplyIfNeeded: configValues.autoApplyIfNeeded,
-				config,
-			});
+			/**
+			 * since we're invoking `git rebase --continue` directly (above),
+			 * we do not have the control over it.
+			 *
+			 * meaning that in case it's the very first rebase,
+			 * the `rewritten-list` in `.git/rebase-merge/`
+			 * (the actual git-rebase, not ours)
+			 * file is not generated yet,
+			 *
+			 * and since we depend on the `git rebase --continue` (the regular rebase)
+			 * to generate the `rewritten-list` file,
+			 * we explode trying to read the file if we try to --apply below.
+			 *
+			 * ---
+			 *
+			 * edit: oh wait nvm, it's potentially any rebase that has
+			 * `break` or `edit` or similar right??
+			 *
+			 * because if the git-rebase-todo file has `break` or `edit`
+			 * or similar commands that make `git rebase --continue` exit
+			 * before it's fully completed, (my theory now is that) our code here proceeds
+			 * and tries to --apply, but again the rewritten-list file
+			 * doesn't exist yet, so we blow up.
+			 *
+			 * ---
+			 *
+			 * let's try to account for only the 1st scenario first.
+			 * TODO implement directly in `--apply`
+			 * (e.g. if user calls `gitStackedRebase` again, while still in a rebase)
+			 *
+			 * upd: ok let's also do the 2nd one because it's useless otherwise
+			 *
+			 */
+			const canApply: boolean =
+				/** part 1 */ fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, "rewritten-list")) &&
+				/** part 2 (incomplete?) */ !fs.existsSync(pathToRegularRebaseDirInsideDotGit) &&
+				/** part 2 (complete?) (is this even needed?) */ goodCommands.every(
+					(cmd) => !namesOfRebaseCommandsThatMakeRebaseExitToPause.includes(cmd.commandName)
+				);
+
+			if (canApply) {
+				await applyIfNeedsToApply({
+					repo,
+					pathToStackedRebaseTodoFile,
+					pathToStackedRebaseDirInsideDotGit, //
+					rootLevelCommandName: "--apply",
+					gitCmd: options.gitCmd,
+					autoApplyIfNeeded: configValues.autoApplyIfNeeded,
+					config,
+				});
+			}
 		}
 
 		return;

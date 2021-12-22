@@ -81,6 +81,16 @@ const defaultApplyCallback__disabled: CallbackAfterDone = ({
 };
 noop(defaultApplyCallback__disabled);
 
+/**
+ *
+ */
+
+//
+
+/**
+ *
+ */
+
 export type ReturnOfApplyIfNeedsToApply =
 	| {
 			neededToApply: false;
@@ -106,8 +116,13 @@ const getPathOfFilenameOfNeedsToApply = (pathToStackedRebaseDirInsideDotGit: str
 
 export const unmarkThatNeedsToApply = (
 	pathToStackedRebaseDirInsideDotGit: string,
-	mark = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit)
-): void => (fs.existsSync(mark) ? fs.unlinkSync(mark) : void 0);
+	mark = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit),
+	rewrittenListFile: string = path.join(pathToStackedRebaseDirInsideDotGit, "rewritten-list")
+): void => (
+	fs.existsSync(mark) && fs.unlinkSync(mark),
+	fs.existsSync(rewrittenListFile) && fs.renameSync(rewrittenListFile, rewrittenListFile + ".will-be-outdated"),
+	void 0
+);
 
 export async function applyIfNeedsToApply({
 	repo,
