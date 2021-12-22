@@ -52,6 +52,7 @@ export type BranchSequencerArgs = BranchSequencerArgsBase & {
 	actionInsideEachCheckedOutBranch: ActionInsideEachCheckedOutBranch;
 	delayMsBetweenCheckouts?: number;
 	callbackAfterDone?: CallbackAfterDone;
+	rewrittenListFile?: "rewritten-list" | "rewritten-list.applied";
 };
 
 export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<EitherExitFinal>;
@@ -67,12 +68,13 @@ export const branchSequencer: BranchSequencer = async ({
 	// callbackBeforeBegin,
 	actionInsideEachCheckedOutBranch,
 	callbackAfterDone = (): void => {},
+	rewrittenListFile = "rewritten-list",
 }) => {
 	if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) {
 		return fail(`\n\nno stacked-rebase in progress? (nothing to ${rootLevelCommandName})\n\n`);
 	}
 
-	const [exit, stackedRebaseCommandsNew] = parseNewGoodCommands(repo, pathToStackedRebaseTodoFile);
+	const [exit, stackedRebaseCommandsNew] = parseNewGoodCommands(repo, pathToStackedRebaseTodoFile, rewrittenListFile);
 	if (!stackedRebaseCommandsNew) return fail(exit);
 
 	// const remotes: Git.Remote[] = await repo.getRemotes();

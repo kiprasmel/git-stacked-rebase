@@ -106,8 +106,13 @@ const getPathOfFilenameOfNeedsToApply = (pathToStackedRebaseDirInsideDotGit: str
 
 export const unmarkThatNeedsToApply = (
 	pathToStackedRebaseDirInsideDotGit: string,
-	mark = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit)
-): void => (fs.existsSync(mark) ? fs.unlinkSync(mark) : void 0);
+	mark = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit),
+	rewrittenListFile: string = path.join(pathToStackedRebaseDirInsideDotGit, "rewritten-list")
+): void => (
+	fs.existsSync(mark) && fs.unlinkSync(mark),
+	fs.existsSync(rewrittenListFile) && fs.renameSync(rewrittenListFile, rewrittenListFile + ".applied"),
+	void 0
+);
 
 export async function applyIfNeedsToApply({
 	repo,
