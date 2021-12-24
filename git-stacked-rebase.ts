@@ -66,10 +66,11 @@ function areOptionsIncompetible(
 ): boolean {
 	if (options.viewTodoOnly) {
 		if (options.apply) reasons.push("--apply cannot be used together with --view-todo");
-		if (options.push) reasons.push("--apply cannot be used together with --push");
-		if (options.forcePush) reasons.push("--apply cannot be used together with --push -f");
-		if (options.branchSequencer) reasons.push("--apply cannot be used together with --branch-sequencer");
-		if (options.branchSequencerExec) reasons.push("--apply cannot be used together with --branch-sequencer --exec");
+		if (options.push) reasons.push("--push cannot be used together with --view-todo");
+		if (options.forcePush) reasons.push("--push --force cannot be used together with --view-todo");
+		if (options.branchSequencer) reasons.push("--branch-sequencer cannot be used together with --view-todo");
+		if (options.branchSequencerExec)
+			reasons.push("--branch-sequencer --exec cannot be used together with --view-todo");
 	}
 
 	/**
