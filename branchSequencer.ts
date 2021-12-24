@@ -120,10 +120,11 @@ export const branchSequencer: BranchSequencer = async ({
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
 	const checkout = async (cmds: GoodCommand[]): Promise<void> => {
-		console.log("\ncheckout", cmds.length);
 		if (!cmds.length) {
 			return;
 		}
+
+		console.log("\ncheckout", cmds.length);
 
 		const goNext = () =>
 			new Promise<void>((r) => {

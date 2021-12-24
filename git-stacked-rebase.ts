@@ -13,6 +13,7 @@ import { filenames } from "./filenames";
 import { configKeys } from "./configKeys";
 import { apply, applyIfNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
+import { branchSequencer } from "./branchSequencer";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -40,6 +41,9 @@ export type OptionsForGitStackedRebase = {
 	apply: boolean;
 	push: boolean;
 	forcePush: boolean;
+
+	branchSequencer: boolean;
+	branchSequencerExec: string | false;
 };
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
@@ -52,6 +56,8 @@ const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	apply: false,
 	push: false,
 	forcePush: false,
+	branchSequencer: false,
+	branchSequencerExec: false,
 });
 
 function areOptionsIncompetible(
@@ -62,6 +68,8 @@ function areOptionsIncompetible(
 		if (options.apply) reasons.push("--apply cannot be used together with --view-todo");
 		if (options.push) reasons.push("--apply cannot be used together with --push");
 		if (options.forcePush) reasons.push("--apply cannot be used together with --push -f");
+		if (options.branchSequencer) reasons.push("--apply cannot be used together with --branch-sequencer");
+		if (options.branchSequencerExec) reasons.push("--apply cannot be used together with --branch-sequencer --exec");
 	}
 
 	/**
@@ -195,6 +203,28 @@ export const gitStackedRebase = async (
 				rootLevelCommandName: "--push --force",
 				gitCmd: options.gitCmd,
 			});
+		}
+
+		if (options.branchSequencer) {
+			if (options.branchSequencerExec) {
+				const toExec: string = options.branchSequencerExec;
+
+				return branchSequencer({
+					gitCmd: options.gitCmd,
+					repo,
+					rootLevelCommandName: "--branch-sequencer --exec",
+					actionInsideEachCheckedOutBranch: ({ execSyncInRepo: execS }) => (execS(toExec), void 0),
+					pathToStackedRebaseDirInsideDotGit,
+					pathToStackedRebaseTodoFile,
+				});
+			} else {
+				/**
+				 * we'll likely end up adding more sub-commands
+				 * to branchSequencer later.
+				 */
+
+				return fail("\n--branch-sequencer (without --exec) - nothing to do?\n\n");
+			}
 		}
 
 		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
@@ -1065,19 +1095,40 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 		!!second && ["--view-todo", "-v", "--view-only", "--view-todo-only"].includes(second);
 	const isApply: boolean = !!second && ["--apply", "-a"].includes(second);
 	const isPush: boolean = !!second && ["--push", "-p"].includes(second);
+	const isBranchSequencer: boolean = !!second && ["--branch-sequencer", "--bs", "-s"].includes(second);
 
-	if (isViewTodoOnly || isApply || isPush) {
+	if (isViewTodoOnly || isApply || isPush || isBranchSequencer) {
 		eatNextArg();
 	}
 
 	let isForcePush: boolean = false;
-	if (isPush && peakNextArg()) {
-		const fourth = eatNextArg() || "";
+	let branchSequencerExec: string | false = false;
 
-		isForcePush = ["--force", "-f"].includes(fourth);
+	if (peakNextArg() && (isPush || isBranchSequencer)) {
+		const third = eatNextArg() || "";
 
-		if (!isForcePush) {
-			return fail(`\nunrecognized 4th option (after --push) (got "${fourth}")\n\n`);
+		if (isPush) {
+			isForcePush = ["--force", "-f"].includes(third);
+		} else if (isBranchSequencer) {
+			/**
+			 * TODO separate --exec & --something
+			 * 1. for execing only the next arg (must be quoted), and
+			 * 2. for stopping arg parsing & execing everything afterwards (no quoting)
+			 *
+			 * TODO also allow selecting if want to exec before, after (or both) each branch
+			 *
+			 */
+			const execNames = ["--exec", "-x"];
+			if (execNames.includes(third) && peakNextArg()) {
+				const fourth = eatNextArg();
+				branchSequencerExec = fourth ? fourth : false;
+			} else {
+				return fail(`\n--branch-sequencer can only (for now) be followed by ${execNames.join("|")}\n\n`);
+			}
+		}
+
+		if (!isForcePush && !branchSequencerExec) {
+			return fail(`\nunrecognized 3th option (got "${third}")\n\n`);
 		}
 	}
 
@@ -1096,6 +1147,8 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 		apply: isApply,
 		push: isPush,
 		forcePush: isForcePush,
+		branchSequencer: isBranchSequencer,
+		branchSequencerExec,
 	};
 
 	// await
