@@ -192,29 +192,6 @@ export const gitStackedRebase = async (
 			return;
 		}
 
-		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
-
-		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
-			repo, //
-			nameOfInitialBranch,
-			Git.Branch.BRANCH.ALL
-		);
-		const currentBranch: Git.Reference = await repo.getCurrentBranch();
-
-		const wasRegularRebaseInProgress: boolean = fs.existsSync(pathToRegularRebaseDirInsideDotGit);
-		// const
-
-		console.log({ wasRegularRebaseInProgress });
-
-		if (!wasRegularRebaseInProgress) {
-			await createInitialEditTodoOfGitStackedRebase(
-				repo, //
-				initialBranch,
-				// __default__pathToStackedRebaseTodoFile
-				pathToStackedRebaseTodoFile
-			);
-		}
-
 		if (options.push) {
 			if (!options.forcePush) {
 				return fail("\npush without --force will fail (since git rebase overrides history).\n\n");
@@ -249,6 +226,29 @@ export const gitStackedRebase = async (
 
 				return fail("\n--branch-sequencer (without --exec) - nothing to do?\n\n");
 			}
+		}
+
+		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
+
+		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
+			repo, //
+			nameOfInitialBranch,
+			Git.Branch.BRANCH.ALL
+		);
+		const currentBranch: Git.Reference = await repo.getCurrentBranch();
+
+		const wasRegularRebaseInProgress: boolean = fs.existsSync(pathToRegularRebaseDirInsideDotGit);
+		// const
+
+		console.log({ wasRegularRebaseInProgress });
+
+		if (!wasRegularRebaseInProgress) {
+			await createInitialEditTodoOfGitStackedRebase(
+				repo, //
+				initialBranch,
+				// __default__pathToStackedRebaseTodoFile
+				pathToStackedRebaseTodoFile
+			);
 		}
 
 		if (!wasRegularRebaseInProgress || options.viewTodoOnly) {
