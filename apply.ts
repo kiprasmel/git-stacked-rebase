@@ -105,6 +105,11 @@ const filenameOfNeedsToApply = "needs-to-apply" as const;
 const getPathOfFilenameOfNeedsToApply = (pathToStackedRebaseDirInsideDotGit: string): string =>
 	path.join(pathToStackedRebaseDirInsideDotGit, filenameOfNeedsToApply);
 
+/**
+ * TODO rename "markThatApplied" because we are _not_ reversing the action
+ * (undo-ing the file rename),
+ * we are invoking a new action of removing the files.
+ */
 export const unmarkThatNeedsToApply = (
 	pathToStackedRebaseDirInsideDotGit: string,
 	mark = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit),

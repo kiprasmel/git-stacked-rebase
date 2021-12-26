@@ -122,14 +122,14 @@ export const gitStackedRebase = async (
 		const dotGitDirPath: string = repo.path();
 
 		const pathToRegularRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "rebase-merge");
-		const pathToRegularRebaseTodoFile = path.join(pathToRegularRebaseDirInsideDotGit, "git-rebase-todo");
+		const pathToRegularRebaseTodoFile = path.join(pathToRegularRebaseDirInsideDotGit, filenames.gitRebaseTodo);
 
 		const createPathForStackedRebase = (withName: string): string => path.join(dotGitDirPath, withName); // "stacked-rebase"
 
 		const __default__pathToStackedRebaseDirInsideDotGit: string = createPathForStackedRebase("stacked-rebase");
 		const __default__pathToStackedRebaseTodoFile = path.join(
 			__default__pathToStackedRebaseDirInsideDotGit,
-			"git-rebase-todo"
+			filenames.gitRebaseTodo
 		);
 
 		let parsed: {
@@ -146,7 +146,7 @@ export const gitStackedRebase = async (
 
 			parsed = {
 				pathToStackedRebaseDirInsideDotGit: insideDir,
-				pathToStackedRebaseTodoFile: path.join(insideDir, "git-rebase-todo"),
+				pathToStackedRebaseTodoFile: path.join(insideDir, filenames.gitRebaseTodo),
 			};
 		} else {
 			parsed = {
