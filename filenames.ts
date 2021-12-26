@@ -6,6 +6,7 @@ export const filenames = {
 	rewrittenListApplied: "rewritten-list.applied",
 	//
 	gitRebaseTodo: "git-rebase-todo",
+	gitRebaseTodoApplied: "git-rebase-todo.applied",
 	//
 
 	/**
