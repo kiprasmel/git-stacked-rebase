@@ -114,13 +114,10 @@ export const unmarkThatNeedsToApply = (
 	pathToStackedRebaseDirInsideDotGit: string,
 	mark = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit),
 	rewrittenListFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenList),
-	rewrittenListAppliedFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenListApplied),
-	gitRebaseTodoFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.gitRebaseTodo),
-	gitRebaseTodoAppliedFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.gitRebaseTodoApplied)
+	rewrittenListAppliedFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenListApplied)
 ): void => (
 	fs.existsSync(mark) && fs.unlinkSync(mark),
 	fs.existsSync(rewrittenListFile) && fs.renameSync(rewrittenListFile, rewrittenListAppliedFile),
-	fs.existsSync(gitRebaseTodoFile) && fs.renameSync(gitRebaseTodoFile, gitRebaseTodoAppliedFile),
 	void 0
 );
 
@@ -153,15 +150,9 @@ export async function applyIfNeedsToApply({
 		filenames.rewrittenListApplied
 	);
 
-	const pathToAppliedGitRebaseTodoFile = path.join(
-		pathToStackedRebaseDirInsideDotGit,
-		filenames.gitRebaseTodoApplied
-	);
-
 	const markThatNeedsToApply = (): void => (
 		fs.writeFileSync(pathToFileIndicatingThatNeedsToApply, ""),
 		fs.existsSync(pathToAppliedRewrittenListFile) && fs.unlinkSync(pathToAppliedRewrittenListFile),
-		fs.existsSync(pathToAppliedGitRebaseTodoFile) && fs.unlinkSync(pathToAppliedGitRebaseTodoFile),
 		void 0
 	);
 
