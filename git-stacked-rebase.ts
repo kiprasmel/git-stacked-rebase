@@ -949,26 +949,26 @@ export async function git_stacked_rebase(): Promise<EitherExitFinal> {
 
 	const helpMsg = `\
 
-git-stacked-rebase <branch> <repo_path=.>
+git-stacked-rebase <branch>
 
     1. will edit/create the todo & will execute the interactive rebase (in the latest branch),
     2. but will not apply the changes to partial branches until --apply is used.
 
 
-git-stacked-rebase <branch> <repo_path=.> [-a|--apply]
+git-stacked-rebase <branch> [-a|--apply]
 
     1. will apply the changes from the latest branch
        to all partial branches (currently, using 'git reset --hard'),
 	2. but wil not push the partial branches to a remote until --push --force is used.
 
 
-git-stacked-rebase <branch> <repo_path=.> [--push|-p --force|-f]
+git-stacked-rebase <branch> [--push|-p --force|-f]
 
     will checkout each branch and will push --force.
     will NOT have any effect if --apply was not used yet.
 
 
-git-stacked-rebase <branch> <repo_path=.> [-v|--view-todo|--view-only]
+git-stacked-rebase <branch> [-v|--view-todo|--view-only]
 
     1. will make git-stacked-rebase work inside a separate, .tmp directory,
         to allow viewing/editing (w/o affecting the actual todo
