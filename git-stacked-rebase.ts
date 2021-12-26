@@ -501,6 +501,43 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		 *
 		 */
 		execSyncInRepo(`${options.gitCmd} rebase --continue`);
+		/**
+		 * if the rebase finishes and ONLY THEN EXITS,
+		 * it's fine and we continue.
+		 *
+		 * otherwise, there was some commands that made the git rebase exit
+		 * in order to allow the user to perform actions
+		 * (i.e. break, edit),
+		 * and thus the `execSync` command will exit and if we ran,
+		 * we'd run without the actual rebase having finished,
+		 *
+		 * so the information would be incomplete
+		 * and we'd cause other actions that will further f it up.
+		 *
+		 * thus, to avoid this, we exit ourselves if the regular rebase
+		 * is still in progress.
+		 *
+		 * ---
+		 *
+		 * note: we would not have to deal with this if we implemented git rebase ourselves here,
+		 * but that'd be a lot of work + maintainability,
+		 * + also we'd need to
+		 *
+		 * edit: wait nvm, we'd fall into the same issues in the same exact scenarios
+		 * (because we are interactive, but break off as soon as need manual input from user
+		 * and cannot get it without exiting),
+		 * so no, this is a given then.
+		 *
+		 */
+		// taken from "part 1" from "canAndShouldBeApplying" from below,
+		// though using the actual (regular) rebase folder instead of ours
+		const isRegularRebaseStillInProgress: boolean = fs.existsSync(
+			path.join(pathToRegularRebaseDirInsideDotGit, filenames.rewrittenList)
+		);
+
+		if (isRegularRebaseStillInProgress) {
+			return;
+		}
 
 		// await repo.continueRebase(undefined as any, () => {
 		// 	//
@@ -517,6 +554,8 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		// }
 
 		// const rebase = await Git.Rebase.init()
+
+		console.log("CONTINUING AFTER EXEC SYNC rebase --continue");
 
 		const commitShaOfNewCurrentCommit = await getCurrentCommit();
 		const rebaseChangedLocalHistory: boolean = commitShaOfCurrentCommit !== commitShaOfNewCurrentCommit;
