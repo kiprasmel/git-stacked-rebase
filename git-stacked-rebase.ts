@@ -274,11 +274,21 @@ export const gitStackedRebase = async (
 		const [exit, goodCommands] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
 		if (!goodCommands) return fail(exit);
 
-		goodCommands.map((cmd) => {
+		const proms: Promise<void>[] = goodCommands.map(async (cmd) => {
 			if (cmd.rebaseKind === "regular") {
 				regularRebaseTodoLines.push(cmd.fullLine);
+			} else if (cmd.rebaseKind === "stacked") {
+				if (cmd.commandName === "branch-end-new") {
+					const newBranchName: string = cmd.targets![0];
+					const force: number = 0;
+					const targetCommitSHA: string = cmd.commitSHAThatBranchPointsTo!;
+					const targetCommit: Git.Commit = await Git.Commit.lookup(repo, targetCommitSHA);
+					await Git.Branch.create(repo, newBranchName, targetCommit, force);
+				}
 			}
 		});
+
+		await Promise.all(proms);
 
 		/**
 		 * libgit2's git rebase is sadly not very powerful
