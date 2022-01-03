@@ -7,6 +7,7 @@ export const filenames = {
 	//
 	gitRebaseTodo: "git-rebase-todo",
 	//
+	latestCommitSha: "latest-commit-sha",
 
 	/**
 	 * TODO extract others into here
