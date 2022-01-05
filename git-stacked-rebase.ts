@@ -246,6 +246,7 @@ export const gitStackedRebase = async (
 			await createInitialEditTodoOfGitStackedRebase(
 				repo, //
 				initialBranch,
+				currentBranch,
 				// __default__pathToStackedRebaseTodoFile
 				pathToStackedRebaseTodoFile
 			);
@@ -666,6 +667,7 @@ export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
 async function createInitialEditTodoOfGitStackedRebase(
 	repo: Git.Repository, //
 	initialBranch: Git.Reference,
+	currentBranch: Git.Reference,
 	pathToRebaseTodoFile: string
 ): Promise<void> {
 	// .catch(logErr);
@@ -678,7 +680,8 @@ async function createInitialEditTodoOfGitStackedRebase(
 	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = (
 		await getWantedCommitsWithBranchBoundaries(
 			repo, //
-			initialBranch
+			initialBranch,
+			currentBranch
 		)
 	).reverse();
 
@@ -817,7 +820,8 @@ type CommitAndBranchBoundary = {
 async function getWantedCommitsWithBranchBoundaries(
 	repo: Git.Repository, //
 	/** beginningBranch */
-	bb: Git.Reference
+	bb: Git.Reference,
+	currentBranch: Git.Reference
 ): Promise<CommitAndBranchBoundary[]> {
 	const fixBranchName = (name: string): string =>
 		name
@@ -873,9 +877,44 @@ async function getWantedCommitsWithBranchBoundaries(
 		resolved: (await bb.resolve()).name(),
 	});
 
-	const commitOfBB: Git.Oid = (await bb.peel(Git.Object.TYPE.COMMIT)).id();
+	const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
+		ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
 
-	const wantedCommits: Git.Commit[] = await getCommitHistoryUntilIncl(repo, commitOfBB);
+	const commitOfInitialBranch: Git.Oid = await referenceToOid(bb);
+	const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
+
+	// https://stackoverflow.com/a/1549155/9285308
+	const latestCommitOfOursThatInitialBranchAlreadyHas: Git.Oid = await Git.Merge.base(
+		repo, //
+		commitOfInitialBranch,
+		commitOfCurrentBranch
+	);
+	console.log({
+		latestCommitOfOursThatInitialBranchAlreadyHas: latestCommitOfOursThatInitialBranchAlreadyHas.tostrS(),
+	});
+
+	const commitOfInitialBranchAsCommit: Git.Commit = await Git.Commit.lookup(repo, commitOfInitialBranch);
+
+	const wantedCommits: Git.Commit[] = await getCommitHistoryUntilIncl(
+		repo, //
+		latestCommitOfOursThatInitialBranchAlreadyHas
+	).then(
+		(commits) => (
+			commits.pop() /** remove the unwanted commit that initial branch already has, that we have too */,
+			commits.push(commitOfInitialBranchAsCommit) /** add the commit of the initial branch itself */,
+			/**
+			 * the operations above are pop() and push(), instead of shift() and unshift()
+			 * (operate at end of array, instead of the start),
+			 *
+			 * because of how the `getCommitHistoryUntilIncl` returns the commits
+			 * (the order - from newest to oldest).
+			 *
+			 * TODO FIXME - this is done later, but probably should be done directly
+			 * in the underlying function to avoid confusion.
+			 */
+			commits
+		)
+	);
 
 	console.log({
 		wantedCommits: wantedCommits.map((c) =>
