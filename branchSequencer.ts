@@ -174,7 +174,7 @@ export const branchSequencer: BranchSequencer = async ({
 
 	await checkout(stackedRebaseCommandsNew.slice(1) as any); // TODO TS
 
-	callbackAfterDone({
+	await callbackAfterDone({
 		pathToStackedRebaseDirInsideDotGit,
 	});
 
