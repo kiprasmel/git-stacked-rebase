@@ -17,6 +17,7 @@ import { branchSequencer } from "./branchSequencer";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
+import { uniq } from "./util/uniq";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
 import { processWriteAndOrExit, fail, EitherExitFinal } from "./util/Exitable";
 import { namesOfRebaseCommandsThatMakeRebaseExitToPause } from "./parse-todo-of-stacked-rebase/validator";
@@ -823,30 +824,8 @@ async function getWantedCommitsWithBranchBoundaries(
 	bb: Git.Reference,
 	currentBranch: Git.Reference
 ): Promise<CommitAndBranchBoundary[]> {
-	const fixBranchName = (name: string): string =>
-		name
-			// .replace(beginningBranchName.includes(name) ? "" : "refs/heads/", "") //
-			.replace("refs/heads/", ""); //
-	// TODO: consider
-	// .replace(name.includes(beginningBranchName) ? "refs/remotes/" : "", "");
-
-	const refs = await Git.Reference.list(repo);
-	const branches: Git.Reference[] = ((
-		await Promise.all(
-			refs.map(
-				(ref: string): Promise<Git.Reference | undefined> =>
-					Git.Branch.lookup(
-						repo, //
-						fixBranchName(ref),
-						Git.Branch.BRANCH.ALL /** filtering seems broken, all act the same as ALL */
-					).catch(() => undefined)
-			)
-		)
-	).filter((branch) => !!branch) as Git.Reference[]).map(
-		(branch) => (!branch.cmp(bb) ? bb : branch) //
-	);
-
-	console.log({ refs, branches: branches.map((b) => fixBranchName(b?.name())) });
+	const refNames: string[] = await Git.Reference.list(repo);
+	const refs: Git.Reference[] = await Promise.all(refNames.map((ref) => Git.Reference.lookup(repo, ref)));
 
 	/**
 	 * BEGIN check e.g. fork & origin/fork
@@ -916,133 +895,47 @@ async function getWantedCommitsWithBranchBoundaries(
 		)
 	);
 
-	console.log({
-		wantedCommits: wantedCommits.map((c) =>
-			[
-				c.sha(), //
-				c.summary(),
-				c.parentcount(),
-			].join(" ")
-		),
-	});
+	let matchedRefs: Git.Reference[];
 
-	const commitsByBranch = Object.fromEntries<Git.Commit | null>(branches.map((b) => [b.name(), null]));
-
-	await Promise.all(
-		branches
-			.map(async (branch) => {
-				const commitOfBranch = await branch.peel(Git.Object.TYPE.COMMIT);
-				// console.log({ branch: branch.name(), commitOfBranch: commitOfBranch.id().tostrS() });
-
-				wantedCommits.map((commit) => {
-					const matches = !commitOfBranch.id().cmp(commit.id());
-
-					(commit as any).meta = (commit as any).meta || { branchEnd: null };
-
-					if (matches) {
-						// // console.log({
-						// // 	matches, //
-						// // 	commitOfBranch: commitOfBranch.id().tostrS(),
-						// // 	commit: commit.id().tostrS(),
-						// // });
-						// commitsByBranch[branch.name()].push(commit);
-
-						// if (commitsByBranch[branch.name()]) {
-						if ((commit as any).meta.branchEnd) {
-							console.error({
-								commit: commit?.summary(),
-								branchOld: (commit as any).meta.branchEnd.name(),
-								branchNew: branch.name(),
-							});
-							/**
-							 * TODO FIXME BFS (starting from beginningBranch? since child only has 1 parent?)
-							 *
-							 * UPD: lol this will go off if e.g. we have 2 branches on the same commit,
-							 * even tho one of them has nothing to do w/ this.
-							 *
-							 * but, ofc, we don't know which one should be ignored (yet?)
-							 */
-							throw new Error(
-								"2 (or more) branches for the same commit, both in the same path - cannot continue (until explicit branch specifying is implemented)."
-							);
-						}
-
-						commitsByBranch[branch.name()] = commit;
-						(commit as any).meta.branchEnd = branch;
-
-						// // return {
-						// // 	commit,
-						// // 	branch,
-						// // };
-					}
-					// else
-					// 	return {
-					// 		commit,
-					// 		branch: null,
-					// 	};
-				});
-			})
-			.flat()
+	const wantedCommitsWithBranchEnds: CommitAndBranchBoundary[] = await Promise.all(
+		wantedCommits.map(
+			(c: Git.Commit) => (
+				(matchedRefs = refs.filter((ref) => !!ref.target()?.equal(c.id()))),
+				assert(
+					matchedRefs.length <= 1 ||
+						(matchedRefs.length === 2 &&
+							uniq(
+								matchedRefs.map((r) =>
+									r
+										?.name()
+										.replace(/^refs\/heads\//, "")
+										.replace(/^refs\/remotes\/[^/]*\//, "")
+								)
+							).length === 1),
+					"" +
+						"2 (or more) branches for the same commit, both in the same path - cannot continue" +
+						"(until explicit branch specifying is implemented)" +
+						"\n\n" +
+						"matchedRefs = " +
+						matchedRefs.map((mr) => mr?.name()) +
+						"\n"
+				),
+				matchedRefs.length === 2 &&
+					(matchedRefs = matchedRefs.some((r) => r?.name() === bb.name())
+						? [bb]
+						: matchedRefs.filter((r) => !r?.isRemote() /* r?.name().includes("refs/heads/") */)),
+				assert(matchedRefs.length <= 1, "refs/heads/ and refs/remotes/*/ replacement went wrong"),
+				{
+					commit: c,
+					branchEnd: !matchedRefs.length ? null : matchedRefs[0],
+				}
+			)
+		)
 	);
 
-	const wantedCommitByBranch = Object.fromEntries(
-		// Object.entries(commitsByBranch).filter(([_branchName, commits]) => commits.length)
-		Object.entries(commitsByBranch).filter(([_, commit]) => !!commit)
-	);
-	// const wantedCommitsByBranch = commitsByBranch;
-
-	// Object.entries(wantedCommitsByBranch).forEach(([_, commits]) => {
-	// 	assert(commits.length === 1);
-	// });
-
-	const wantedCommitByBranchStr = Object.fromEntries(
-		Object.entries(wantedCommitByBranch).map(([branchName, commit]) => [
-			branchName, //
-			// commits.map((c) => c.summary()),
-			commit?.sha(),
-			// commits.map((c) => c.sha()),
-			// ].join("  \n")
-		])
-	);
-
-	console.log({
-		wantedCommitByBranch: wantedCommitByBranchStr,
-		// wantedCommitsByBranch.map(([branchName, commits]) => [
-		// 	branchName,
-		// 	commits.map((c) => c),
-		// ]),
-		wantedBranchByCommit: swapKeyVal(wantedCommitByBranch),
-	});
-
-	console.log({
-		wantedCommits: wantedCommits.map(
-			(c) =>
-				c.sha() + //
-				" " +
-				((c as any).meta?.branchEnd as Git.Reference)?.name()
-		),
-	});
-
-	const commitsAndBranchBoundaries: CommitAndBranchBoundary[] = wantedCommits.map((c) => ({
-		commit: c,
-		branchEnd: (c as any).meta?.branchEnd as Git.Reference | null,
-	}));
-
-	return commitsAndBranchBoundaries;
+	return wantedCommitsWithBranchEnds;
 }
 
-function swapKeyVal(obj: {}) {
-	return Object.entries(obj) //
-		.reduce(
-			(
-				acc, //
-				[k, v]
-			) => Object.assign(acc, { [(v as unknown) as string]: k }),
-			{}
-		);
-}
-
-noop(getCommitOfBranch);
 async function getCommitOfBranch(repo: Git.Repository, branchReference: Git.Reference) {
 	const branchOid: Git.Oid = await (await branchReference.peel(Git.Object.TYPE.COMMIT)).id();
 	return await Git.Commit.lookup(repo, branchOid);
