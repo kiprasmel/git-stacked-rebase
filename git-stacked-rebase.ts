@@ -903,7 +903,12 @@ async function getWantedCommitsWithBranchBoundaries(
 				(matchedRefs = refs.filter((ref) => !!ref.target()?.equal(c.id()))),
 				assert(
 					matchedRefs.length <= 1 ||
-						(matchedRefs.length === 2 &&
+						/**
+						 * if it's more than 1,
+						 * it's only allowed all of the branches are the same ones,
+						 * just on different remotes.
+						 */
+						(matchedRefs.length > 1 &&
 							uniq(
 								matchedRefs.map((r) =>
 									r
@@ -920,7 +925,7 @@ async function getWantedCommitsWithBranchBoundaries(
 						matchedRefs.map((mr) => mr?.name()) +
 						"\n"
 				),
-				matchedRefs.length === 2 &&
+				matchedRefs.length > 1 &&
 					(matchedRefs = matchedRefs.some((r) => r?.name() === bb.name())
 						? [bb]
 						: matchedRefs.filter((r) => !r?.isRemote() /* r?.name().includes("refs/heads/") */)),
