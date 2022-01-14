@@ -23,7 +23,7 @@ export const apply: BranchSequencerBase = (args) =>
 		// callbackAfterDone: defaultApplyCallback,
 		delayMsBetweenCheckouts: 0,
 	}).then(
-		(ret) => (unmarkThatNeedsToApply(args.pathToStackedRebaseDirInsideDotGit), ret) //
+		(ret) => (markThatApplied(args.pathToStackedRebaseDirInsideDotGit), ret) //
 	);
 
 const defaultApplyAction: ActionInsideEachCheckedOutBranch = async ({
@@ -82,44 +82,72 @@ const defaultApplyCallback__disabled: CallbackAfterDone = ({
 };
 noop(defaultApplyCallback__disabled);
 
-export type ReturnOfApplyIfNeedsToApply =
+export type ReturnOfApplyIfNeedsToApply = {
+	markThatNeedsToApply: () => void;
+} & (
 	| {
 			neededToApply: false;
 			userAllowedToApplyAndWeApplied?: never;
-			markThatNeedsToApply: () => void;
 	  }
 	| {
 			neededToApply: true;
 			userAllowedToApplyAndWeApplied: false;
 			// markThatNeedsToApply?: never; // TODO TS infer auto - force code owner to exit
-			markThatNeedsToApply: () => void;
 	  }
 	| {
 			neededToApply: true;
 			userAllowedToApplyAndWeApplied: true;
-			markThatNeedsToApply: () => void;
-	  };
-
-const filenameOfNeedsToApply = "needs-to-apply" as const;
-
-const getPathOfFilenameOfNeedsToApply = (pathToStackedRebaseDirInsideDotGit: string): string =>
-	path.join(pathToStackedRebaseDirInsideDotGit, filenameOfNeedsToApply);
-
-/**
- * TODO rename "markThatApplied" because we are _not_ reversing the action
- * (undo-ing the file rename),
- * we are invoking a new action of removing the files.
- */
-export const unmarkThatNeedsToApply = (
-	pathToStackedRebaseDirInsideDotGit: string,
-	mark = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit),
-	rewrittenListFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenList),
-	rewrittenListAppliedFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenListApplied)
-): void => (
-	fs.existsSync(mark) && fs.unlinkSync(mark),
-	fs.existsSync(rewrittenListFile) && fs.renameSync(rewrittenListFile, rewrittenListAppliedFile),
-	void 0
+	  }
 );
+
+const getPaths = (
+	pathToStackedRebaseDirInsideDotGit: string //
+) =>
+	({
+		rewrittenListPath: path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenList),
+		needsToApplyPath: path.join(pathToStackedRebaseDirInsideDotGit, filenames.needsToApply),
+		appliedPath: path.join(pathToStackedRebaseDirInsideDotGit, filenames.applied),
+	} as const);
+
+const markThatNeedsToApply = (
+	pathToStackedRebaseDirInsideDotGit: string //
+): void =>
+	[getPaths(pathToStackedRebaseDirInsideDotGit)].map(
+		({ rewrittenListPath, needsToApplyPath, appliedPath }) => (
+			fs.existsSync(rewrittenListPath)
+				? fs.copyFileSync(rewrittenListPath, needsToApplyPath)
+				: fs.writeFileSync(needsToApplyPath, ""),
+			fs.existsSync(appliedPath) && fs.unlinkSync(appliedPath),
+			void 0
+		)
+	)[0];
+
+export const markThatApplied = (pathToStackedRebaseDirInsideDotGit: string): void =>
+	[getPaths(pathToStackedRebaseDirInsideDotGit)].map(
+		({ rewrittenListPath, needsToApplyPath, appliedPath }) => (
+			fs.existsSync(needsToApplyPath) && fs.unlinkSync(needsToApplyPath), //
+			fs.copyFileSync(rewrittenListPath, appliedPath),
+			void 0
+		)
+	)[0];
+
+const doesNeedToApply = (pathToStackedRebaseDirInsideDotGit: string): boolean => {
+	const { rewrittenListPath, needsToApplyPath, appliedPath } = getPaths(pathToStackedRebaseDirInsideDotGit);
+
+	const needsToApplyPart1: boolean = fs.existsSync(needsToApplyPath);
+	if (needsToApplyPart1) {
+		return true;
+	}
+
+	const needsToApplyPart2: boolean = fs.existsSync(appliedPath)
+		? /**
+		   * check if has been applied, but that apply is outdated
+		   */
+		  fs.readFileSync(appliedPath) !== fs.readFileSync(rewrittenListPath)
+		: false;
+
+	return needsToApplyPart2;
+};
 
 export async function applyIfNeedsToApply({
 	repo,
@@ -132,34 +160,13 @@ export async function applyIfNeedsToApply({
 	autoApplyIfNeeded: boolean; //
 	config: Git.Config;
 }): Promise<ReturnOfApplyIfNeedsToApply> {
-	/**
-	 * currently we're not saving the branch names
-	 * & where they point to etc.,
-	 * so doing rebase after rebase without --apply
-	 * will break the workflow after the 1st one.
-	 *
-	 * thus, until we have a more sophisticated solution,
-	 * automatically --apply'ing (when needed) should do just fine.
-	 *
-	 */
-	const pathToFileIndicatingThatNeedsToApply = getPathOfFilenameOfNeedsToApply(pathToStackedRebaseDirInsideDotGit);
-	const needsToApply: boolean = fs.existsSync(pathToFileIndicatingThatNeedsToApply);
-
-	const pathToAppliedRewrittenListFile = path.join(
-		pathToStackedRebaseDirInsideDotGit,
-		filenames.rewrittenListApplied
-	);
-
-	const markThatNeedsToApply = (): void => (
-		fs.writeFileSync(pathToFileIndicatingThatNeedsToApply, ""),
-		fs.existsSync(pathToAppliedRewrittenListFile) && fs.unlinkSync(pathToAppliedRewrittenListFile),
-		void 0
-	);
+	const needsToApply: boolean = doesNeedToApply(pathToStackedRebaseDirInsideDotGit);
+	const _markThatNeedsToApply = (): void => markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 
 	if (!needsToApply) {
 		return {
 			neededToApply: false,
-			markThatNeedsToApply,
+			markThatNeedsToApply: _markThatNeedsToApply,
 		};
 	}
 
@@ -181,7 +188,7 @@ export async function applyIfNeedsToApply({
 				return {
 					neededToApply: true,
 					userAllowedToApplyAndWeApplied: false,
-					markThatNeedsToApply,
+					markThatNeedsToApply: _markThatNeedsToApply,
 				};
 			}
 
@@ -196,13 +203,11 @@ export async function applyIfNeedsToApply({
 			pathToStackedRebaseDirInsideDotGit, //
 			...rest,
 		});
-
-		unmarkThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 	}
 
 	return {
 		neededToApply: true,
 		userAllowedToApplyAndWeApplied: true, //
-		markThatNeedsToApply,
+		markThatNeedsToApply: _markThatNeedsToApply,
 	};
 }
