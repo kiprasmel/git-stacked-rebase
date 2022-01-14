@@ -3,7 +3,8 @@
  */
 export const filenames = {
 	rewrittenList: "rewritten-list",
-	rewrittenListApplied: "rewritten-list.applied",
+	needsToApply: "needs-to-apply",
+	applied: "applied",
 	//
 	gitRebaseTodo: "git-rebase-todo",
 	//
