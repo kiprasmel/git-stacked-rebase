@@ -54,7 +54,7 @@ export type BranchSequencerArgs = BranchSequencerArgsBase & {
 	actionInsideEachCheckedOutBranch: ActionInsideEachCheckedOutBranch;
 	delayMsBetweenCheckouts?: number;
 	callbackAfterDone?: CallbackAfterDone;
-	rewrittenListFile?: typeof filenames.rewrittenList | typeof filenames.rewrittenListApplied;
+	rewrittenListFile?: typeof filenames.rewrittenList;
 };
 
 export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<void>;
