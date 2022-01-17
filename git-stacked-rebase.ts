@@ -970,6 +970,7 @@ git-stacked-rebase <branch>
 
     1. will edit/create the todo & will execute the interactive rebase (in the latest branch),
     2. but will not apply the changes to partial branches until --apply is used.
+	2.1 unless autoApply is enabled via \`git config [--global] ${configKeys.autoApplyIfNeeded} true'.
 
 
 git-stacked-rebase <branch> [-a|--apply]
@@ -981,8 +982,9 @@ git-stacked-rebase <branch> [-a|--apply]
 
 git-stacked-rebase <branch> [--push|-p --force|-f]
 
-    will checkout each branch and will push --force.
-    will NOT have any effect if --apply was not used yet.
+    1. will checkout each branch and will push --force,
+    2. but will NOT have any effect if --apply was not used yet.
+	2.1 unless autoApply is enabled.
 
 
 git-stacked-rebase <branch> [-v|--view-todo|--view-only]
