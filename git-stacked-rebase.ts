@@ -26,6 +26,7 @@ import { GoodCommand, namesOfRebaseCommandsThatMakeRebaseExitToPause } from "./p
 
 export type OptionsForGitStackedRebase = {
 	gitDir: string;
+	getGitConfig: (ctx: { GitConfig: typeof Git.Config; repo: Git.Repository }) => Promise<Git.Config> | Git.Config;
 
 	/**
 	 * editor name, or a function that opens the file inside some editor.
@@ -49,10 +50,15 @@ export type OptionsForGitStackedRebase = {
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
 
-const getDefaultOptions = (): OptionsForGitStackedRebase => ({
+export const defaultEditor = "vi" as const;
+export const defaultGitCmd = "/usr/bin/env git" as const;
+
+export const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	gitDir: ".", //
-	editor: process.env.EDITOR ?? "vi",
-	gitCmd: process.env.GIT_CMD ?? "/usr/bin/env git",
+	// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+	getGitConfig: ({ GitConfig }) => GitConfig.openDefault(),
+	editor: process.env.EDITOR ?? defaultEditor,
+	gitCmd: process.env.GIT_CMD ?? defaultGitCmd,
 	viewTodoOnly: false,
 	apply: false,
 	push: false,
@@ -107,7 +113,7 @@ export const gitStackedRebase = async (
 		}
 
 		const repo = await Git.Repository.open(options.gitDir);
-		const config = await Git.Config.openDefault();
+		const config: Git.Config = await options.getGitConfig({ GitConfig: Git.Config, repo });
 
 		const configValues = {
 			gpgSign: !!(await config.getBool(configKeys.gpgSign).catch(() => 0)),
@@ -366,21 +372,21 @@ export const gitStackedRebase = async (
 			commitShaOfInitialBranch
 		);
 
-		fs.writeFileSync(
-			path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
-			commitShaOfInitialBranch
-		);
+		// fs.writeFileSync(
+		// 	path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
+		// 	commitShaOfInitialBranch
+		// );
 		/**
 		 * TODO - is this even needed? seems only a nodegit thing
 		 */
-		fs.writeFileSync(
-			path.join(pathToRegularRebaseDirInsideDotGit, "onto_name"), //
-			initialBranch.name() + "\n"
-		);
-		fs.writeFileSync(
-			path.join(pathToRegularRebaseDirInsideDotGit, "cmt.1"), //
-			commitShaOfInitialBranch
-		);
+		// fs.writeFileSync(
+		// 	path.join(pathToRegularRebaseDirInsideDotGit, "onto_name"), //
+		// 	initialBranch.name() + "\n"
+		// );
+		// fs.writeFileSync(
+		// 	path.join(pathToRegularRebaseDirInsideDotGit, "cmt.1"), //
+		// 	commitShaOfInitialBranch
+		// );
 
 		fs.writeFileSync(
 			// path.join(dotGitDirPath, "HEAD"), //
@@ -511,6 +517,7 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 		 * with --apply or whatever.
 		 *
 		 */
+		execSyncInRepo("read");
 		execSyncInRepo(`${options.gitCmd} rebase --continue`);
 		/**
 		 * if the rebase finishes and ONLY THEN EXITS,
