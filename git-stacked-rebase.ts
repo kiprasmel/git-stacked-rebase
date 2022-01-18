@@ -961,8 +961,19 @@ export async function git_stacked_rebase(): Promise<EitherExitFinal> {
 	else pkg = {};
 
 	const gitStackedRebaseVersion = pkg.version;
+	/**
+	 * TODO compile-time + dirty check
+	 */
+	const gitStackedRebaseProjectCommit: string = await Git.Repository.open(__dirname)
+		.then((repo) => repo.getHeadCommit())
+		.then((commit) => commit.sha())
+		.catch(() => "");
 
-	const gitStackedRebaseVersionStr: string = !gitStackedRebaseVersion ? "" : "v" + gitStackedRebaseVersion;
+	const gitStackedRebaseVersionStr: string = !gitStackedRebaseVersion
+		? ""
+		: "v" +
+		  gitStackedRebaseVersion +
+		  (!gitStackedRebaseProjectCommit ? "" : " commit " + gitStackedRebaseProjectCommit);
 
 	const helpMsg = `\
 
