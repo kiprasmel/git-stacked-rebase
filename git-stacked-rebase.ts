@@ -244,13 +244,88 @@ export const gitStackedRebase = async (
 		console.log({ wasRegularRebaseInProgress });
 
 		if (!wasRegularRebaseInProgress) {
-			await createInitialEditTodoOfGitStackedRebase(
+			// await createInitialEditTodoOfGitStackedRebase(
+			// 	repo, //
+			// 	initialBranch,
+			// 	currentBranch,
+			// 	// __default__pathToStackedRebaseTodoFile
+			// 	pathToStackedRebaseTodoFile
+			// );
+
+			const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
+				ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
+
+			// const commitOfInitialBranch: Git.Oid = await referenceToOid(bb);
+			const commitOfInitialBranch: Git.Oid = await referenceToOid(initialBranch);
+			const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
+
+			// https://stackoverflow.com/a/1549155/9285308
+			const latestCommitOfOursThatInitialBranchAlreadyHas: Git.Oid = await Git.Merge.base(
 				repo, //
-				initialBranch,
-				currentBranch,
-				// __default__pathToStackedRebaseTodoFile
-				pathToStackedRebaseTodoFile
+				commitOfInitialBranch,
+				commitOfCurrentBranch
 			);
+
+			const editorScript = `\
+#!/usr/bin/env bash
+
+printf "yes sir\n\n"
+
+pushd "${dotGitDirPath}"
+
+printf "pwd: $(pwd)\n"
+
+# cat rebase-merge/git-rebase-todo
+cat ${pathToRegularRebaseTodoFile}
+
+# cat ${pathToRegularRebaseTodoFile} > ${pathToStackedRebaseTodoFile}.regular
+cp -r ${pathToRegularRebaseDirInsideDotGit} ${pathToRegularRebaseDirInsideDotGit}.bp
+
+# abort the rebase before even starting it
+exit 1
+			`;
+			const editorScriptPath: string = path.join(dotGitDirPath, "editorScript.sh");
+			fs.writeFileSync(editorScriptPath, editorScript, { mode: 0o777 });
+
+			try {
+				execSyncInRepo(
+					[
+						options.gitCmd,
+						"rebase",
+						"--interactive",
+						latestCommitOfOursThatInitialBranchAlreadyHas.tostrS(),
+						"--onto",
+						initialBranch.name(),
+						">/dev/null 2>&1",
+					].join(" "),
+					{
+						env: {
+							// https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt-sequenceeditor
+							GIT_SEQUENCE_EDITOR: editorScriptPath,
+						},
+					}
+				);
+			} catch (e) {
+				// as expected. do nothing.
+				// TODO verify that it actually came from our script exiting intentionally
+			}
+
+			console.log("rebase -i exited");
+
+			const [_exit, goodRegularCommands] = parseTodoOfStackedRebase(
+				path.join(pathToRegularRebaseDirInsideDotGit + ".bp", filenames.gitRebaseTodo)
+			);
+
+			console.log("parsedRegular: %O", _exit, goodRegularCommands);
+
+			execSyncInRepo("read");
+
+			/**
+			 * TODO - would now have to use the logic from `getWantedCommitsWithBranchBoundaries`
+			 * & subsequent utils, though adapted differently - we already have the commits,
+			 * now we gotta add the branch boundaries & then continue like regular.
+			 *
+			 */
 		}
 
 		if (!wasRegularRebaseInProgress || options.viewTodoOnly) {
@@ -672,6 +747,7 @@ export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
 	);
 }
 
+noop(createInitialEditTodoOfGitStackedRebase);
 async function createInitialEditTodoOfGitStackedRebase(
 	repo: Git.Repository, //
 	initialBranch: Git.Reference,
