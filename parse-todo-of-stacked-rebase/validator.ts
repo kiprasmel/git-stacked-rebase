@@ -292,7 +292,10 @@ export type GoodCommand = {
 	  }
 );
 
-export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] {
+export function validate(
+	linesOfEditedRebaseTodo: string[], //
+	{ enforceRequirementsSpecificToStackedRebase = false } = {}
+): GoodCommand[] {
 	const badCommands: BadCommand[] = [];
 	const goodCommands: GoodCommand[] = [];
 
@@ -319,6 +322,13 @@ export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] {
 	 * we're not processing command-by-command, we're processing line-by-line.
 	 */
 	linesOfEditedRebaseTodo.forEach((fullLine, index) => {
+		if (fullLine.startsWith("#")) {
+			/**
+			 * ignore comments
+			 */
+			return;
+		}
+
 		const [commandOrAliasName, ..._rest] = fullLine.split(" ");
 		const rest = _rest.join(" ");
 
@@ -346,14 +356,16 @@ export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] {
 
 		const reasonsIfBad: string[] = [];
 
-		if (index === 0) {
-			if (commandName !== "branch-end-initial") {
-				reasonsIfBad.push("initial command must be `branch-end-initial`");
+		if (enforceRequirementsSpecificToStackedRebase) {
+			if (index === 0) {
+				if (commandName !== "branch-end-initial") {
+					reasonsIfBad.push("initial command must be `branch-end-initial`");
+				}
 			}
-		}
-		if (index === linesOfEditedRebaseTodo.length - 1) {
-			if (commandName !== "branch-end-last") {
-				reasonsIfBad.push("last command must be `branch-end-last`");
+			if (index === linesOfEditedRebaseTodo.length - 1) {
+				if (commandName !== "branch-end-last") {
+					reasonsIfBad.push("last command must be `branch-end-last`");
+				}
 			}
 		}
 
