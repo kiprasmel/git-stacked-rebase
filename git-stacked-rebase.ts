@@ -19,8 +19,8 @@ import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
 import { uniq } from "./util/uniq";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
-import { processWriteAndOrExit, fail, EitherExitFinal } from "./util/Exitable";
-import { namesOfRebaseCommandsThatMakeRebaseExitToPause } from "./parse-todo-of-stacked-rebase/validator";
+import { Termination } from "./util/error";
+import { GoodCommand, namesOfRebaseCommandsThatMakeRebaseExitToPause } from "./parse-todo-of-stacked-rebase/validator";
 
 // console.log = () => {};
 
@@ -84,7 +84,7 @@ function areOptionsIncompetible(
 export const gitStackedRebase = async (
 	nameOfInitialBranch: string,
 	specifiedOptions: SomeOptionsForGitStackedRebase = {}
-): Promise<EitherExitFinal> => {
+): Promise<void> => {
 	try {
 		const options: OptionsForGitStackedRebase = {
 			...getDefaultOptions(), //
@@ -95,7 +95,7 @@ export const gitStackedRebase = async (
 		const reasonsWhatWhyIncompatible: string[] = [];
 
 		if (areOptionsIncompetible(options, reasonsWhatWhyIncompatible)) {
-			return fail(
+			throw new Termination(
 				"\n" +
 					bullets(
 						"error - incompatible options:", //
@@ -195,7 +195,7 @@ export const gitStackedRebase = async (
 
 		if (options.push) {
 			if (!options.forcePush) {
-				return fail("\npush without --force will fail (since git rebase overrides history).\n\n");
+				throw new Termination("\npush without --force will fail (since git rebase overrides history).\n\n");
 			}
 
 			return await forcePush({
@@ -225,7 +225,7 @@ export const gitStackedRebase = async (
 				 * to branchSequencer later.
 				 */
 
-				return fail("\n--branch-sequencer (without --exec) - nothing to do?\n\n");
+				throw new Termination("\n--branch-sequencer (without --exec) - nothing to do?\n\n");
 			}
 		}
 
@@ -273,8 +273,7 @@ export const gitStackedRebase = async (
 
 		const regularRebaseTodoLines: string[] = [];
 
-		const [exit, goodCommands] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
-		if (!goodCommands) return fail(exit);
+		const goodCommands: GoodCommand[] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
 
 		const proms: Promise<void>[] = goodCommands.map(async (cmd) => {
 			if (cmd.rebaseKind === "regular") {
@@ -646,8 +645,7 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 
 		return;
 	} catch (e) {
-		console.error(e);
-		return fail(e);
+		throw e; // TODO FIXME - no try/catch at all?
 	}
 };
 
@@ -949,7 +947,7 @@ async function getCommitOfBranch(repo: Git.Repository, branchReference: Git.Refe
 /**
  * the CLI
  */
-export async function git_stacked_rebase(): Promise<EitherExitFinal> {
+export async function git_stacked_rebase(): Promise<void> {
 	const pkgFromSrc = path.join(__dirname, "package.json");
 	const pkgFromDist = path.join(__dirname, "../", "package.json");
 	let pkg;
@@ -1058,7 +1056,9 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 	console.log({ "process.argv after non-positional": process.argv });
 
 	const nameOfInitialBranch: string | undefined = eatNextArg();
-	if (!nameOfInitialBranch) return fail(helpMsg);
+	if (!nameOfInitialBranch) {
+		throw new Termination(helpMsg);
+	}
 
 	/**
 	 * TODO: improve arg parsing, lmao
@@ -1112,17 +1112,19 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 				const fourth = eatNextArg();
 				branchSequencerExec = fourth ? fourth : false;
 			} else {
-				return fail(`\n--branch-sequencer can only (for now) be followed by ${execNames.join("|")}\n\n`);
+				throw new Termination(
+					`\n--branch-sequencer can only (for now) be followed by ${execNames.join("|")}\n\n`
+				);
 			}
 		}
 
 		if (!isForcePush && !branchSequencerExec) {
-			return fail(`\nunrecognized 3th option (got "${third}")\n\n`);
+			throw new Termination(`\nunrecognized 3th option (got "${third}")\n\n`);
 		}
 	}
 
 	if (process.argv.length) {
-		return fail(
+		throw new Termination(
 			"" + //
 				"\n" +
 				bullets("\nerror - leftover arguments: ", process.argv, "  ") +
@@ -1146,5 +1148,13 @@ git-stacked-rebase ${gitStackedRebaseVersionStr}
 
 if (!module.parent) {
 	git_stacked_rebase() //
-		.then(processWriteAndOrExit);
+		.then(() => process.exit(0))
+		.catch((e) => {
+			if (e instanceof Termination) {
+				process.stderr.write(e.message);
+				process.exit(1);
+			} else {
+				throw e;
+			}
+		});
 }
