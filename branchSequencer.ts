@@ -6,7 +6,7 @@ import Git from "nodegit";
 import { filenames } from "./filenames";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
-import { EitherExitFinal, fail } from "./util/Exitable";
+import { Termination } from "./util/error";
 
 import { parseNewGoodCommands } from "./parse-todo-of-stacked-rebase/parseNewGoodCommands";
 import { GoodCommand } from "./parse-todo-of-stacked-rebase/validator";
@@ -57,8 +57,8 @@ export type BranchSequencerArgs = BranchSequencerArgsBase & {
 	rewrittenListFile?: typeof filenames.rewrittenList | typeof filenames.rewrittenListApplied;
 };
 
-export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<EitherExitFinal>;
-export type BranchSequencer = (args: BranchSequencerArgs) => Promise<EitherExitFinal>;
+export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<void>;
+export type BranchSequencer = (args: BranchSequencerArgs) => Promise<void>;
 
 export const branchSequencer: BranchSequencer = async ({
 	pathToStackedRebaseDirInsideDotGit, //
@@ -73,11 +73,14 @@ export const branchSequencer: BranchSequencer = async ({
 	rewrittenListFile = filenames.rewrittenList,
 }) => {
 	if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) {
-		return fail(`\n\nno stacked-rebase in progress? (nothing to ${rootLevelCommandName})\n\n`);
+		throw new Termination(`\n\nno stacked-rebase in progress? (nothing to ${rootLevelCommandName})\n\n`);
 	}
 
-	const [exit, stackedRebaseCommandsNew] = parseNewGoodCommands(repo, pathToStackedRebaseTodoFile, rewrittenListFile);
-	if (!stackedRebaseCommandsNew) return fail(exit);
+	const stackedRebaseCommandsNew: GoodCommand[] = parseNewGoodCommands(
+		repo,
+		pathToStackedRebaseTodoFile,
+		rewrittenListFile
+	);
 
 	// const remotes: Git.Remote[] = await repo.getRemotes();
 	// const remote: Git.Remote | undefined = remotes.find((r) =>

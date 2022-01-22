@@ -3,7 +3,7 @@
 
 import { assert } from "console";
 import { bullets, joinWith, tick } from "nice-comment";
-import { EitherExit, fail, succ } from "../util/Exitable";
+import { Termination } from "../util/error";
 
 /**
  * if invalid, should fill the array with reasons why not valid.
@@ -292,7 +292,7 @@ export type GoodCommand = {
 	  }
 );
 
-export function validate(linesOfEditedRebaseTodo: string[]): EitherExit<GoodCommand[]> {
+export function validate(linesOfEditedRebaseTodo: string[]): GoodCommand[] {
 	const badCommands: BadCommand[] = [];
 	const goodCommands: GoodCommand[] = [];
 
@@ -418,7 +418,7 @@ export function validate(linesOfEditedRebaseTodo: string[]): EitherExit<GoodComm
 	});
 
 	if (badCommands.length) {
-		return fail(
+		throw new Termination(
 			"\n" +
 				joinWith("\n\n")([
 					"found errors in rebase commands:",
@@ -432,5 +432,5 @@ export function validate(linesOfEditedRebaseTodo: string[]): EitherExit<GoodComm
 		);
 	}
 
-	return succ(goodCommands);
+	return goodCommands;
 }

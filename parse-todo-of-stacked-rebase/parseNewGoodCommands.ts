@@ -8,7 +8,6 @@ import Git from "nodegit";
 import { array } from "nice-comment";
 
 import { filenames } from "../filenames";
-import { EitherExit, fail, succ } from "../util/Exitable";
 
 import { parseTodoOfStackedRebase } from "./parseTodoOfStackedRebase";
 import { GoodCommand, stackedRebaseCommands } from "./validator";
@@ -17,9 +16,8 @@ export function parseNewGoodCommands(
 	repo: Git.Repository,
 	pathToStackedRebaseTodoFile: string, //
 	rewrittenListFile: typeof filenames.rewrittenList | typeof filenames.rewrittenListApplied
-): EitherExit<GoodCommand[]> {
-	const [exit, goodCommands] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
-	if (!goodCommands) return fail(exit);
+): GoodCommand[] {
+	const goodCommands: GoodCommand[] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
 
 	logGoodCmds(goodCommands);
 
@@ -164,7 +162,7 @@ export function parseNewGoodCommands(
 
 	assert(stackedRebaseCommandsOld.length === stackedRebaseCommandsNew.length);
 
-	return succ(stackedRebaseCommandsNew);
+	return stackedRebaseCommandsNew;
 }
 
 const logGoodCmds = (goodCommands: GoodCommand[]): void => {
