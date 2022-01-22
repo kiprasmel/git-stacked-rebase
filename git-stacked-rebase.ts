@@ -484,7 +484,7 @@ REWRITTEN_LIST_BACKUP_FILE_PATH="$STACKED_REBASE_DIR/${filenames.rewrittenList}"
 
 #echo "REBASE_MERGE_DIR $REBASE_MERGE_DIR; STACKED_REBASE_DIR $STACKED_REBASE_DIR;"
 
-cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
+cp "$REWRITTEN_LIST_FILE_PATH" "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 
 		`;
 
@@ -1382,7 +1382,9 @@ if (!module.parent) {
 				process.stderr.write(e.message);
 				process.exit(1);
 			} else {
-				throw e;
+				console.error(e);
+				process.exit(1);
+				// throw e;
 			}
 		});
 }
