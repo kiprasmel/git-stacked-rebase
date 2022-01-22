@@ -20,7 +20,10 @@ export async function testCase() {
 	} = await setupRepo();
 
 	const config: Git.Config = await repo.config();
-	config.setBool(configKeys.autoApplyIfNeeded, Git.Config.MAP.FALSE);
+
+	await config.setBool(configKeys.autoApplyIfNeeded, Git.Config.MAP.FALSE);
+	await config.setString("user.email", "tester@test.com");
+	await config.setString("user.name", "tester");
 
 	const commitOidsInInitial: Git.Oid[] = [];
 	const initialBranch: Git.Reference = await appendCommitsTo(commitOidsInInitial, 3, repo, sig);
@@ -35,7 +38,10 @@ export async function testCase() {
 
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
-	execSyncInRepo("read");
+	// const read = () => execSyncInRepo("read");
+	const read = () => void 0;
+
+	read();
 
 	const commitOidsInLatestStacked: Git.Oid[] = [];
 	await appendCommitsTo(commitOidsInLatestStacked, 12, repo, sig);
@@ -63,12 +69,12 @@ export async function testCase() {
 
 			console.log("finished editor");
 
-			execSyncInRepo("read");
+			read();
 		},
 	});
 
 	console.log("looking up branches to make sure they were created successfully");
-	execSyncInRepo("read");
+	read();
 	for (const [newPartial] of newPartialBranches) {
 		/**
 		 * will throw if branch does not exist
@@ -81,7 +87,7 @@ export async function testCase() {
 	 *
 	 */
 	console.log("launching 2nd rebase to change command of nth commit");
-	execSyncInRepo("read");
+	read();
 
 	const nthCommit2ndRebase = 5;
 
@@ -108,7 +114,7 @@ export async function testCase() {
 	execSyncInRepo(`${defaultGitCmd} rebase --continue`);
 
 	execSyncInRepo(`${defaultGitCmd} status`);
-	execSyncInRepo("read");
+	read();
 
 	/**
 	 * now some partial branches will be "gone" from the POV of the latestBranch<->initialBranch.
@@ -124,7 +130,7 @@ export async function testCase() {
 	 */
 
 	console.log("attempting early 3rd rebase to --apply");
-	execSyncInRepo("read");
+	read();
 
 	await gitStackedRebase(initialBranch.shorthand(), {
 		gitDir: dir,

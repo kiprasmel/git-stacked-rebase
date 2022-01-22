@@ -194,6 +194,7 @@ export const gitStackedRebase = async (
 			autoApplyIfNeeded: configValues.autoApplyIfNeeded,
 			config,
 		});
+		console.log({ neededToApply, userAllowedToApplyAndWeApplied });
 
 		if (neededToApply && !userAllowedToApplyAndWeApplied) {
 			return;
