@@ -5,11 +5,12 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "ts-node",
+			"name": "ts-node tests",
 			"type": "node",
 			"request": "launch",
 			"args": [
-				"${relativeFile}" //
+				// "${relativeFile}" //
+				"test/run.ts"
 			],
 			"runtimeArgs": [
 				"-r", //
