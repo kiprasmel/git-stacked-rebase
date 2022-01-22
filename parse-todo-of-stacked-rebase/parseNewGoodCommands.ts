@@ -74,6 +74,25 @@ export function parseNewGoodCommands(
 
 	let lastNewCommit: OldCommit | null = null;
 
+	/**
+	 * TODO FIXME
+	 *
+	 * we're going thru oldCommits and incrementing the `i`,
+	 * even though we jump thru and keep staying at the same `goodCommandMinIndex`.
+	 *
+	 * the oldCommits are from the rewrittenList,
+	 * meaning they only begin from where the first rewrite was done
+	 * (reword/edit/etc),
+	 *
+	 * so iterating thru them to generate a new list of good commands
+	 * ofc is broken.
+	 *
+	 * instead we need to go thru the old __commands__,
+	 * whom come from the old git-rebase-todo file (of stacked rebase),
+	 * and use the oldCommits/newCommits to re-generate the rebase todo,
+	 * but now adjusted to the commits that have been rewritten.
+	 *
+	 */
 	let goodCommandMinIndex = 1;
 	for (let i = 0; i < oldCommits.length; i++) {
 		const oldCommit: OldCommit = oldCommits[i];
