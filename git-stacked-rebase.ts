@@ -273,7 +273,6 @@ export const gitStackedRebase = async (
 		);
 
 		console.log("reading after internal rebase call");
-		execSyncInRepo("read");
 
 		if (!wasRegularRebaseInProgress || options.viewTodoOnly) {
 			if (options.editor instanceof Function) {
