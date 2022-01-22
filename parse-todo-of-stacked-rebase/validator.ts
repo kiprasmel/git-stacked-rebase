@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/consistent-type-assertions */
 /* eslint-disable indent */
 
-import { assert } from "console";
+import assert from "assert";
 import { bullets, joinWith, tick } from "nice-comment";
 import { Termination } from "../util/error";
 
