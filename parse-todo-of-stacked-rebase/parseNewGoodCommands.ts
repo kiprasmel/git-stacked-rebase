@@ -16,9 +16,9 @@ export function parseNewGoodCommands(
 	repo: Git.Repository,
 	pathToStackedRebaseTodoFile: string //
 ): GoodCommand[] {
-	const goodCommands: GoodCommand[] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
+	const oldGoodCommands: GoodCommand[] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
 
-	logGoodCmds(goodCommands);
+	logGoodCmds(oldGoodCommands);
 
 	const pathOfRewrittenList: string = path.join(repo.path(), "stacked-rebase", filenames.rewrittenList);
 	const rewrittenList: string = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
@@ -70,7 +70,7 @@ export function parseNewGoodCommands(
 	 */
 	const goodNewCommands: GoodCommand[] = [];
 
-	goodNewCommands.push(goodCommands[0]);
+	goodNewCommands.push(oldGoodCommands[0]);
 
 	let lastNewCommit: OldCommit | null = null;
 
@@ -78,7 +78,7 @@ export function parseNewGoodCommands(
 	for (let i = 0; i < oldCommits.length; i++) {
 		const oldCommit: OldCommit = oldCommits[i];
 
-		const oldCommandAtIdx: GoodCommand = goodCommands[goodCommandMinIndex];
+		const oldCommandAtIdx: GoodCommand = oldGoodCommands[goodCommandMinIndex];
 
 		if (oldCommandAtIdx.commandName in stackedRebaseCommands) {
 			goodNewCommands.push({
@@ -88,7 +88,7 @@ export function parseNewGoodCommands(
 			goodCommandMinIndex++;
 		}
 
-		const goodOldCommand = goodCommands.find((cmd) => cmd.targets?.[0] === oldCommit.oldSHA);
+		const goodOldCommand = oldGoodCommands.find((cmd) => cmd.targets?.[0] === oldCommit.oldSHA);
 
 		if (!goodOldCommand) {
 			throw new Error("TODO: goodCommandOld not found");
@@ -135,12 +135,12 @@ export function parseNewGoodCommands(
 		//
 	}
 
-	goodNewCommands.push(goodCommands[goodCommands.length - 1]);
+	goodNewCommands.push(oldGoodCommands[oldGoodCommands.length - 1]);
 
 	// console.log({ goodNewCommands });
 	console.log({
-		len: goodCommands.length,
-		goodCommands: goodCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
+		len: oldGoodCommands.length,
+		goodCommands: oldGoodCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
 	});
 
 	console.log({
@@ -148,7 +148,7 @@ export function parseNewGoodCommands(
 		goodNewCommands: goodNewCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
 	});
 
-	const stackedRebaseCommandsOld = goodCommands.filter((cmd) => cmd.commandName in stackedRebaseCommands);
+	const stackedRebaseCommandsOld = oldGoodCommands.filter((cmd) => cmd.commandName in stackedRebaseCommands);
 	const stackedRebaseCommandsNew: GoodCommand[] = goodNewCommands
 		.map((cmd, i) =>
 			cmd.commandName in stackedRebaseCommands
