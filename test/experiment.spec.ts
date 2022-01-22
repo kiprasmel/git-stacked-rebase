@@ -107,6 +107,9 @@ export async function testCase() {
 
 	execSyncInRepo(`${defaultGitCmd} rebase --continue`);
 
+	execSyncInRepo(`${defaultGitCmd} status`);
+	execSyncInRepo("read");
+
 	/**
 	 * now some partial branches will be "gone" from the POV of the latestBranch<->initialBranch.
 	 *

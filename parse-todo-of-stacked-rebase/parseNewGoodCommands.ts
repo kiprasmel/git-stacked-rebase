@@ -20,7 +20,7 @@ export function parseNewGoodCommands(
 
 	logGoodCmds(goodCommands);
 
-	const pathOfRewrittenList: string = path.join(repo.workdir(), ".git", "stacked-rebase", filenames.rewrittenList);
+	const pathOfRewrittenList: string = path.join(repo.path(), "stacked-rebase", filenames.rewrittenList);
 	const rewrittenList: string = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
 	const rewrittenListLines: string[] = rewrittenList.split("\n").filter((line) => !!line);
 
