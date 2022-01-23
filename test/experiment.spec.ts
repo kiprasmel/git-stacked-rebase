@@ -15,15 +15,10 @@ import { configKeys } from "../configKeys";
 export async function testCase() {
 	const {
 		repo, //
+		config,
 		sig,
 		dir,
 	} = await setupRepo();
-
-	const config: Git.Config = await repo.config();
-
-	await config.setBool(configKeys.autoApplyIfNeeded, Git.Config.MAP.FALSE);
-	await config.setString("user.email", "tester@test.com");
-	await config.setString("user.name", "tester");
 
 	const commitOidsInInitial: Git.Oid[] = [];
 	const initialBranch: Git.Reference = await appendCommitsTo(commitOidsInInitial, 3, repo, sig);
@@ -155,6 +150,12 @@ export async function setupRepo() {
 	const isBare = 0;
 	const repo: Git.Repository = await Git.Repository.init(dir, isBare);
 
+	const config: Git.Config = await repo.config();
+
+	await config.setBool(configKeys.autoApplyIfNeeded, Git.Config.MAP.FALSE);
+	await config.setString("user.email", "tester@test.com");
+	await config.setString("user.name", "tester");
+
 	const sig: Git.Signature = await Git.Signature.default(repo);
 	console.log("sig %s", sig);
 
@@ -166,6 +167,7 @@ export async function setupRepo() {
 	return {
 		dir,
 		repo,
+		config,
 		sig,
 		initialCommit,
 	} as const;
