@@ -699,6 +699,11 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 		console.log("big buns - the proper rebase returned");
 
 		/**
+		 * will need to apply, unless proven otherwise
+		 */
+		markThatNeedsToApply();
+
+		/**
 		 * part 2 of "the different ways to launch git rebase"
 		 */
 		execSyncInRepo(`${options.gitCmd} rebase --continue`);
@@ -770,8 +775,11 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 		});
 		console.log("");
 
-		if (rebaseChangedLocalHistory) {
-			markThatNeedsToApply();
+		if (!rebaseChangedLocalHistory) {
+			/**
+			 * TODO `unmarkThatNeedsToApply` (NOT the same as `markThatApplied`!)
+			 */
+			// unmarkThatNeedsToApply();
 		}
 
 		/**
