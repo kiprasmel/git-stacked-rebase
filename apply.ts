@@ -109,7 +109,7 @@ const getPaths = (
 		appliedPath: path.join(pathToStackedRebaseDirInsideDotGit, filenames.applied),
 	} as const);
 
-const markThatNeedsToApply = (
+export const markThatNeedsToApply = (
 	pathToStackedRebaseDirInsideDotGit: string //
 ): void =>
 	[getPaths(pathToStackedRebaseDirInsideDotGit)].map(
