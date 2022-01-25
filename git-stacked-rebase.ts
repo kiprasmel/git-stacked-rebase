@@ -11,7 +11,7 @@ import { bullets } from "nice-comment";
 
 import { filenames } from "./filenames";
 import { configKeys } from "./configKeys";
-import { apply, applyIfNeedsToApply } from "./apply";
+import { apply, applyIfNeedsToApply, markThatNeedsToApply as _markThatNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 import { branchSequencer } from "./branchSequencer";
 
@@ -288,6 +288,10 @@ export const gitStackedRebase = async (
 		const pathToStackedRebaseTodoFile: string = parsed.pathToStackedRebaseTodoFile;
 
 		const checkIsRegularRebaseStillInProgress = (): boolean => fs.existsSync(pathToRegularRebaseDirInsideDotGit);
+
+		if (fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply))) {
+			_markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
+		}
 
 		if (options.apply) {
 			return await apply({
@@ -742,7 +746,7 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 		/**
 		 * will need to apply, unless proven otherwise
 		 */
-		markThatNeedsToApply();
+		fs.writeFileSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply), "");
 
 		/**
 		 * part 2 of "the different ways to launch git rebase"
@@ -818,11 +822,14 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 		});
 		console.log("");
 
-		if (!rebaseChangedLocalHistory) {
-			/**
-			 * TODO `unmarkThatNeedsToApply` (NOT the same as `markThatApplied`!)
-			 */
-			// unmarkThatNeedsToApply();
+		fs.unlinkSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply));
+		if (rebaseChangedLocalHistory) {
+			markThatNeedsToApply();
+		} else {
+			// /**
+			//  * TODO `unmarkThatNeedsToApply` (NOT the same as `markThatApplied`!)
+			//  */
+			// // unmarkThatNeedsToApply();
 		}
 
 		/**
