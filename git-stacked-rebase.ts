@@ -1384,7 +1384,7 @@ git-stacked-rebase <branch> [-a|--apply]
 	2. but wil not push the partial branches to a remote until --push --force is used.
 
 
-git-stacked-rebase <branch> [-c|--continue]
+git-stacked-rebase [<branch>] (-c|--continue)
 
 	(!) should be used instead of git-rebase's --continue
 
@@ -1474,6 +1474,31 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 	const nameOfInitialBranch: string | undefined = eatNextArg();
 	if (!nameOfInitialBranch) {
 		throw new Termination(helpMsg);
+	}
+
+	if (["--continue", "-c"].includes(nameOfInitialBranch) && !process.argv.length) {
+		console.log("--continue without initialBranch");
+
+		/**
+		 * TODO allow `null` / make optional
+		 *
+		 * both will need some intellisense to only allow
+		 * in specific cases
+		 *
+		 * (unless we'll keep track of the
+		 * current initial branch we're working with?)
+		 *
+		 */
+		const initialBranch = "";
+
+		/**
+		 * TODO call more appropraitely / extract default options
+		 * so that it's less error-prone here
+		 */
+		return gitStackedRebase(initialBranch, {
+			gitDir,
+			continue: true,
+		});
 	}
 
 	/**
