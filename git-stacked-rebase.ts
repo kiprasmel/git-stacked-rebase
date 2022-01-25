@@ -309,6 +309,8 @@ export const gitStackedRebase = async (
 				return;
 			}
 
+			console.log("after --continue, rebase done. trying to --apply");
+
 			/**
 			 * rebase has finished. we can try to --apply now
 			 * so that the partial branches do not get out of sync.
