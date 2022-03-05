@@ -137,7 +137,9 @@ export async function testCase() {
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function setupRepo() {
 	const dir: string = path.join(__dirname, ".tmp");
-	fs.rmdirSync(dir, { recursive: true });
+	if (fs.existsSync(dir)) {
+		fs.rmdirSync(dir, { recursive: true });
+	}
 	fs.mkdirSync(dir);
 	console.log("tmpdir path %s", dir);
 
@@ -155,6 +157,12 @@ export async function setupRepo() {
 	await config.setBool(configKeys.autoApplyIfNeeded, Git.Config.MAP.FALSE);
 	await config.setString("user.email", "tester@test.com");
 	await config.setString("user.name", "tester");
+
+	/**
+	 * fixups / not implemented in libgit2.
+	 * though, would be better if received empty/minimal config by default..
+	 */
+	await config.setString("merge.conflictStyle", "diff3"); // zdiff3
 
 	const sig: Git.Signature = await Git.Signature.default(repo);
 	console.log("sig %s", sig);
