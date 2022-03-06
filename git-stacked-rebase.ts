@@ -636,6 +636,13 @@ REWRITTEN_LIST_BACKUP_FILE_PATH="$STACKED_REBASE_DIR/${filenames.rewrittenList}"
 
 cp "$REWRITTEN_LIST_FILE_PATH" "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 
+
+echo "POST REWRITE SCRIPT"
+echo "S1 $1"
+echo "STDIN:"
+cat /dev/stdin
+
+
 		`;
 
 		/**
