@@ -143,7 +143,7 @@ const doesNeedToApply = (pathToStackedRebaseDirInsideDotGit: string): boolean =>
 		? /**
 		   * check if has been applied, but that apply is outdated
 		   */
-		  fs.readFileSync(appliedPath) !== fs.readFileSync(rewrittenListPath)
+		  !fs.readFileSync(appliedPath).equals(fs.readFileSync(rewrittenListPath))
 		: false;
 
 	return needsToApplyPart2;
