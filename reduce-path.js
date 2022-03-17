@@ -3,6 +3,7 @@
 /* eslint-disable */
 
 const assert = require("assert")
+const fs = require("fs")
 
 const obj1 = {
 	"a": "b",
@@ -105,6 +106,19 @@ const obj2afterGitLog = {
 	"6775d4aed6207b75774fecc3329c4a723c1499f0": "6775d4aed6207b75774fecc3329c4a723c1499f0",
 }
 
-assert.deepStrictEqual(Object.values(obj2), Object.values(obj2afterGitLog))
+// assert.deepStrictEqual(Object.values(obj2), Object.values(obj2afterGitLog))
 
 // "b902571d8bef8f2209880daf51730da3f02bd9b3"
+
+const rewrittenList = fs.readFileSync(".git/stacked-rebase/rewritten-list", { encoding: "utf-8" })
+console.log({ rewrittenList })
+
+// const rewrittenLists = rewrittenList
+// 	.split("\n---\n")
+// 	.map(lines => lines.split("\n"))
+// 	.map(lines => lines.slice(1)) // remove $1
+// 	.filter(lines => lines.length && lines.every(line => line.length)) // remove empty "amend"
+// console.log({ lists: rewrittenLists });
+
+const rewrittenLists = rewrittenList
+	.split("\n\n")
