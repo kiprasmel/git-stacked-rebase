@@ -647,6 +647,7 @@ REWRITTEN_LIST_BACKUP_FILE_PATH="$STACKED_REBASE_DIR/${filenames.rewrittenList}"
 #EOF
 
 cat >> "$REWRITTEN_LIST_BACKUP_FILE_PATH" <<EOF
+$(git rev-parse HEAD)
 $(cat /dev/stdin)
 
 EOF
