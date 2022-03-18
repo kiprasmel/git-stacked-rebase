@@ -650,6 +650,7 @@ REWRITTEN_LIST_BACKUP_FILE_PATH="$STACKED_REBASE_DIR/${filenames.rewrittenList}"
 #EOF
 
 cat >> "$REWRITTEN_LIST_BACKUP_FILE_PATH" <<EOF
+$1
 $(cat /dev/stdin)
 
 EOF
