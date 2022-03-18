@@ -17,19 +17,51 @@ const obj1 = {
 
 	"y": "z",
 	"z": "z",
+
+	/**
+	 * this might mean that we need to go backwards
+	 * rather than forwards
+	 * (multiple commits can be reported as rewritten into one,
+	 * but i don't think the opposite is possible)
+	 * 
+	 * ~~and/or we might need another phase,
+	 * because currently, A -> F,
+	 * and both B and C stay at D.~~
+	 * done
+	 * 
+	 */
+	"A": "D",
+	"B": "D",
+	"C": "D",
+	"D": "E",
+	"E": "F",
 }
 
 reducePath(obj1)
 console.log(obj1)
-assert.deepStrictEqual(obj1, { "a": "e", "g": "h", "x": "x", "y": "z" })
+assert.deepStrictEqual(obj1, {
+	"a": "e",
+
+	"g": "h",
+
+	"x": "x",
+
+	"y": "z",
+
+	"A": "F",
+	"B": "F",
+	"C": "F",
+})
 
 function reducePath(obj) {
-	let prevSize = Infinity
+	let prevSize = -Infinity
 	let entries
+	let keysMarkedForDeletion = new Set()
 
 	// as long as it continues to improve
-	while ((entries = Object.entries(obj)).length < prevSize) {
-		prevSize = entries.length
+	while (keysMarkedForDeletion.size > prevSize) {
+		prevSize = keysMarkedForDeletion.size
+		entries = Object.entries(obj)
 
 		for (const [key, value] of entries) {
 			const keyIsValue = key === value
@@ -38,19 +70,23 @@ function reducePath(obj) {
 				continue
 			}
 
-			const gotReducedAlready = !(key in obj)
-			if (gotReducedAlready) {
-				continue
-			}
+			// const gotReducedAlready = !(key in obj)
+			// if (gotReducedAlready) {
+			// 	continue
+			// }
 
 			const valueIsAnotherKey = value in obj
 			if (valueIsAnotherKey) {
 				console.log("reducing. old:", key, "->", value, ";", value, "->", obj[value], "new:", key, "->", obj[value])
 				// reduce
 				obj[key] = obj[value]
-				delete obj[value]
+				keysMarkedForDeletion.add(value)
 			}
 		}
+	}
+
+	for (const key of keysMarkedForDeletion.keys()) {
+		delete obj[key]
 	}
 
 	/**
