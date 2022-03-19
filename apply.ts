@@ -8,6 +8,7 @@ import { noop } from "./util/noop";
 
 import { filenames } from "./filenames";
 import { configKeys } from "./configKeys";
+// eslint-disable-next-line import/no-cycle
 import {
 	BranchSequencerBase, //
 	branchSequencer,
@@ -15,6 +16,7 @@ import {
 	CallbackAfterDone,
 	BranchSequencerArgsBase,
 } from "./branchSequencer";
+import { combineRewrittenLists } from "./reducePath";
 
 export const apply: BranchSequencerBase = (args) =>
 	branchSequencer({
@@ -155,6 +157,46 @@ const doesNeedToApply = (pathToStackedRebaseDirInsideDotGit: string): boolean =>
 
 	return needsToApplyPart2;
 };
+
+export function readRewrittenListNotAppliedOrAppliedOrError(
+	repoPath: string
+): {
+	pathOfRewrittenList: string;
+	pathOfRewrittenListApplied: string;
+	rewrittenListRaw: string;
+	/**
+	 * you probably want these:
+	 */
+	combinedRewrittenList: string;
+	combinedRewrittenListLines: string[];
+} {
+	const pathOfRewrittenList: string = path.join(repoPath, "stacked-rebase", filenames.rewrittenList);
+	const pathOfRewrittenListApplied: string = path.join(repoPath, "stacked-rebase", filenames.applied);
+
+	/**
+	 * not combined yet
+	 */
+	let rewrittenListRaw: string;
+	if (fs.existsSync(pathOfRewrittenList)) {
+		rewrittenListRaw = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
+	} else if (fs.existsSync(pathOfRewrittenListApplied)) {
+		rewrittenListRaw = fs.readFileSync(pathOfRewrittenListApplied, { encoding: "utf-8" });
+	} else {
+		throw new Error(
+			`rewritten-list not found neither in ${pathOfRewrittenList}, nor in ${pathOfRewrittenListApplied}`
+		);
+	}
+
+	const { combinedRewrittenList } = combineRewrittenLists(rewrittenListRaw);
+
+	return {
+		pathOfRewrittenList,
+		pathOfRewrittenListApplied,
+		rewrittenListRaw,
+		combinedRewrittenList,
+		combinedRewrittenListLines: combinedRewrittenList.split("\n").filter((line) => !!line),
+	};
+}
 
 export async function applyIfNeedsToApply({
 	repo,
