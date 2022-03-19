@@ -183,6 +183,9 @@ for (const list of rewrittenLists) {
 
 console.log("mergedReducedRewrittenLists", mergedReducedRewrittenLists)
 
+const combinedRewrittenList = Object.entries(mergedReducedRewrittenLists[0].mapping).map(([k, v]) => k + " " + v).join("\n") + "\n"
+fs.writeFileSync("rewritten-list", combinedRewrittenList)
+
 const b4 = Object.keys(mergedReducedRewrittenLists[0].mapping)
 const after = Object.values(mergedReducedRewrittenLists[0].mapping)
 
