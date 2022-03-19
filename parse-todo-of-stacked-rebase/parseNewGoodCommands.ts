@@ -8,6 +8,7 @@ import Git from "nodegit";
 import { array } from "nice-comment";
 
 import { filenames } from "../filenames";
+import { combineRewrittenLists } from "../reduce-path";
 
 import { parseTodoOfStackedRebase } from "./parseTodoOfStackedRebase";
 import { GoodCommand, stackedRebaseCommands } from "./validator";
@@ -22,7 +23,8 @@ export function parseNewGoodCommands(
 
 	const pathOfRewrittenList: string = path.join(repo.path(), "stacked-rebase", filenames.rewrittenList);
 	const rewrittenList: string = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
-	const rewrittenListLines: string[] = rewrittenList.split("\n").filter((line) => !!line);
+	const { combinedRewrittenList } = combineRewrittenLists(rewrittenList);
+	const rewrittenListLines: string[] = combinedRewrittenList.split("\n").filter((line) => !!line);
 
 	console.log({ rewrittenListLines });
 
