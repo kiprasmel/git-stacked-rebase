@@ -190,7 +190,22 @@ export const markThatApplied = (pathToStackedRebaseDirInsideDotGit: string): voi
 	[getPaths(pathToStackedRebaseDirInsideDotGit)].map(
 		({ rewrittenListPath, needsToApplyPath, appliedPath }) => (
 			fs.existsSync(needsToApplyPath) && fs.unlinkSync(needsToApplyPath), //
-			fs.renameSync(rewrittenListPath, appliedPath),
+			/**
+			 * need to check if the `rewrittenListPath` exists,
+			 * because even if it does not, then the "apply" can still go through
+			 * and "apply", by using the already .applied file, i.e. do nothing.
+			 *
+			 * TODO just do not run "apply" if the file doesn't exist?
+			 * or is there a case where it's useful still?
+			 *
+			 */
+			fs.existsSync(rewrittenListPath) && fs.renameSync(rewrittenListPath, appliedPath),
+			// fs.existsSync(rewrittenListPath)
+			// 	? fs.renameSync(rewrittenListPath, appliedPath)
+			// 	: !fs.existsSync(appliedPath) &&
+			// 	  (() => {
+			// 			throw new Error("applying uselessly");
+			// 	  })(),
 			void 0
 		)
 	)[0];
