@@ -101,6 +101,68 @@ export type ReturnOfApplyIfNeedsToApply = {
 			userAllowedToApplyAndWeApplied: true;
 	  }
 );
+export async function applyIfNeedsToApply({
+	repo,
+	pathToStackedRebaseTodoFile,
+	pathToStackedRebaseDirInsideDotGit, //
+	autoApplyIfNeeded,
+	config,
+	...rest
+}: BranchSequencerArgsBase & {
+	autoApplyIfNeeded: boolean; //
+	config: Git.Config;
+}): Promise<ReturnOfApplyIfNeedsToApply> {
+	const needsToApply: boolean = doesNeedToApply(pathToStackedRebaseDirInsideDotGit);
+	const _markThatNeedsToApply = (): void => markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
+
+	if (!needsToApply) {
+		return {
+			neededToApply: false,
+			markThatNeedsToApply: _markThatNeedsToApply,
+		};
+	}
+
+	if (needsToApply) {
+		if (!autoApplyIfNeeded) {
+			const question = createQuestion();
+
+			const answerRaw: string = await question("\nneed to --apply before continuing. proceed? [Y/n/(a)lways] ");
+			console.log({ answerRaw });
+
+			const answer: string = answerRaw.trim().toLowerCase();
+
+			const userAllowedToApply: boolean = ["y", "yes", ""].includes(answer);
+			console.log({ userAllowedToApply });
+
+			const userAllowedToApplyAlways: boolean = ["a", "always"].includes(answer);
+
+			if (!userAllowedToApply && !userAllowedToApplyAlways) {
+				return {
+					neededToApply: true,
+					userAllowedToApplyAndWeApplied: false,
+					markThatNeedsToApply: _markThatNeedsToApply,
+				};
+			}
+
+			if (userAllowedToApplyAlways) {
+				await config.setBool(configKeys.autoApplyIfNeeded, 1);
+			}
+		}
+
+		await apply({
+			repo,
+			pathToStackedRebaseTodoFile,
+			pathToStackedRebaseDirInsideDotGit, //
+			...rest,
+		});
+	}
+
+	return {
+		neededToApply: true,
+		userAllowedToApplyAndWeApplied: true, //
+		markThatNeedsToApply: _markThatNeedsToApply,
+	};
+}
 
 const getPaths = (
 	pathToStackedRebaseDirInsideDotGit: string //
@@ -195,68 +257,5 @@ export function readRewrittenListNotAppliedOrAppliedOrError(
 		rewrittenListRaw,
 		combinedRewrittenList,
 		combinedRewrittenListLines: combinedRewrittenList.split("\n").filter((line) => !!line),
-	};
-}
-
-export async function applyIfNeedsToApply({
-	repo,
-	pathToStackedRebaseTodoFile,
-	pathToStackedRebaseDirInsideDotGit, //
-	autoApplyIfNeeded,
-	config,
-	...rest
-}: BranchSequencerArgsBase & {
-	autoApplyIfNeeded: boolean; //
-	config: Git.Config;
-}): Promise<ReturnOfApplyIfNeedsToApply> {
-	const needsToApply: boolean = doesNeedToApply(pathToStackedRebaseDirInsideDotGit);
-	const _markThatNeedsToApply = (): void => markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
-
-	if (!needsToApply) {
-		return {
-			neededToApply: false,
-			markThatNeedsToApply: _markThatNeedsToApply,
-		};
-	}
-
-	if (needsToApply) {
-		if (!autoApplyIfNeeded) {
-			const question = createQuestion();
-
-			const answerRaw: string = await question("\nneed to --apply before continuing. proceed? [Y/n/(a)lways] ");
-			console.log({ answerRaw });
-
-			const answer: string = answerRaw.trim().toLowerCase();
-
-			const userAllowedToApply: boolean = ["y", "yes", ""].includes(answer);
-			console.log({ userAllowedToApply });
-
-			const userAllowedToApplyAlways: boolean = ["a", "always"].includes(answer);
-
-			if (!userAllowedToApply && !userAllowedToApplyAlways) {
-				return {
-					neededToApply: true,
-					userAllowedToApplyAndWeApplied: false,
-					markThatNeedsToApply: _markThatNeedsToApply,
-				};
-			}
-
-			if (userAllowedToApplyAlways) {
-				await config.setBool(configKeys.autoApplyIfNeeded, 1);
-			}
-		}
-
-		await apply({
-			repo,
-			pathToStackedRebaseTodoFile,
-			pathToStackedRebaseDirInsideDotGit, //
-			...rest,
-		});
-	}
-
-	return {
-		neededToApply: true,
-		userAllowedToApplyAndWeApplied: true, //
-		markThatNeedsToApply: _markThatNeedsToApply,
 	};
 }
