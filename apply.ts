@@ -126,7 +126,7 @@ export const markThatApplied = (pathToStackedRebaseDirInsideDotGit: string): voi
 	[getPaths(pathToStackedRebaseDirInsideDotGit)].map(
 		({ rewrittenListPath, needsToApplyPath, appliedPath }) => (
 			fs.existsSync(needsToApplyPath) && fs.unlinkSync(needsToApplyPath), //
-			fs.copyFileSync(rewrittenListPath, appliedPath),
+			fs.renameSync(rewrittenListPath, appliedPath),
 			void 0
 		)
 	)[0];
