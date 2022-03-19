@@ -4,6 +4,7 @@
 
 const assert = require("assert")
 const fs = require("fs")
+const { execSync } = require("child_process")
 
 const obj1 = {
 	"a": "b",
@@ -103,75 +104,93 @@ const prefix = "" // "test/.tmp-described.off/"
 const rewrittenListFile = fs.readFileSync(prefix + ".git/stacked-rebase/rewritten-list", { encoding: "utf-8" })
 console.log({ rewrittenListFile })
 
-// const rewrittenLists = rewrittenListFile
-// 	.split("\n---\n")
-// 	.map(lines => lines.split("\n"))
-// 	.map(lines => lines.slice(1)) // remove $1
-// 	.filter(lines => lines.length && lines.every(line => line.length)) // remove empty "amend"
-// console.log({ lists: rewrittenLists });
+/**
+ * $1 (amend/rebase)
+ */
+const extraOperatorLineCount = 1
 
 const rewrittenLists = rewrittenListFile
 	.split("\n\n")
 	.map(lists => lists.split("\n"))
 	.map(list => list[list.length - 1] === "" ? list.slice(0, -1) : list)
 	// .slice(0, -1)
-	.filter(list => list.length)
-	.map(list => list.map(line => line.split(" ")))
-	.map(list => Object.fromEntries(list))
-console.log({ rewrittenLists });
+	.filter(list => list.length > extraOperatorLineCount)
+	.map(list => ({
+			type: list[0],
+			mapping: Object.fromEntries(
+				list.slice(1).map(line => line.split(" "))
+			)
+		})
+	)
+	// .map(list => Object.fromEntries(list))
+console.log("rewrittenLists", rewrittenLists)
 
-const reducedRewrittenLists = rewrittenLists
-	// .map(list => (reducePath(list), list))
-	.map(list => reducePath(list))
+let prev = []
+let mergedReducedRewrittenLists = []
+for (const list of rewrittenLists) {
+	if (list.type === "amend") {
+		prev.push(list)
+	} else if (list.type === "rebase") {
+		/**
+		 * merging time
+		 */
+		for (const amend of prev) {
+			assert.equal(Object.keys(amend.mapping).length, 1)
 
-console.log({ reducedRewrittenLists });
+			const [key, value] = Object.entries(amend.mapping)[0]
 
-const last = reducedRewrittenLists[reducedRewrittenLists.length - 1]
-const lastVals = Object.values(last).reverse()
-console.log({ lastVals });
+			/**
+			 * (try to) merge
+			 */
+			if (key in list.mapping) {
+				if (value === list.mapping[key]) {
+					// pointless
+					continue
+				} else {
+					throw new Error(
+						`NOT IMPLEMENTED - identical key in 'amend' and 'rebase', but different values.`
+					+ `(key = "${key}", amend's value = "${value}", rebase's value = "${list.mapping[key]}")`
+					)
+				}
+			} else {
+				if (Object.values(list.mapping).includes(key)) {
+					/**
+					 * add the single new entry of amend's mapping into rebase's mapping.
+					 * it will get `reducePath`'d later.
+					 */
+					Object.assign(list.mapping, amend.mapping)
+				} else {
+					throw new Error(
+						"NOT IMPLEMENTED - neither key nor value of 'amend' was included in the 'rebase'."
+					+ "could be that we missed the ordering, or when we call 'reducePath', or something else."
+					)
+				}
+			}
+		}
+
+		prev = []
+		reducePath(list.mapping)
+		mergedReducedRewrittenLists.push(list)
+	} else {
+		throw new Error(`invalid list type (got "${list.type}")`)
+	}
+}
 /**
- * compare with
- * git log --pretty=format:"%H"
+ * TODO handle multiple rebases
+ * or, multiple separate files for each new rebase,
+ * since could potentially lose some info if skipping partial steps?
  */
 
-/**
- * ayo lol, prolly found a bug in git -- the output in
- * rewritten-list, or /dev/stdin, after the rebase is done,
- * is not fully complete -- it doesn't correctly print the SHAs
- * that got changed while the rebase was paused,
- * e.g. commit --amend while paused by "edit" or "break" commands.
- * 
- * thus, at least until we report it and confirm it's actually a bug
- * and not intended this way,
- * we can get the desired output for ourselves
- * by merging all the rewrittenLists!
- * 
- */
+console.log("mergedReducedRewrittenLists", mergedReducedRewrittenLists)
 
-/** 
- * TODO verify keys/values are not identical in a bad way
- */
-const merge = (A, B) => ({
-	...A,
-	...B
-})
+const b4 = Object.keys(mergedReducedRewrittenLists[0].mapping)
+const after = Object.values(mergedReducedRewrittenLists[0].mapping)
 
-const mergedReducedRewrittenLists = reducedRewrittenLists.reduce((acc, curr) => reducePath(merge(acc, curr)), {})
+fs.writeFileSync("b4", b4.join("\n") + "\n")
+fs.writeFileSync("after", after.join("\n") + "\n")
 
-console.log({ mergedReducedRewrittenLists });
-const vals = Object.values(mergedReducedRewrittenLists).reverse()
-console.log({ vals });
+const N = after.length
+console.log({ N })
 
-/**
- * it fixes the above issues!
- * 
- * but wait! we cannot just merge like this,
- * because when we take the values,
- * the commits whom were not the full list (and only 1 commit remap, because --amend,
- * or not full rebase up till the initial branch (TODO need to confirm the 2nd case)),
- * end up being in the wrong place (they end up either in the start or the end).
- * 
- * the problem is that we don't know __when__ the rewrite of the commit happened.
- * TODO need to track that as well?
- * 
- */
+execSync(`git log --pretty=format:"%H" | head -n ${N} | tac - > curr`)
+execSync(`diff -us curr after`, { stdio: "inherit" })
