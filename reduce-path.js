@@ -100,100 +100,111 @@ function reducePath(obj) {
 	return obj
 }
 
-const prefix = "" // "test/.tmp-described.off/"
-const rewrittenListFile = fs.readFileSync(prefix + ".git/stacked-rebase/rewritten-list", { encoding: "utf-8" })
-console.log({ rewrittenListFile })
+function combineRewrittenLists(rewrittenListFile) {
+	/**
+	 * $1 (amend/rebase)
+	 */
+	const extraOperatorLineCount = 1
 
-/**
- * $1 (amend/rebase)
- */
-const extraOperatorLineCount = 1
+	const rewrittenLists = rewrittenListFile
+		.split("\n\n")
+		.map(lists => lists.split("\n"))
+		.map(list => list[list.length - 1] === "" ? list.slice(0, -1) : list)
+		// .slice(0, -1)
+		.filter(list => list.length > extraOperatorLineCount)
+		.map(list => ({
+				type: list[0],
+				mapping: Object.fromEntries(
+					list.slice(1).map(line => line.split(" "))
+				)
+			})
+		)
+		// .map(list => Object.fromEntries(list))
+	console.log("rewrittenLists", rewrittenLists)
 
-const rewrittenLists = rewrittenListFile
-	.split("\n\n")
-	.map(lists => lists.split("\n"))
-	.map(list => list[list.length - 1] === "" ? list.slice(0, -1) : list)
-	// .slice(0, -1)
-	.filter(list => list.length > extraOperatorLineCount)
-	.map(list => ({
-			type: list[0],
-			mapping: Object.fromEntries(
-				list.slice(1).map(line => line.split(" "))
-			)
-		})
-	)
-	// .map(list => Object.fromEntries(list))
-console.log("rewrittenLists", rewrittenLists)
-
-let prev = []
-let mergedReducedRewrittenLists = []
-for (const list of rewrittenLists) {
-	if (list.type === "amend") {
-		prev.push(list)
-	} else if (list.type === "rebase") {
-		/**
-		 * merging time
-		 */
-		for (const amend of prev) {
-			assert.equal(Object.keys(amend.mapping).length, 1)
-
-			const [key, value] = Object.entries(amend.mapping)[0]
-
+	let prev = []
+	let mergedReducedRewrittenLists = []
+	for (const list of rewrittenLists) {
+		if (list.type === "amend") {
+			prev.push(list)
+		} else if (list.type === "rebase") {
 			/**
-			 * (try to) merge
+			 * merging time
 			 */
-			if (key in list.mapping) {
-				if (value === list.mapping[key]) {
-					// pointless
-					continue
+			for (const amend of prev) {
+				assert.equal(Object.keys(amend.mapping).length, 1)
+
+				const [key, value] = Object.entries(amend.mapping)[0]
+
+				/**
+				 * (try to) merge
+				 */
+				if (key in list.mapping) {
+					if (value === list.mapping[key]) {
+						// pointless
+						continue
+					} else {
+						throw new Error(
+							`NOT IMPLEMENTED - identical key in 'amend' and 'rebase', but different values.`
+						+ `(key = "${key}", amend's value = "${value}", rebase's value = "${list.mapping[key]}")`
+						)
+					}
 				} else {
-					throw new Error(
-						`NOT IMPLEMENTED - identical key in 'amend' and 'rebase', but different values.`
-					+ `(key = "${key}", amend's value = "${value}", rebase's value = "${list.mapping[key]}")`
-					)
-				}
-			} else {
-				if (Object.values(list.mapping).includes(key)) {
-					/**
-					 * add the single new entry of amend's mapping into rebase's mapping.
-					 * it will get `reducePath`'d later.
-					 */
-					Object.assign(list.mapping, amend.mapping)
-				} else {
-					throw new Error(
-						"NOT IMPLEMENTED - neither key nor value of 'amend' was included in the 'rebase'."
-					+ "could be that we missed the ordering, or when we call 'reducePath', or something else."
-					)
+					if (Object.values(list.mapping).includes(key)) {
+						/**
+						 * add the single new entry of amend's mapping into rebase's mapping.
+						 * it will get `reducePath`'d later.
+						 */
+						Object.assign(list.mapping, amend.mapping)
+					} else {
+						throw new Error(
+							"NOT IMPLEMENTED - neither key nor value of 'amend' was included in the 'rebase'."
+						+ "could be that we missed the ordering, or when we call 'reducePath', or something else."
+						)
+					}
 				}
 			}
-		}
 
-		prev = []
-		reducePath(list.mapping)
-		mergedReducedRewrittenLists.push(list)
-	} else {
-		throw new Error(`invalid list type (got "${list.type}")`)
+			prev = []
+			reducePath(list.mapping)
+			mergedReducedRewrittenLists.push(list)
+		} else {
+			throw new Error(`invalid list type (got "${list.type}")`)
+		}
+	}
+	/**
+	 * TODO handle multiple rebases
+	 * or, multiple separate files for each new rebase,
+	 * since could potentially lose some info if skipping partial steps?
+	 */
+
+	console.log("mergedReducedRewrittenLists", mergedReducedRewrittenLists)
+
+	const combinedRewrittenList = Object.entries(mergedReducedRewrittenLists[0].mapping).map(([k, v]) => k + " " + v).join("\n") + "\n"
+	fs.writeFileSync("rewritten-list", combinedRewrittenList)
+
+	return {
+		mergedReducedRewrittenLists,
+		combinedRewrittenList,
 	}
 }
-/**
- * TODO handle multiple rebases
- * or, multiple separate files for each new rebase,
- * since could potentially lose some info if skipping partial steps?
- */
 
-console.log("mergedReducedRewrittenLists", mergedReducedRewrittenLists)
+if (!module.parent) {
+	const prefix = "" // "test/.tmp-described.off/"
+	const rewrittenListFile = fs.readFileSync(prefix + ".git/stacked-rebase/rewritten-list", { encoding: "utf-8" })
+	console.log({ rewrittenListFile })
 
-const combinedRewrittenList = Object.entries(mergedReducedRewrittenLists[0].mapping).map(([k, v]) => k + " " + v).join("\n") + "\n"
-fs.writeFileSync("rewritten-list", combinedRewrittenList)
+	const { mergedReducedRewrittenLists } = combineRewrittenLists(rewrittenListFile)
 
-const b4 = Object.keys(mergedReducedRewrittenLists[0].mapping)
-const after = Object.values(mergedReducedRewrittenLists[0].mapping)
+	const b4 = Object.keys(mergedReducedRewrittenLists[0].mapping)
+	const after = Object.values(mergedReducedRewrittenLists[0].mapping)
+	
+	fs.writeFileSync("b4", b4.join("\n") + "\n")
+	fs.writeFileSync("after", after.join("\n") + "\n")
 
-fs.writeFileSync("b4", b4.join("\n") + "\n")
-fs.writeFileSync("after", after.join("\n") + "\n")
+	const N = after.length
+	console.log({ N })
 
-const N = after.length
-console.log({ N })
-
-execSync(`git log --pretty=format:"%H" | head -n ${N} | tac - > curr`)
-execSync(`diff -us curr after`, { stdio: "inherit" })
+	execSync(`git log --pretty=format:"%H" | head -n ${N} | tac - > curr`)
+	execSync(`diff -us curr after`, { stdio: "inherit" })
+}
