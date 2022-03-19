@@ -134,6 +134,13 @@ export const markThatApplied = (pathToStackedRebaseDirInsideDotGit: string): voi
 const doesNeedToApply = (pathToStackedRebaseDirInsideDotGit: string): boolean => {
 	const { rewrittenListPath, needsToApplyPath, appliedPath } = getPaths(pathToStackedRebaseDirInsideDotGit);
 
+	if (!fs.existsSync(rewrittenListPath)) {
+		/**
+		 * nothing to apply
+		 */
+		return false;
+	}
+
 	const needsToApplyPart1: boolean = fs.existsSync(needsToApplyPath);
 	if (needsToApplyPart1) {
 		return true;
