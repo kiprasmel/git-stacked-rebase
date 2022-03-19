@@ -22,7 +22,17 @@ export function parseNewGoodCommands(
 	logGoodCmds(oldGoodCommands);
 
 	const pathOfRewrittenList: string = path.join(repo.path(), "stacked-rebase", filenames.rewrittenList);
-	const rewrittenList: string = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
+	const pathOfRewrittenListApplied: string = path.join(repo.path(), "stacked-rebase", filenames.applied);
+	let rewrittenList: string;
+	if (fs.existsSync(pathOfRewrittenList)) {
+		rewrittenList = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
+	} else if (fs.existsSync(pathOfRewrittenListApplied)) {
+		rewrittenList = fs.readFileSync(pathOfRewrittenListApplied, { encoding: "utf-8" });
+	} else {
+		throw new Error(
+			`rewritten-list not found neither in ${pathOfRewrittenList}, nor in ${pathOfRewrittenListApplied}`
+		);
+	}
 	const { combinedRewrittenList } = combineRewrittenLists(rewrittenList);
 	const rewrittenListLines: string[] = combinedRewrittenList.split("\n").filter((line) => !!line);
 
