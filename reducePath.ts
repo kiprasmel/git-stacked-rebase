@@ -1,63 +1,20 @@
-#!/usr/bin/env node
+#!/usr/bin/env ts-node-dev
 
 /* eslint-disable */
 
-const assert = require("assert")
-const fs = require("fs")
-const { execSync } = require("child_process")
+import assert from "assert"
+import fs from "fs"
+import { execSync } from "child_process"
 
-const obj1 = {
-	"a": "b",
-	"b": "c",
-	"c": "d",
-	"d": "e",
+export type StringFromToMap = { [key: string]: string }
 
-	"g": "h",
-
-	"x": "x",
-
-	"y": "z",
-	"z": "z",
-
-	/**
-	 * this might mean that we need to go backwards
-	 * rather than forwards
-	 * (multiple commits can be reported as rewritten into one,
-	 * but i don't think the opposite is possible)
-	 * 
-	 * ~~and/or we might need another phase,
-	 * because currently, A -> F,
-	 * and both B and C stay at D.~~
-	 * done
-	 * 
-	 */
-	"A": "D",
-	"B": "D",
-	"C": "D",
-	"D": "E",
-	"E": "F",
-}
-
-reducePath(obj1)
-console.log(obj1)
-assert.deepStrictEqual(obj1, {
-	"a": "e",
-
-	"g": "h",
-
-	"x": "x",
-
-	"y": "z",
-
-	"A": "F",
-	"B": "F",
-	"C": "F",
-})
-
-function reducePath(obj) {
-	let prevSize = -Infinity
-	let entries
-	let keysMarkedForDeletion = new Set()
+/**
+ * mutates `obj` and returns it too
+ */
+export function reducePath(obj: StringFromToMap): StringFromToMap {
+	let prevSize             : number             = -Infinity
+	let entries              : [string, string][]
+	let keysMarkedForDeletion: Set<string>        = new Set<string>()
 
 	// as long as it continues to improve
 	while (keysMarkedForDeletion.size > prevSize) {
@@ -100,30 +57,61 @@ function reducePath(obj) {
 	return obj
 }
 
-function combineRewrittenLists(rewrittenListFile) {
+export type RewrittenListBlockBase = {
+	mapping: StringFromToMap
+}
+export type RewrittenListBlockAmend = RewrittenListBlockBase & {
+	type: "amend"
+}
+export type RewrittenListBlockRebase = RewrittenListBlockBase & {
+	type: "rebase"
+}
+export type RewrittenListBlock = RewrittenListBlockAmend | RewrittenListBlockRebase
+
+export type CombineRewrittenListsRet = {
+	/**
+	 * notice that this only includes rebases, no amends --
+	 * that's the whole point.
+	 * 
+	 * further, probably only the 1st one is necessary,
+	 * because it's likely that we'll start creating separate files for new rebases,
+	 * or that might not be needed at all, because we might be able to
+	 * --apply after every rebase, no matter if the user exited or not,
+	 * thus we'd always have only 1 "rebase" block in the rewritten list.
+	 */
+	mergedReducedRewrittenLists: RewrittenListBlockRebase[],
+
+	/**
+	 * the git's standard represantation of the rewritten-list
+	 * (no extras of ours)
+	 */
+	combinedRewrittenList: string,
+}
+export function combineRewrittenLists(rewrittenListFileContent: string): CombineRewrittenListsRet {
 	/**
 	 * $1 (amend/rebase)
 	 */
-	const extraOperatorLineCount = 1
+	const extraOperatorLineCount = 1 as const
 
-	const rewrittenLists = rewrittenListFile
+	const rewrittenLists: RewrittenListBlock[] = rewrittenListFileContent
 		.split("\n\n")
 		.map(lists => lists.split("\n"))
 		.map(list => list[list.length - 1] === "" ? list.slice(0, -1) : list)
 		// .slice(0, -1)
 		.filter(list => list.length > extraOperatorLineCount)
-		.map(list => ({
-				type: list[0],
-				mapping: Object.fromEntries(
-					list.slice(1).map(line => line.split(" "))
+		.map((list): RewrittenListBlock => ({
+				type: list[0] as RewrittenListBlock["type"],
+				mapping: Object.fromEntries<string>(
+					list.slice(1).map(line => line.split(" ") as [string, string])
 				)
 			})
 		)
 		// .map(list => Object.fromEntries(list))
 	console.log("rewrittenLists", rewrittenLists)
 
-	let prev = []
-	let mergedReducedRewrittenLists = []
+	let prev                       : RewrittenListBlockAmend[]  = []
+	let mergedReducedRewrittenLists: RewrittenListBlockRebase[] = []
+
 	for (const list of rewrittenLists) {
 		if (list.type === "amend") {
 			prev.push(list)
@@ -169,7 +157,7 @@ function combineRewrittenLists(rewrittenListFile) {
 			reducePath(list.mapping)
 			mergedReducedRewrittenLists.push(list)
 		} else {
-			throw new Error(`invalid list type (got "${list.type}")`)
+			throw new Error(`invalid list type (got "${(list as any).type}")`)
 		}
 	}
 	/**
@@ -181,7 +169,7 @@ function combineRewrittenLists(rewrittenListFile) {
 	console.log("mergedReducedRewrittenLists", mergedReducedRewrittenLists)
 
 	const combinedRewrittenList = Object.entries(mergedReducedRewrittenLists[0].mapping).map(([k, v]) => k + " " + v).join("\n") + "\n"
-	fs.writeFileSync("rewritten-list", combinedRewrittenList)
+	// fs.writeFileSync("rewritten-list", combinedRewrittenList)
 
 	return {
 		mergedReducedRewrittenLists,
@@ -198,13 +186,21 @@ if (!module.parent) {
 
 	const b4 = Object.keys(mergedReducedRewrittenLists[0].mapping)
 	const after = Object.values(mergedReducedRewrittenLists[0].mapping)
+
+	const path = require("path")
+	const os = require("os")
+	const dir = path.join(os.tmpdir(), "gsr-reduce-path")
+	fs.mkdirSync(dir, { recursive: true })
 	
-	fs.writeFileSync("b4", b4.join("\n") + "\n")
-	fs.writeFileSync("after", after.join("\n") + "\n")
+	const b4path    = path.join(dir, "b4")
+	const afterpath = path.join(dir, "after")
+	fs.writeFileSync(b4path   , b4   .join("\n") + "\n")
+	fs.writeFileSync(afterpath, after.join("\n") + "\n")
 
 	const N = after.length
 	console.log({ N })
 
-	execSync(`git log --pretty=format:"%H" | head -n ${N} | tac - > curr`)
-	execSync(`diff -us curr after`, { stdio: "inherit" })
+	const currpath = path.join(dir, "curr")
+	execSync(`git log --pretty=format:"%H" | head -n ${N} | tac - > ${currpath}`)
+	execSync(`diff -us ${currpath} ${afterpath}`, { stdio: "inherit" })
 }
