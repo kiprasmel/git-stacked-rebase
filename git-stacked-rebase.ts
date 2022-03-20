@@ -289,8 +289,6 @@ export const gitStackedRebase = async (
 
 		const checkIsRegularRebaseStillInProgress = (): boolean => fs.existsSync(pathToRegularRebaseDirInsideDotGit);
 
-		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
-
 		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
 			repo, //
 			nameOfInitialBranch,
@@ -413,6 +411,14 @@ export const gitStackedRebase = async (
 		if (wasRegularRebaseInProgress) {
 			throw new Termination("regular rebase already in progress");
 		}
+
+		/**
+		 * only create the dir now, when it's needed.
+		 * otherwise, other commands can incorrectly infer
+		 * that our own stacked rebase is in progress,
+		 * when it's not, up until now.
+		 */
+		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
 
 		await createInitialEditTodoOfGitStackedRebase(
 			repo, //
