@@ -171,6 +171,7 @@ const getPaths = (
 		rewrittenListPath: path.join(pathToStackedRebaseDirInsideDotGit, filenames.rewrittenList),
 		needsToApplyPath: path.join(pathToStackedRebaseDirInsideDotGit, filenames.needsToApply),
 		appliedPath: path.join(pathToStackedRebaseDirInsideDotGit, filenames.applied),
+		gitRebaseTodoPath: path.join(pathToStackedRebaseDirInsideDotGit, filenames.gitRebaseTodo),
 	} as const);
 
 export const markThatNeedsToApply = (
@@ -188,7 +189,7 @@ export const markThatNeedsToApply = (
 
 export const markThatApplied = (pathToStackedRebaseDirInsideDotGit: string): void =>
 	[getPaths(pathToStackedRebaseDirInsideDotGit)].map(
-		({ rewrittenListPath, needsToApplyPath, appliedPath }) => (
+		({ rewrittenListPath, needsToApplyPath, gitRebaseTodoPath }) => (
 			fs.existsSync(needsToApplyPath) && fs.unlinkSync(needsToApplyPath), //
 			/**
 			 * need to check if the `rewrittenListPath` exists,
@@ -199,13 +200,17 @@ export const markThatApplied = (pathToStackedRebaseDirInsideDotGit: string): voi
 			 * or is there a case where it's useful still?
 			 *
 			 */
-			fs.existsSync(rewrittenListPath) && fs.renameSync(rewrittenListPath, appliedPath),
-			// fs.existsSync(rewrittenListPath)
-			// 	? fs.renameSync(rewrittenListPath, appliedPath)
-			// 	: !fs.existsSync(appliedPath) &&
-			// 	  (() => {
-			// 			throw new Error("applying uselessly");
-			// 	  })(),
+			// fs.existsSync(rewrittenListPath) && fs.renameSync(rewrittenListPath, appliedPath),
+			// // fs.existsSync(rewrittenListPath)
+			// // 	? fs.renameSync(rewrittenListPath, appliedPath)
+			// // 	: !fs.existsSync(appliedPath) &&
+			// // 	  (() => {
+			// // 			throw new Error("applying uselessly");
+			// // 	  })(),
+			fs.existsSync(rewrittenListPath) && fs.unlinkSync(rewrittenListPath),
+			fs.existsSync(gitRebaseTodoPath) && fs.unlinkSync(gitRebaseTodoPath),
+			fs.readdirSync(pathToStackedRebaseDirInsideDotGit).length === 0 &&
+				fs.rmdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true }),
 			void 0
 		)
 	)[0];
