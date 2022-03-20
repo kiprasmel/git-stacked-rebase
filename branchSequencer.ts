@@ -7,67 +7,26 @@ import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { Termination } from "./util/error";
 
 import { parseNewGoodCommands } from "./parse-todo-of-stacked-rebase/parseNewGoodCommands";
-import { GoodCommand } from "./parse-todo-of-stacked-rebase/validator";
+import { GoodCommand, GoodCommandStacked } from "./parse-todo-of-stacked-rebase/validator";
 
-export type ActionInsideEachCheckedOutBranch = (ctx: ArgsForActionInsideEachCheckedOutBranch) => void | Promise<void>;
-
-/**
- *
- */
-
-export type ArgsForActionInsideEachCheckedOutBranch = {
-	repo: Git.Repository; //
-	targetBranch: string;
-	targetCommitSHA: string;
-	cmd: GoodCommand;
-	isFinalCheckout: boolean;
-	execSyncInRepo: ReturnType<typeof createExecSyncInRepo>;
-};
-
-/**
- *
- */
-
-export type CtxForCallbackAfterDone = {
+export type GetBranchesCtx = {
 	pathToStackedRebaseDirInsideDotGit: string;
-};
-
-export type CallbackAfterDone = (ctx: CtxForCallbackAfterDone) => void | Promise<void>;
-
-/**
- *
- */
-
-export type BranchSequencerArgsBase = {
-	pathToStackedRebaseDirInsideDotGit: string; //
-	// goodCommands: GoodCommand[];
-	pathToStackedRebaseTodoFile: string;
-	repo: Git.Repository;
 	rootLevelCommandName: string;
-	gitCmd: string;
+	repo: Git.Repository;
+	pathToStackedRebaseTodoFile: string;
 };
-
-export type BranchSequencerArgs = BranchSequencerArgsBase & {
-	// callbackBeforeBegin?: CallbackAfterDone; // TODO
-	actionInsideEachCheckedOutBranch: ActionInsideEachCheckedOutBranch;
-	delayMsBetweenCheckouts?: number;
-	callbackAfterDone?: CallbackAfterDone;
+export type SimpleBranchAndCommit = {
+	commitSHA: string | null;
+	branchEndFullName: string;
+	// branchExistsYet: boolean; // TODO
 };
+export type GetBoundariesInclInitial = (ctx: GetBranchesCtx) => SimpleBranchAndCommit[];
 
-export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<void>;
-export type BranchSequencer = (args: BranchSequencerArgs) => Promise<void>;
-
-export const branchSequencer: BranchSequencer = async ({
+const defautlGetBoundariesInclInitial: GetBoundariesInclInitial = ({
 	pathToStackedRebaseDirInsideDotGit, //
-	// goodCommands,
-	pathToStackedRebaseTodoFile,
-	repo,
 	rootLevelCommandName,
-	delayMsBetweenCheckouts = 0,
-	// callbackBeforeBegin,
-	actionInsideEachCheckedOutBranch,
-	callbackAfterDone = (): void => {},
-	gitCmd,
+	repo,
+	pathToStackedRebaseTodoFile,
 }) => {
 	/**
 	 * TODO REMOVE / modify this logic (see next comment)
@@ -122,74 +81,102 @@ export const branchSequencer: BranchSequencer = async ({
 	 */
 	const stackedRebaseCommandsNew: GoodCommand[] = parseNewGoodCommands(repo, pathToStackedRebaseTodoFile);
 
-	// const remotes: Git.Remote[] = await repo.getRemotes();
-	// const remote: Git.Remote | undefined = remotes.find((r) =>
-	// 	stackedRebaseCommandsOld.find((cmd) => cmd.targets && cmd.targets[0].includes(r.name()))
-	// );
+	for (const cmd of stackedRebaseCommandsNew) {
+		assert(cmd.rebaseKind === "stacked");
+		assert(cmd.targets?.length);
+	}
 
-	// const diffCommands: string[] = stackedRebaseCommandsOld
-	// 	.map((cmd, idx) => {
-	// 		const otherCmd: GoodCommand = stackedRebaseCommandsNew[idx];
-	// 		assert(cmd.commandName === otherCmd.commandName);
-	// 		assert(cmd.targets?.length);
-	// 		assert(otherCmd.targets?.length);
-	// 		assert(cmd.targets.every((t) => otherCmd.targets?.every((otherT) => t === otherT)));
+	return (stackedRebaseCommandsNew //
+		.filter((cmd) => cmd.rebaseKind === "stacked") as GoodCommandStacked[]) //
+		.map(
+			(cmd): SimpleBranchAndCommit => ({
+				commitSHA: cmd.commitSHAThatBranchPointsTo,
+				branchEndFullName: cmd.targets![0],
+			})
+		);
+};
 
-	// 		const trim = (str: string): string => str.replace("refs/heads/", "").replace("refs/remotes/", "");
+/**
+ *
+ */
 
-	// 		return !remote || idx === 0 // || idx === stackedRebaseCommandsOld.length - 1
-	// 			? ""
-	// 			: `git -c core.pager='' diff -u ${remote.name()}/${trim(cmd.targets[0])} ${trim(
-	// 					otherCmd.targets[0]
-	// 			  )}`;
-	// 	})
-	// 	.filter((cmd) => !!cmd);
+export type ActionInsideEachCheckedOutBranchCtx = {
+	repo: Git.Repository; //
+	targetBranch: string;
+	targetCommitSHA: string;
+	isFinalCheckout: boolean;
+	execSyncInRepo: ReturnType<typeof createExecSyncInRepo>;
+};
+export type ActionInsideEachCheckedOutBranch = (ctx: ActionInsideEachCheckedOutBranchCtx) => void | Promise<void>;
 
+export type BranchSequencerArgsBase = {
+	pathToStackedRebaseDirInsideDotGit: string; //
+	// goodCommands: GoodCommand[];
+	pathToStackedRebaseTodoFile: string;
+	repo: Git.Repository;
+	rootLevelCommandName: string;
+	gitCmd: string;
+};
+export type BranchSequencerArgs = BranchSequencerArgsBase & {
+	// callbackBeforeBegin?: CallbackAfterDone; // TODO
+	actionInsideEachCheckedOutBranch: ActionInsideEachCheckedOutBranch;
+	delayMsBetweenCheckouts?: number;
 	/**
-	 * first actually reset, only then diff
+	 *
 	 */
+	getBoundariesInclInitial?: GetBoundariesInclInitial;
+};
 
-	// const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = (
-	// 	await getWantedCommitsWithBranchBoundaries(
-	// 		repo, //
-	// 		initialBranch
-	// 	)
-	// ).reverse();
+export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<void>;
+export type BranchSequencer = (args: BranchSequencerArgs) => Promise<void>;
 
-	// const previousTargetBranchName: string = stackedRebaseCommandsNew[0]
-	// 	? stackedRebaseCommandsNew[0].targets?.[0] ?? ""
-	// 	: "";
-
+export const branchSequencer: BranchSequencer = async ({
+	pathToStackedRebaseDirInsideDotGit, //
+	pathToStackedRebaseTodoFile,
+	repo,
+	rootLevelCommandName,
+	delayMsBetweenCheckouts = 0,
+	// callbackBeforeBegin,
+	actionInsideEachCheckedOutBranch,
+	gitCmd,
+	//
+	getBoundariesInclInitial = defautlGetBoundariesInclInitial,
+}) => {
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
-	const checkout = async (cmds: GoodCommand[]): Promise<void> => {
-		if (!cmds.length) {
+	const branchesAndCommits: SimpleBranchAndCommit[] = getBoundariesInclInitial({
+		pathToStackedRebaseDirInsideDotGit,
+		pathToStackedRebaseTodoFile,
+		repo,
+		rootLevelCommandName,
+	});
+
+	return checkout(branchesAndCommits.slice(1) as any); // TODO TS
+
+	async function checkout(boundaries: SimpleBranchAndCommit[]): Promise<void> {
+		if (!boundaries.length) {
 			return;
 		}
 
-		console.log("\ncheckout", cmds.length);
+		console.log("\ncheckout", boundaries.length);
 
 		const goNext = () =>
 			new Promise<void>((r) => {
 				setTimeout(() => {
-					checkout(cmds.slice(1)).then(() => r());
+					checkout(boundaries.slice(1)).then(() => r());
 				}, delayMsBetweenCheckouts);
 			});
 
-		const cmd = cmds[0];
-
-		assert(cmd.rebaseKind === "stacked");
-
-		const targetCommitSHA: string | null = cmd.commitSHAThatBranchPointsTo;
+		const boundary = boundaries[0];
+		const branch = boundary.branchEndFullName;
+		const targetCommitSHA: string | null = boundary.commitSHA;
 
 		if (!targetCommitSHA) {
 			return goNext();
 		}
 
-		assert(cmd.targets?.length);
-
-		let targetBranch = cmd.targets[0].replace("refs/heads/", "");
-		assert(targetBranch && typeof targetBranch === "string");
+		let targetBranch = branch.replace("refs/heads/", "");
+		assert(targetBranch);
 
 		/**
 		 * if we only have the remote branch, but it's not checked out locally,
@@ -246,7 +233,7 @@ export const branchSequencer: BranchSequencer = async ({
 		/**
 		 * meaning we're on the latest branch
 		 */
-		const isFinalCheckout: boolean = cmds.length === 1;
+		const isFinalCheckout: boolean = boundaries.length === 1;
 
 		/**
 		 * https://libgit2.org/libgit2/#HEAD/group/checkout/git_checkout_head
@@ -258,22 +245,10 @@ export const branchSequencer: BranchSequencer = async ({
 			repo, //
 			targetBranch,
 			targetCommitSHA,
-			cmd,
 			isFinalCheckout,
 			execSyncInRepo,
 		});
 
 		return goNext();
-
-		// for (const cmd of stackedRebaseCommandsNew) {
-		// 	};
-	};
-
-	await checkout(stackedRebaseCommandsNew.slice(1) as any); // TODO TS
-
-	await callbackAfterDone({
-		pathToStackedRebaseDirInsideDotGit,
-	});
-
-	return;
+	}
 };
