@@ -267,7 +267,7 @@ type BadCommand = {
 	reasons: string[];
 };
 
-export type GoodCommand = {
+export type GoodCommandBase = {
 	commandOrAliasName: EitherRebaseEitherCommandOrAlias;
 	lineNumber: number;
 	fullLine: string;
@@ -280,17 +280,17 @@ export type GoodCommand = {
 	index: number;
 
 	// commandName: EitherRebaseCommand;
-} & (
-	| {
-			rebaseKind: "regular";
-			commandName: RegularRebaseCommand;
-	  }
-	| {
-			rebaseKind: "stacked";
-			commandName: StackedRebaseCommand;
-			commitSHAThatBranchPointsTo: string | null;
-	  }
-);
+};
+export type GoodCommandRegular = GoodCommandBase & {
+	rebaseKind: "regular";
+	commandName: RegularRebaseCommand;
+};
+export type GoodCommandStacked = GoodCommandBase & {
+	rebaseKind: "stacked";
+	commandName: StackedRebaseCommand;
+	commitSHAThatBranchPointsTo: string | null;
+};
+export type GoodCommand = GoodCommandRegular | GoodCommandStacked;
 
 export function validate(
 	linesOfEditedRebaseTodo: string[], //
