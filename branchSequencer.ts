@@ -69,10 +69,57 @@ export const branchSequencer: BranchSequencer = async ({
 	callbackAfterDone = (): void => {},
 	gitCmd,
 }) => {
+	/**
+	 * TODO REMOVE / modify this logic (see next comment)
+	 */
 	if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) {
 		throw new Termination(`\n\nno stacked-rebase in progress? (nothing to ${rootLevelCommandName})\n\n`);
 	}
+	// const hasPostRewriteHookInstalledWithLatestVersion = false;
 
+	/**
+	 *
+	 * this is only needed to get the branch names.
+	 *
+	 * we should instead have this as a function in the options,
+	 * we should provide the default value,
+	 * but allow the higher level command to overwrite it.
+	 *
+	 * use case differences:
+	 *
+	 * a) apply:
+	 *
+	 * needs (always or no?) to parse the new good commands
+	 *
+	 * b) push:
+	 *
+	 * since is only allowed after apply has been done,
+	 * it doesn't actually care nor need to parse the new good commands,
+	 * and instead can be done by simply going thru the branches
+	 * that you would normally do with `getWantedCommitsWithBranchBoundaries`.
+	 *
+	 * and so it can be used even if the user has never previously used stacked rebase!
+	 * all is needed is the `initialBranch` and the current commit,
+	 * so that we find all the previous branches up until `initialBranch`
+	 * and just push them!
+	 *
+	 * and this is safe because again, if there's something that needs to be applied,
+	 * then before you can push, you'll need to apply first.
+	 *
+	 * otherwise, you can push w/o any need of apply,
+	 * or setting up the intial rebase todo, or whatever else,
+	 * because it's not needed!
+	 *
+	 * ---
+	 *
+	 * this is also good because we become less stateful / need less state
+	 * to function properly.
+	 *
+	 * it very well could get rid of some bugs / impossible states
+	 * that we'd sometimes end up in.
+	 * (and no longer need to manually rm -rf .git/stacked-rebase either)
+	 *
+	 */
 	const stackedRebaseCommandsNew: GoodCommand[] = parseNewGoodCommands(repo, pathToStackedRebaseTodoFile);
 
 	// const remotes: Git.Remote[] = await repo.getRemotes();
