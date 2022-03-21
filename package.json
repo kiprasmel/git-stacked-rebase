@@ -1,7 +1,7 @@
 {
 	"name": "git-stacked-rebase",
 	"version": "0.6.1",
-	"main": "index.js",
+	"main": "dist/git-stacked-rebase.js",
 	"repository": "git@github.com:kiprasmel/git-stacked-rebase.git",
 	"author": "Kipras Melnikovas <kipras@kipras.org> (https://kipras.org/)",
 	"license": "UNLICENSED",
