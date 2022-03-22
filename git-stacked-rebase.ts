@@ -1414,16 +1414,6 @@ git-stacked-rebase <branch> [-a|--apply]
 	2. but wil not push the partial branches to a remote until --push --force is used.
 
 
-git-stacked-rebase [<branch>] (-c|--continue)
-
-	(!) should be used instead of git-rebase's --continue
-
-	...because, additionally to invoking git rebase --continue,
-	this option automatically (prompts you to) --apply (if the rebase
-	has finished), thus ensuring that the partial branches
-	do not go out of sync with the newly rewritten history.
-
-
 git-stacked-rebase <branch> [--push|-p --force|-f]
 
     1. will checkout each branch and will push --force,
