@@ -20,7 +20,9 @@ export type SimpleBranchAndCommit = {
 	branchEndFullName: string;
 	// branchExistsYet: boolean; // TODO
 };
-export type GetBoundariesInclInitial = (ctx: GetBranchesCtx) => SimpleBranchAndCommit[];
+export type GetBoundariesInclInitial = (
+	ctx: GetBranchesCtx //
+) => SimpleBranchAndCommit[] | Promise<SimpleBranchAndCommit[]>;
 
 const defautlGetBoundariesInclInitial: GetBoundariesInclInitial = ({
 	pathToStackedRebaseDirInsideDotGit, //
@@ -116,6 +118,9 @@ export type BranchSequencerArgsBase = {
 	repo: Git.Repository;
 	rootLevelCommandName: string;
 	gitCmd: string;
+	//
+	initialBranch: Git.Reference;
+	currentBranch: Git.Reference;
 };
 export type BranchSequencerArgs = BranchSequencerArgsBase & {
 	// callbackBeforeBegin?: CallbackAfterDone; // TODO
@@ -144,7 +149,7 @@ export const branchSequencer: BranchSequencer = async ({
 }) => {
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
-	const branchesAndCommits: SimpleBranchAndCommit[] = getBoundariesInclInitial({
+	const branchesAndCommits: SimpleBranchAndCommit[] = await getBoundariesInclInitial({
 		pathToStackedRebaseDirInsideDotGit,
 		pathToStackedRebaseTodoFile,
 		repo,
