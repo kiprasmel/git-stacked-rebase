@@ -139,16 +139,114 @@ export function combineRewrittenLists(rewrittenListFileContent: string): Combine
 					}
 				} else {
 					if (Object.values(list.mapping).includes(key)) {
+						if (Object.values(list.mapping).includes(value)) {
+
+							console.warn(`value already in values`, {
+								[key]: value,
+								[Object.entries(list.mapping).find(([_k, v]) => v === value)![0]]: value,
+							})
+							// continue
+							// throw;
+
+							/**
+							 * happened when:
+							 * mark "edit" on commit A and B,
+							 * reach commit A,
+							 * do git commit --amend to change the title,
+							 * continue to commit B,
+							 * stop because of the another "edit",
+							 * reset to HEAD~ (commit A) (changes kept in workdir),
+							 * add all changes,
+							 * git commit --amend them into commit A.
+							 * 
+							 * how things ended up in the rewritten-list, was that:
+							 * 
+							 * amend
+							 * TMP_SHA -> NEW_SHA
+							 * 
+							 * rebase
+							 * COMMIT_A_SHA -> TMP_SHA
+							 * COMMIT_B_SHA -> NEW_SHA
+							 * 
+							 * 
+							 * and would end up as
+							 * 
+							 * COMMIT_A_SHA -> NEW_SHA
+							 * COMMIT_B_SHA -> NEW_SHA
+							 * 
+							 * from our `git-rebase-todo` file, the ~~OLD_SHA_2~~ COMMIT_B_SHA was the original one found,
+							 * BUT, it pointed to commit B, not commit A!
+							 * 
+							 * there were more mappings in the rewritten-list that included the commit A's SHA...
+							 * this is getting complicated.
+							 * 
+							 * ---rm
+							 * the 1st mapping of TMP_SHA -> NEW_SHA ended up first in the rewritten-list inside an "amend".
+							 * the 2nd mapping of OLD_SHA_2 -> NEW_SHA ended up second in the rewritten-list inside the "rebase".
+							 * ---
+							 * 
+							 * 
+							 * TODO needs more testing.
+							 * 
+							 * i mean, we very well could just get rid of the key->value pair
+							 * if there exists another one with the same value,
+							 * but how do we know which key to keep?
+							 * 
+							 * wait... you keep the earliest key?
+							 * 
+							 */
+							// fwiw, i don't think this algo makes you keep the earliest key (or does it?)
+							Object.entries(list.mapping).forEach(([k, v]) => {
+								if (v === value && k !== key) {
+									// if it's not our key, delete it
+									// (our key will get assigned a new value below.)
+									console.info("deleting entry because duplicate A->B, C->A, D->B, ends up C->B, D->B, keeping only one", {
+										[k]: list.mapping[k],
+									})
+									delete list.mapping[k]
+								}
+							})
+							/**
+							 * TODO test if you "fixup" (reset, add, amend) first --
+							 * does this reverse the order & you'd need the last key?
+							 * 
+							 * TODO what if you did both and you need a key from the middle? lol
+							 * 
+							 */
+						}
+
 						/**
 						 * add the single new entry of amend's mapping into rebase's mapping.
 						 * it will get `reducePath`'d later.
 						 */
 						Object.assign(list.mapping, amend.mapping)
 					} else {
-						throw new Error(
-							"NOT IMPLEMENTED - neither key nor value of 'amend' was included in the 'rebase'."
-						+ "could be that we missed the ordering, or when we call 'reducePath', or something else."
-						)
+						if (Object.values(list.mapping).includes(value)) {
+							/**
+							 * TODO needs more testing.
+							 * especially which one is the actually newer one -- same questions apply as above.
+							 */
+							console.warn("the `rebase`'s mapping got a newer value than the amend, apparently. continuing.", {
+								[key]: value,
+								[Object.entries(list.mapping).find(([_k, v]) => v === value)![0]]: value,
+							})
+							continue
+						} else {
+							console.warn(
+								"NOT IMPLEMENTED - neither key nor value of 'amend' was included in the 'rebase'."
+								+ "\ncould be that we missed the ordering, or when we call 'reducePath', or something else.",
+							{
+								[key]: value,
+							})
+
+							/**
+							 * i think this happens when commit gets rewritten,
+							 * then amended, and amended again.
+							 * 
+							 * looks like it's fine to ignore it.
+							 */
+							continue
+						}
 					}
 				}
 			}
