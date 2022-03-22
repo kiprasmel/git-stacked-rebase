@@ -289,6 +289,19 @@ export const gitStackedRebase = async (
 
 		const checkIsRegularRebaseStillInProgress = (): boolean => fs.existsSync(pathToRegularRebaseDirInsideDotGit);
 
+		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
+
+		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
+			repo, //
+			nameOfInitialBranch,
+			Git.Branch.BRANCH.ALL
+		);
+		if (!initialBranch) {
+			throw new Error("initialBranch lookup failed");
+		}
+
+		const currentBranch: Git.Reference = await repo.getCurrentBranch();
+
 		if (fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply))) {
 			_markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 		}
@@ -300,6 +313,8 @@ export const gitStackedRebase = async (
 				pathToStackedRebaseDirInsideDotGit, //
 				rootLevelCommandName: "--apply",
 				gitCmd: options.gitCmd,
+				initialBranch,
+				currentBranch,
 			});
 		}
 
@@ -327,6 +342,8 @@ export const gitStackedRebase = async (
 				gitCmd: options.gitCmd,
 				autoApplyIfNeeded: configValues.autoApplyIfNeeded,
 				config,
+				initialBranch,
+				currentBranch,
 			});
 
 			return;
@@ -340,6 +357,8 @@ export const gitStackedRebase = async (
 			gitCmd: options.gitCmd,
 			autoApplyIfNeeded: configValues.autoApplyIfNeeded,
 			config,
+			initialBranch,
+			currentBranch,
 		});
 
 		if (neededToApply && !userAllowedToApplyAndWeApplied) {
@@ -357,6 +376,8 @@ export const gitStackedRebase = async (
 				pathToStackedRebaseDirInsideDotGit,
 				rootLevelCommandName: "--push --force",
 				gitCmd: options.gitCmd,
+				initialBranch,
+				currentBranch,
 			});
 		}
 
@@ -371,6 +392,8 @@ export const gitStackedRebase = async (
 					actionInsideEachCheckedOutBranch: ({ execSyncInRepo: execS }) => (execS(toExec), void 0),
 					pathToStackedRebaseDirInsideDotGit,
 					pathToStackedRebaseTodoFile,
+					initialBranch,
+					currentBranch,
 				});
 			} else {
 				/**
@@ -381,15 +404,6 @@ export const gitStackedRebase = async (
 				throw new Termination("\n--branch-sequencer (without --exec) - nothing to do?\n\n");
 			}
 		}
-
-		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
-
-		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
-			repo, //
-			nameOfInitialBranch,
-			Git.Branch.BRANCH.ALL
-		);
-		const currentBranch: Git.Reference = await repo.getCurrentBranch();
 
 		const wasRegularRebaseInProgress: boolean = checkIsRegularRebaseStillInProgress();
 		// const
@@ -900,6 +914,8 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 					gitCmd: options.gitCmd,
 					autoApplyIfNeeded: configValues.autoApplyIfNeeded,
 					config,
+					initialBranch,
+					currentBranch,
 				});
 			}
 		}
@@ -1086,7 +1102,7 @@ type CommitAndBranchBoundary = {
 	branchEnd: Git.Reference | null;
 };
 
-async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
+export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 	repo: Git.Repository, //
 	/** beginningBranch */
 	bb: Git.Reference,
