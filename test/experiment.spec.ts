@@ -1,6 +1,5 @@
 #!/usr/bin/env ts-node-dev
 
-import os from "os";
 import fs from "fs";
 import path from "path";
 import assert from "assert";
@@ -12,6 +11,7 @@ import { gitStackedRebase } from "../git-stacked-rebase";
 import { RegularRebaseCommand } from "../parse-todo-of-stacked-rebase/validator";
 import { createExecSyncInRepo } from "../util/execSyncInRepo";
 import { configKeys } from "../configKeys";
+import { noop } from "../util/noop";
 
 export async function testCase() {
 	const {
@@ -81,18 +81,19 @@ export async function testCase() {
 	/**
 	 *
 	 */
-	console.log("launching 2nd rebase to change command of nth commit");
-	execSyncInRepo("read");
-	await gitStackedRebase(initialBranch.shorthand(), {
-		gitDir: dir,
-		getGitConfig: () => config,
-		editor: async ({ filePath }) => {
-			const nthCommit = 5;
-			const SHA = commitOidsInLatestStacked[nthCommit].tostrS();
+	// console.log("launching 2nd rebase to change command of nth commit");
+	// execSyncInRepo("read");
+	// await gitStackedRebase(initialBranch.shorthand(), {
+	// 	gitDir: dir,
+	// 	getGitConfig: () => config,
+	// 	editor: async ({ filePath }) => {
+	// 		const nthCommit = 5;
+	// 		const SHA = commitOidsInLatestStacked[nthCommit].tostrS();
 
-			humanOpChangeCommandOfNthCommit(filePath, SHA, "edit");
-		},
-	});
+	noop(humanOpChangeCommandOfNthCommit);
+	// 		humanOpChangeCommandOfNthCommit(filePath, SHA, "edit");
+	// 	},
+	// });
 	/**
 	 * rebase will now exit because of the "edit" command,
 	 * and so will our stacked rebase,
@@ -108,7 +109,9 @@ export async function testCase() {
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function setupRepo() {
-	const dir = fs.mkdtempSync(os.tmpdir());
+	const dir: string = path.join(__dirname, ".tmp");
+	fs.rmdirSync(dir, { recursive: true });
+	fs.mkdirSync(dir);
 	console.log("tmpdir path %s", dir);
 
 	const foldersToDeletePath: string = path.join(__dirname, "folders-to-delete");
