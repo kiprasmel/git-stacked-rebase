@@ -1,0 +1,19 @@
+{
+  "name": "nvim-git-rebase-todo",
+  "version": "0.0.0",
+  "main": "dist/nvim-git-rebase-todo.js",
+  "types": "dist/nvim-git-rebase-todo.d.ts",
+  "author": "Kipras Melnikovas <kipras@kipras.org> (https://kipras.org/)",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "tsc -b -w",
+	"build": "tsc -b",
+	"postinstall": "ln -s -f \"$(pwd)\" \"${NVIM_RPLUGIN_MANIFEST:-$HOME/.config/nvim/rplugin/node}/\""
+  },
+  "dependencies": {
+    "neovim": "4.10.1"
+  },
+  "devDependencies": {
+    "typescript": "4.6.3"
+  }
+}
