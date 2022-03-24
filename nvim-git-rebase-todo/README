@@ -1,0 +1,7 @@
+showing the current commit's info (while in the git-rebase-todo file) would save a lot of time.
+
+could potentially add extra stuff like grouping files by which commits modified them, or vice versa, etc.
+
+need a monorepo setup for this, if nvim's node-client [1] works well
+
+[1] https://github.com/neovim/node-client
