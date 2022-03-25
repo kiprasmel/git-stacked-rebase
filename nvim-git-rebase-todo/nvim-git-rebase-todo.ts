@@ -27,10 +27,19 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 	);
 
 	plugin.registerAutocmd(
+		/**
+		 * :help events
+		 *
+		 * CursorMoved?
+		 */
 		"BufEnter",
 		async (_fileName: string) => {
 			await vim.buffer.append("BufEnter for git-rebase-todo File?");
-			// await vim.window.
+			// const w = new vim.Window({});
+			// w.setOption("width", 10);
+			const w = await vim.window;
+
+			console.log(w);
 		},
 		{ sync: false, pattern: "git-rebase-todo", eval: 'expand("<afile>")' }
 	);
