@@ -1,4 +1,10 @@
+// import fs from "fs";
+
 import { NvimPlugin } from "neovim";
+
+/**
+ * TODO `console.log`s break stuff
+ */
 
 export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 	const { nvim: vim } = plugin;
@@ -37,10 +43,28 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 			await vim.buffer.append("BufEnter for git-rebase-todo File?");
 			// const w = new vim.Window({});
 			// w.setOption("width", 10);
-			const w = await vim.window;
-
-			console.log(w);
+			//
+			// const w = await vim.window;
+			// console.log(w);
 		},
 		{ sync: false, pattern: "git-rebase-todo", eval: 'expand("<afile>")' }
 	);
+
+	// plugin.registerAutocmd(
+	// 	/**
+	// 	 * :help events
+	// 	 *
+	// 	 * CursorMoved?
+	// 	 */
+	// 	"CursorMoved",
+	// 	async (_fileName: string) => {
+	// 		// await vim.buffer.append("BufEnter for git-rebase-todo File?");
+	// 		// const w = new vim.Window({});
+	// 		// w.setOption("width", 10);
+	// 		// const w = await vim.window;
+	// 		// eslint-disable-next-line prefer-rest-params
+	// 		// console.log("cursor moved!", arguments);
+	// 	},
+	// 	{ sync: false, pattern: "git-rebase-todo", eval: 'expand("<afile>")' }
+	// );
 }
