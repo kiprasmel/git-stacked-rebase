@@ -5,3 +5,55 @@ could potentially add extra stuff like grouping files by which commits modified 
 need a monorepo setup for this, if nvim's node-client [1] works well
 
 [1] https://github.com/neovim/node-client
+
+
+setup
+==========
+
+yarn
+
+
+development
+===========
+
+# terminal 1
+yarn dev
+
+# terminal 2
+NVIM_LISTEN_ADDRESS=/tmp/nvim NVIM_NODE_LOG_FILE=nvim.log nvim ../.git/stacked-rebase/git-rebase-todo
+
+# terminal 3 (potentially vsplit w/ terminal 2)
+nvim_listen_address=/tmp/nvim node
+
+let v, w, c
+nvim = await require('neovim/scripts/nvim')
+v = nvim
+w = await v.getWindow()
+c = await w.client
+
+// v.command("vsp")
+// v.command("q")
+
+line = await c.line
+commit = line.split(" ")[1]
+const cp = require("child_process")
+stat = cp.execSync(`git show --stat ${commit}`, { encoding: "utf8" }).split("\n")
+
+# potentially terminal 4
+watch cat nvim.log
+
+# upon changes in source code, re-run in nvim
+# to update the generated rplugin.vim manifest
+:UpdateRemotePlugins
+
+---
+
+see also:
+- https://github.com/neovim/node-client
+	- https://neovim.io/node-client/
+		- https://neovim.io/node-client/modules.html
+			- https://neovim.io/node-client/classes/Neovim.html
+			- https://neovim.io/node-client/classes/NeovimClient.html
+			- https://neovim.io/node-client/classes/Window.html
+- https://neovim.io/doc/user/api.html
+	- https://neovim.io/doc/user/windows.html#window
