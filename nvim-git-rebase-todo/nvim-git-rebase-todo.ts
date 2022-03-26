@@ -5,6 +5,7 @@ import util from "util";
 
 import { NvimPlugin, Buffer, Window } from "neovim";
 import { OpenWindowOptions } from "neovim/lib/api/Neovim";
+import { AutocmdOptions } from "neovim/lib/host/NvimPlugin";
 
 const execAsync = util.promisify(cp.exec);
 
@@ -16,27 +17,6 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 	const { nvim: vim } = plugin;
 
 	plugin.setOptions({ dev: false });
-
-	plugin.registerCommand(
-		"EchoMessage",
-		async () => {
-			try {
-				await vim.outWrite("Dayman (ah-ah-ah) \n");
-			} catch (err) {
-				console.error(err);
-			}
-		},
-		{ sync: false }
-	);
-
-	plugin.registerFunction(
-		"SetLines",
-		() =>
-			vim
-				.setLine("May I offer you an egg in these troubling times")
-				.then(() => console.log("Line should be set")),
-		{ sync: false }
-	);
 
 	/**
 	 * TODO make actually configurable
@@ -119,73 +99,25 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		width, //
 		height,
 	}: SetWindowRelativeToCursorOpts): Promise<OpenWindowOptions> => {
-		/**
-		 * TODO REFACTOR - the "relative to cursor" behavior
-		 * should be applied when initializing as well
-		 * it's not noticable because you always start at row 0,
-		 * (unless if you come from another buffer!
-		 *  but probably unlikely since by that point
-		 *  would already be initialized?
-		 *
-			 * 
-		 *
-		 *  or we .close our gWindow so still matters?)
-		 *
-			 * 
-		 *
-		 */
-
 		const cursor = await vim.window.cursor;
 
-		// const row = await vim.window.row;
-		// const col = await vim.window.col;
-
 		const relWin = await vim.window;
-		// const [row, _col] = await relWin.cursor;
 
 		return {
 			// relative: "cursor",
 			relative: "win" as const,
-			win: relWin as any,
-			// row: row - 1,
-			// col: col,
-			// col: await relWin.width,
+			win: (relWin as unknown) as number, // TODO TS fix incorrect types @ upstream
+			//
 			bufpos: cursor,
+			//
 			row: -1, // TODO investigate when in very last row & fully scrolled down with Ctrl-E
-			// col: 20,
 			col: await relWin.width,
+			//
 			width,
 			height,
 			//
 			style: "minimal",
 		};
-		// await vim.windowConfig(gWindow,);
-
-		// ? ({
-		// 		// relative: "win",
-		// 		// win: relWin.id,
-		// 		// relative: "cursor",
-		// 		//
-		// 		width,
-		// 		height,
-		// 		//
-		// 		// anchor: "NE", // TODO is this needed?
-		// 		row: 0,
-		// 		// row: relWinHeight,
-		// 		col: relWinWidth,
-
-		// 		//
-		// 		style: "minimal",
-		//   } as const)
-
-		// gWindow.row = _row;
-		// await gWindow.setOption("row", _row);
-		// gWindow.cursor = cursor;
-		// gWindow.width = _row;
-
-		// eslint-disable-next-line @typescript-eslint/ban-ts-ignore
-		// @ts-ignore
-		// gWindow.row = _row;
 	};
 
 	type InitWindowOpts = WH & {
@@ -199,11 +131,7 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		 */
 
 		const relWin: Window = await vim.getWindow();
-
 		const relWinWidth: number = await relWin.width;
-		// const relWinHeight: number = await gRelWin.height;
-
-		const enter = false;
 
 		const opts: OpenWindowOptions = config.relativeToCursor
 			? {
@@ -223,6 +151,7 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 					style: "minimal",
 			  } as const);
 
+		const enter = false;
 		const window: number | Window = await vim.openWindow(buffer, enter, opts);
 
 		if (typeof window === "number") {
@@ -243,8 +172,9 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 
 		/**
 		 * TODO REFACTOR
+		 * the `hideWindow` should be a prop probably,
+		 * instead of implying it like this w/ `0x0`
 		 */
-		// if (width === 0 && height === 0 && !config.relativeToCursor) {
 		if (width === 0 && height === 0) {
 			await hideWindow();
 		} else {
@@ -257,19 +187,6 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 			} else {
 				gWindow.width = width;
 				gWindow.height = height;
-
-				// await vim.windowConfig(gWindow, {
-				// 	relative: "win",
-				// 	win: relWin,
-				// 	// row: row - 1,
-				// 	// col: col,
-				// 	// col: await relWin.width,
-				// 	row: 0,
-				// 	// col: 0,
-				// 	col: await relWin.width,
-				// 	width,
-				// 	height,
-				// });
 			}
 		}
 	};
@@ -279,10 +196,6 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 	 */
 
 	const getCommittishOfCurrentLine = async (): Promise<Committish> => {
-		// const line: string | null = await new Promise<string>((r) => r(vim.line)).catch(() => null);
-		// const line: string | null = await new Promise<string>((r) => r(vim.line)).catch(() => null);
-		// console.log({ line });
-
 		let line: string | null;
 		try {
 			line = await vim.line;
@@ -309,12 +222,6 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 
 		return committish;
 	};
-	// /**
-	//  * TODO make private, allow to be changed only in `drawLinesOfCommittishStat`
-	//  * (factory fn),
-	//  * and create a getter fn to allow comparing
-	//  */
-	// let gCommittish: null | string = null;
 
 	let count: number = 0;
 	/**
@@ -328,7 +235,6 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 	 *
 	 */
 	const getStatLines = async (committish: NonNullable<Committish>): Promise<string[]> => {
-		// const gitShowCmd: string = `git show --stat ${committish}`;
 		/**
 		 * remove everything except the `/path/to/file | N +-`
 		 */
@@ -343,7 +249,14 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		].join(" ");
 
 		const stat: string[] = await execAsync(gitShowCmd, { encoding: "utf-8" }).then((x) =>
-			x.stderr ? [] : x.stdout.split("\n")
+			/**
+			 * if stderr, it's an error.
+			 * TODO ideally would be more explicit,
+			 * i.e. "hideWindow" or smthn
+			 */
+			x.stderr //
+				? []
+				: x.stdout.split("\n")
 		);
 		if (!stat.length) {
 			return [];
@@ -355,20 +268,6 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 
 		return stat;
 	};
-
-	// type DrawLinesOfCommittishStatRet = {
-	// 	width: number;
-	// 	height: number;
-
-	// 	committish: string | null;
-
-	// 	bufStart: number;
-	// 	bufEnd: number;
-	// };
-
-	// let previousState: DrawLinesOfCommittishStatRet | null = null;
-
-	// const drawLinesOfCommittishStat = async (): Promise<DrawLinesOfCommittishStatRet> => {
 
 	type Committish = string | null;
 	let previousCommittish: Committish;
@@ -382,6 +281,8 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 
 		/**
 		 * TODO OPTIMIZE
+		 * could cache already computed Committish'es
+		 * see also the above idea for pre-computing all lines in the file
 		 */
 		const commitState = async (opts: Omit<InitWindowOpts, "buffer"> & { lines: string[] }): Promise<Committish> => {
 			const { lines, ...rest } = opts;
@@ -446,51 +347,42 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		});
 	};
 
+	/**
+	 *
+	 */
+
 	const pattern = "git-rebase-todo" as const;
-
-	plugin.registerAutocmd(
-		/**
-		 * :help events
-		 *
-		 * CursorMoved?
-		 */
-		"BufEnter",
-		async (_fileName: string) => {
-			// await vim.buffer.append("BufEnter for git-rebase-todo File?");
-			// const w = new vim.Window({});
-			// w.setOption("width", 10);
-			//
-			// const w = await vim.window;
-			// console.log(w);
-
-			// const { width, height } = await drawLinesOfCommittishStat();
-			// await initWindow({ width, height });
-			await drawLinesOfCommittishStat();
-		},
-		{ sync: false, pattern: pattern, eval: 'expand("<afile>")' }
-	);
-
-	plugin.registerAutocmd(
-		"BufLeave",
-		async () => {
-			await hideWindow();
-		},
-		{
-			sync: false,
-			pattern: pattern,
-			eval: 'expand("<afile>")',
-		}
-	);
+	const commonOptions: AutocmdOptions = {
+		sync: false, //
+		pattern,
+		eval: 'expand("<afile>")', // i don't know what this does
+	};
 
 	/**
 	 * :help events
 	 */
 	plugin.registerAutocmd(
-		"CursorMoved",
-		() => {
-			drawLinesOfCommittishStat();
-		},
-		{ sync: false, pattern: pattern, eval: 'expand("<afile>")' }
+		"BufEnter", //
+		() => drawLinesOfCommittishStat(),
+		{
+			...commonOptions,
+		}
+	);
+
+	plugin.registerAutocmd(
+		"BufLeave", //
+		() => hideWindow(),
+		{
+			...commonOptions,
+		}
+	);
+
+	plugin.registerAutocmd(
+		"CursorMoved", //
+		() => drawLinesOfCommittishStat(),
+		{
+			...commonOptions,
+		}
 	);
 
 	/**
@@ -500,10 +392,10 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 	 * TODO OPTIMIZE
 	 */
 	plugin.registerAutocmd(
-		"CursorMovedI",
-		() => {
-			drawLinesOfCommittishStat();
-		},
-		{ sync: false, pattern: pattern, eval: 'expand("<afile>")' }
+		"CursorMovedI", //
+		() => drawLinesOfCommittishStat(),
+		{
+			...commonOptions,
+		}
 	);
 }
