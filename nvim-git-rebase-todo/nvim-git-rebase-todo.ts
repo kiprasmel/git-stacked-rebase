@@ -27,7 +27,13 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		maxWidth: 60,
 		fixedWidth: 60,
 		showStatParsingCount: false,
+
+		// relativeToCursor: true,
+		// closeToLeft: 5,
+		// rowLowerIfCloseToLeft: 1,
 		relativeToCursor: false,
+		closeToLeft: 0,
+		rowLowerIfCloseToLeft: 0,
 	};
 
 	let gBuffer: Buffer;
@@ -102,6 +108,7 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		const cursor = await vim.window.cursor;
 
 		const relWin = await vim.window;
+		const col: number = config.closeToLeft || (await relWin.width);
 
 		return {
 			// relative: "cursor",
@@ -110,8 +117,8 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 			//
 			bufpos: cursor,
 			//
-			row: -1, // TODO investigate when in very last row & fully scrolled down with Ctrl-E
-			col: await relWin.width,
+			row: -1 + (config.closeToLeft ? config.rowLowerIfCloseToLeft : 0), // TODO investigate when in very last row & fully scrolled down with Ctrl-E
+			col,
 			//
 			width,
 			height,
@@ -131,7 +138,7 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		 */
 
 		const relWin: Window = await vim.getWindow();
-		const relWinWidth: number = await relWin.width;
+		const col: number = config.closeToLeft || (await relWin.width);
 
 		const opts: OpenWindowOptions = config.relativeToCursor
 			? {
@@ -145,8 +152,8 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 					height,
 					//
 					// anchor: "NE", // TODO is this needed?
-					row: 0,
-					col: relWinWidth,
+					row: 0 + (config.closeToLeft ? config.rowLowerIfCloseToLeft : 0),
+					col,
 					//
 					style: "minimal",
 			  } as const);
