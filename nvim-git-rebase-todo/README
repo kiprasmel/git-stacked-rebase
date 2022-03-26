@@ -37,7 +37,7 @@ await c.line
 line = await c.line
 commit = line.split(" ")[1]
 const cp = require("child_process")
-stat = cp.execSync(`git show --stat ${commit}`, { encoding: "utf8" })
+stat = cp.execSync(`git show --stat ${commit}`, { encoding: "utf8" }).split("\n")
 
 # potentially terminal 4
 watch cat nvim.log
@@ -55,5 +55,6 @@ see also:
 			- https://neovim.io/node-client/classes/Neovim.html
 			- https://neovim.io/node-client/classes/NeovimClient.html
 			- https://neovim.io/node-client/classes/Window.html
-- https://neovim.io/doc/user/api.html
+- ! https://neovim.io/doc/user/api.html
 	- https://neovim.io/doc/user/windows.html#window
+- ! https://github.com/neovim/node-client/tree/master/packages/neovim/src/api/Neovim.ts
