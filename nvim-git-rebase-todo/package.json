@@ -8,7 +8,7 @@
 	"scripts": {
 		"dev": "tsc -b -w",
 		"build": "tsc -b",
-		"postinstall": "ln -s -f \"$(pwd)\" \"${NVIM_RPLUGIN_MANIFEST:-$HOME/.config/nvim/rplugin/node}/\""
+		"postinstall": "DIR=\"${NVIM_RPLUGIN_MANIFEST:-$HOME/.config/nvim/rplugin/node}\"; mkdir -p \"$DIR\" && ln -s -f \"$(pwd)\" \"/$DIR\""
 	},
 	"dependencies": {
 		"neovim": "4.10.1"
