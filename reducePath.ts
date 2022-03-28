@@ -132,10 +132,34 @@ export function combineRewrittenLists(rewrittenListFileContent: string): Combine
 						// pointless
 						continue
 					} else {
-						throw new Error(
-							`NOT IMPLEMENTED - identical key in 'amend' and 'rebase', but different values.`
-						+ `(key = "${key}", amend's value = "${value}", rebase's value = "${list.mapping[key]}")`
-						)
+						//throw new Error(
+						//	`NOT IMPLEMENTED - identical key in 'amend' and 'rebase', but different values.`
+						//+ `(key = "${key}", amend's value = "${value}", rebase's value = "${list.mapping[key]}")`
+						//)
+
+						/**
+						 * amend
+						 * A->B
+						 *
+						 * rebase
+						 * A->C
+						 *
+						 *
+						 * hmm.
+						 * will we need to keep track of _when_ the post-rewrite happened as well?
+						 * (i.e. on what commit)
+						 * though, idk if that's possible, i think i already tried,
+						 * but since the post-rewrite script is called _after_ the amend/rebase happens,
+						 * it gives you the same commit that you already have,
+						 * i.e. the already rewritten one, instead of the previous one...
+						 *
+						 */
+
+						/**
+						 * for starters, we can try always favoring the amend over rebase
+						 */
+						Object.assign(list.mapping, amend.mapping)
+
 					}
 				} else {
 					if (Object.values(list.mapping).includes(key)) {
