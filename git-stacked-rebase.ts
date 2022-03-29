@@ -1443,7 +1443,7 @@ git-stacked-rebase [...] -V|--version [...]
 git-stacked-rebase [...] -h|--help    [...]
 
 
-git-stacked-rebase ${gitStackedRebaseVersionStr}
+git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 `.replace(/\t/g, " ".repeat(4));
 
 	if (process.argv.some((arg) => ["-h", "--help"].includes(arg))) {
