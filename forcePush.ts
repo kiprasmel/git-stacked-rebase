@@ -44,6 +44,23 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 			const branch: Git.Reference = await repo.getCurrentBranch();
 			const upstreamBranch: Git.Reference | null = await Git.Branch.upstream(branch).catch(() => null);
 
+			/**
+			 * TODO work out a good solution because we don't want the user
+			 * to get interrupted while in-between the "push" flow,
+			 * or at least handle it ourselves / ask the user how to continue
+			 *
+			 * maybe need to have a `--push --continue`?
+			 * ugh, starts to get mixed up w/ other commands, idk!
+			 * or could `--continue` be used in any circumstance,
+			 * i.e. both in a rebase setting, and in a push setting?
+			 *
+			 * could maybe utilize --dry-run? or analyze ourselves? idk
+			 *
+			 * needs to be further explored with our `--sync` (TBD)
+			 *
+			 */
+			const forceWithLeaseOrForce: string = "--force-with-lease";
+
 			if (!upstreamBranch) {
 				const remotes: string[] = await repo.getRemoteNames();
 
@@ -85,11 +102,11 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 					remote = answer;
 				}
 
-				const cmd = `push -u ${remote} ${branch.name()} --force`;
+				const cmd = `push -u ${remote} ${branch.name()} ${forceWithLeaseOrForce}`;
 				console.log(`running ${cmd}`);
 				execSyncInRepo(`${argsBase.gitCmd} ${cmd}`);
 			} else {
-				execSyncInRepo(`${argsBase.gitCmd} push --force`);
+				execSyncInRepo(`${argsBase.gitCmd} push ${forceWithLeaseOrForce}`);
 			}
 		},
 		delayMsBetweenCheckouts: 0,
