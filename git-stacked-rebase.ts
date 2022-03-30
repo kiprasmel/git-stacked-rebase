@@ -433,18 +433,18 @@ export const gitStackedRebase = async (
 			initialBranch,
 			currentBranch,
 			// __default__pathToStackedRebaseTodoFile
-			pathToStackedRebaseTodoFile
-			// () =>
-			// 	getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
-			// 		gitCmd: options.gitCmd,
-			// 		repo,
-			// 		initialBranch,
-			// 		currentBranch,
-			// 		dotGitDirPath,
-			// 		pathToRegularRebaseTodoFile,
-			// 		pathToStackedRebaseTodoFile,
-			// 		pathToRegularRebaseDirInsideDotGit,
-			// 	})
+			pathToStackedRebaseTodoFile,
+			() =>
+				getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
+					gitCmd: options.gitCmd,
+					repo,
+					initialBranch,
+					currentBranch,
+					dotGitDirPath,
+					pathToRegularRebaseTodoFile,
+					pathToStackedRebaseTodoFile,
+					pathToRegularRebaseDirInsideDotGit,
+				})
 		);
 
 		if (!wasRegularRebaseInProgress || options.viewTodoOnly) {
@@ -1366,7 +1366,6 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 	return extendCommitsWithBranchEnds(repo, bb, wantedCommits);
 }
 
-noop(getWantedCommitsWithBranchBoundariesUsingNativeGitRebase);
 async function getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 	gitCmd,
 	repo,
@@ -1385,7 +1384,7 @@ async function getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 	pathToRegularRebaseTodoFile: string;
 	pathToStackedRebaseTodoFile: string;
 	pathToRegularRebaseDirInsideDotGit: string;
-}) {
+}): Promise<CommitAndBranchBoundary[]> {
 	const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
 		ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
 
