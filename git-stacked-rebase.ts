@@ -22,7 +22,8 @@ import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTo
 import { Termination } from "./util/error";
 import { assertNever } from "./util/assertNever";
 import {
-	GoodCommand, //
+	GoodCommand,
+	GoodCommandStacked, //
 	namesOfRebaseCommandsThatMakeRebaseExitToPause,
 	StackedRebaseCommand,
 } from "./parse-todo-of-stacked-rebase/validator";
@@ -570,8 +571,8 @@ export const gitStackedRebase = async (
 			 * TODO thus consider.
 			 *
 			 */
-			const oldLatestBranchCmd: GoodCommand = goodCommands[oldLatestBranchCmdIndex];
-			const newLatestBranchCmd: GoodCommand = goodCommands[newLatestBranchCmdIndex];
+			const oldLatestBranchCmd: GoodCommandStacked = goodCommands[oldLatestBranchCmdIndex] as GoodCommandStacked; // TODO TS
+			const newLatestBranchCmd: GoodCommandStacked = goodCommands[newLatestBranchCmdIndex] as GoodCommandStacked; // TODO TS
 
 			/**
 			 * create the new "latest branch"
@@ -582,7 +583,7 @@ export const gitStackedRebase = async (
 			 * move the old "latest branch" earlier to it's target
 			 */
 			await repo.checkoutBranch(oldLatestBranchCmd.targets![0]);
-			const commit: Git.Commit = await Git.Commit.lookup(repo, oldLatestBranchCmd.targets![0]);
+			const commit: Git.Commit = await Git.Commit.lookup(repo, oldLatestBranchCmd.commitSHAThatBranchPointsTo!);
 			await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
 
 			/**
