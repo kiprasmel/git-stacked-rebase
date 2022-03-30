@@ -362,11 +362,11 @@ export function validate(
 					reasonsIfBad.push("initial command must be `branch-end-initial`");
 				}
 			}
-			if (index === linesOfEditedRebaseTodo.length - 1) {
-				if (commandName !== "branch-end-last") {
-					reasonsIfBad.push("last command must be `branch-end-last`");
-				}
-			}
+			// if (index === linesOfEditedRebaseTodo.length - 1) {
+			// 	if (commandName !== "branch-end-last") {
+			// 		reasonsIfBad.push("last command must be `branch-end-last`");
+			// 	}
+			// }
 		}
 
 		if (commandUsedAtLines[commandName].length > allEitherRebaseCommands[commandName].maxUseCount) {

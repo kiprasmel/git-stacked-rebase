@@ -20,7 +20,12 @@ import { noop } from "./util/noop";
 import { uniq } from "./util/uniq";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
 import { Termination } from "./util/error";
-import { GoodCommand, namesOfRebaseCommandsThatMakeRebaseExitToPause } from "./parse-todo-of-stacked-rebase/validator";
+import { assertNever } from "./util/assertNever";
+import {
+	GoodCommand, //
+	namesOfRebaseCommandsThatMakeRebaseExitToPause,
+	StackedRebaseCommand,
+} from "./parse-todo-of-stacked-rebase/validator";
 
 // console.log = () => {};
 
@@ -467,17 +472,155 @@ export const gitStackedRebase = async (
 
 		const goodCommands: GoodCommand[] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
 
+		// eslint-disable-next-line no-inner-declarations
+		async function createBranchForCommand(
+			cmd: GoodCommand & { commandName: StackedRebaseCommand & "branch-end-new" }
+		): Promise<void> {
+			const newBranchName: string = cmd.targets![0];
+			const force: number = 0;
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+			const targetCommitSHA: string = cmd.commitSHAThatBranchPointsTo!;
+			const targetCommit: Git.Commit = await Git.Commit.lookup(repo, targetCommitSHA);
+			await Git.Branch.create(repo, newBranchName, targetCommit, force);
+		}
+
+		/**
+		 * TODO should probably go into `validator`
+		 */
+		const oldLatestBranchCmdIndex: number = goodCommands.findIndex((cmd) => cmd.commandName === "branch-end-last");
+		// if (indexOfLatestBranch === -1) // TODO verify in validator
+
+		const isThereANewLatestBranch: boolean = oldLatestBranchCmdIndex !== goodCommands.length - 1;
+
+		if (isThereANewLatestBranch) {
+			let newLatestBranchCmdIndex: number | null = null;
+			for (let i = goodCommands.length - 1; i >= 0; i--) {
+				const cmd = goodCommands[i];
+				if (cmd.commandName === "branch-end-new") {
+					newLatestBranchCmdIndex = i;
+					break;
+				}
+			}
+			if (newLatestBranchCmdIndex === null || newLatestBranchCmdIndex <= oldLatestBranchCmdIndex) {
+				// TODO validator
+				const when =
+					newLatestBranchCmdIndex === null
+						? "at all"
+						: newLatestBranchCmdIndex <= oldLatestBranchCmdIndex
+						? "after the branch-end-latest command"
+						: ""; // assertNever(newLatestBranchCmdIndex);
+
+				throw new Termination(
+					"\n" +
+						`apparently a new latest branch was attempted (by adding commands _after_ the "branch-end-last")` +
+						`\nbut there was no "branch-end-new" command (${when})`
+				);
+			}
+
+			/**
+			 * strategy:
+			 *
+			 * 1. create the "branch-end-new" at the appropriate position
+			 *
+			 * now, both the new & the old "latest" branches are pointing to the same commit
+			 *
+			 * 2. reset the old "latest" branch to the newly provided, earlier position
+			 *
+			 * 3. update the command names of the 2 branches
+			 *    3.1 in "goodCommands"
+			 *    3.2 in our "git-rebase-todo" file?
+			 *
+			 *
+			 * strategy v2:
+			 * 1. same
+			 * 2.
+			 *
+			 *
+			 * note 1:
+			 * in general, idk if this is the best approach.
+			 * though, it requries the least amount of effort from the user, afaik.
+			 *
+			 * if we instead made the user manually move the "branch-end-latest" to an earlier position (normal / same as here),
+			 * but the also rename it to "branch-end" (extra work),
+			 * and then create a new "branch-end-latest" in the very end (normal / similar to here (just "-latest" instead of "-new")),
+			 *
+			 * it's more steps, and idk if it conveys the picture well,
+			 * because we no longer say "branch-end-new" explicitly,
+			 * nor is it explicit that the "branch-end-last" has been moved.
+			 *
+			 * so then yes, the alternative sucks,
+			 * & this (branch-end-last being not the latest command) is good.
+			 *
+			 * note 2:
+			 * TODO will most likely need to do extra handling for the `rebaseChangedLocalHistory`,
+			 * because even tho we won't change local history _of the commits_,
+			 * the branches do indeed change, and here it's not simply adding a branch in the middle
+			 * (though does that also need extra handling?),
+			 * we're changing the latest branch, so it matters a lot
+			 * and would need to run the `--apply`
+			 * (currently `rebaseChangedLocalHistory` would prevent `--apply` from running).
+			 *
+			 * note 2.1:
+			 * TODO need to support a use-case where the new latest branch
+			 * is not new, i.e. user has had already created it,
+			 * and now has simply moved it after the "branch-end-last".
+			 *
+			 * note 3:
+			 * this logic implies that we should always be doing `--apply`,
+			 * TODO thus consider.
+			 *
+			 */
+			const oldLatestBranchCmd: GoodCommand = goodCommands[oldLatestBranchCmdIndex];
+			const newLatestBranchCmd: GoodCommand = goodCommands[newLatestBranchCmdIndex];
+
+			/**
+			 * create the new "latest branch"
+			 */
+			await createBranchForCommand(newLatestBranchCmd as any); // TODO TS
+
+			/**
+			 * move the old "latest branch" earlier to it's target
+			 */
+			await repo.checkoutBranch(oldLatestBranchCmd.targets![0]);
+			const commit: Git.Commit = await Git.Commit.lookup(repo, oldLatestBranchCmd.targets![0]);
+			await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
+
+			/**
+			 * go to the new "latest branch".
+			 */
+			await repo.checkoutBranch(newLatestBranchCmd.targets![0]);
+
+			/**
+			 * TODO update in the actual `git-rebase-todo` file
+			 */
+
+			/**
+			 * need to change to "branch-end", instead of "branch-end-new",
+			 * since obviously the branch already exists
+			 */
+			goodCommands[oldLatestBranchCmdIndex].commandName = "branch-end";
+			goodCommands[oldLatestBranchCmdIndex].commandOrAliasName = "branch-end";
+
+			goodCommands[newLatestBranchCmdIndex].commandName = "branch-end-last";
+			goodCommands[newLatestBranchCmdIndex].commandOrAliasName = "branch-end-last";
+
+			/**
+			 * it's fine if the new "latest branch" does not have
+			 * a remote set yet, because `--push` handles that,
+			 * and we regardless wouldn't want to mess anything
+			 * in the remote until `--push` is used.
+			 */
+		}
+
 		for (const cmd of goodCommands) {
 			if (cmd.rebaseKind === "regular") {
 				regularRebaseTodoLines.push(cmd.fullLine);
 			} else if (cmd.rebaseKind === "stacked") {
 				if (cmd.commandName === "branch-end-new") {
-					const newBranchName: string = cmd.targets![0];
-					const force: number = 0;
-					const targetCommitSHA: string = cmd.commitSHAThatBranchPointsTo!;
-					const targetCommit: Git.Commit = await Git.Commit.lookup(repo, targetCommitSHA);
-					await Git.Branch.create(repo, newBranchName, targetCommit, force);
+					await createBranchForCommand(cmd as any); // TODO TS
 				}
+			} else {
+				assertNever(cmd);
 			}
 		}
 
