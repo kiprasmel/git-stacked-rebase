@@ -26,6 +26,7 @@ import {
 	GoodCommandStacked, //
 	namesOfRebaseCommandsThatMakeRebaseExitToPause,
 	StackedRebaseCommand,
+	StackedRebaseEitherCommandOrAlias,
 } from "./parse-todo-of-stacked-rebase/validator";
 
 // console.log = () => {};
@@ -598,8 +599,8 @@ export const gitStackedRebase = async (
 			 * update the commands
 			 * TODO update in the actual `git-rebase-todo` file
 			 */
-			// swapKeys(goodCommands[oldLatestBranchCmdIndex], goodCommands[newLatestBranchCmdIndex], "commandName");
-			// swapKeys(goodCommands[oldLatestBranchCmdIndex], goodCommands[newLatestBranchCmdIndex], "commandOrAliasName"); // eslint-disable-line prettier/prettier
+			// swapKeys(oldLatestBranchCmd, newLatestBranchCmd, "commandName");
+			// swapKeys(oldLatestBranchCmd, newLatestBranchCmd, "commandOrAliasName"); // eslint-disable-line prettier/prettier
 
 			// // eslint-disable-next-line no-inner-declarations
 			// function swapKeys<T>(A: T, B: T, key: keyof T): void {
@@ -610,11 +611,47 @@ export const gitStackedRebase = async (
 			 * need to change to "branch-end", instead of "branch-end-new",
 			 * since obviously the branch already exists
 			 */
-			goodCommands[oldLatestBranchCmdIndex].commandName = "branch-end";
-			goodCommands[oldLatestBranchCmdIndex].commandOrAliasName = "branch-end";
+			oldLatestBranchCmd.commandName = "branch-end";
+			oldLatestBranchCmd.commandOrAliasName = "branch-end";
 
-			goodCommands[newLatestBranchCmdIndex].commandName = "branch-end-last";
-			goodCommands[newLatestBranchCmdIndex].commandOrAliasName = "branch-end-last";
+			newLatestBranchCmd.commandName = "branch-end-last";
+			newLatestBranchCmd.commandOrAliasName = "branch-end-last";
+
+			/**
+			 * TODO FIXME don't do this so hackishly lmao
+			 */
+			const editedRebaseTodo: string = fs.readFileSync(pathToStackedRebaseTodoFile, { encoding: "utf-8" });
+			const linesOfEditedRebaseTodo: string[] = editedRebaseTodo.split("\n");
+
+			/**
+			 * replace the "branch-end-last" with "branch-end"
+			 */
+			// const oldLineBefore = linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber].split(" ");
+			// assert.equal(oldLineBefore[0], "branch-end-last");
+			// oldLineBefore.splice(0, 1, "branch-end"); // remove 1st word ("branch-end-last") and add "branch-end"
+			// linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] = oldLineBefore.join(" ");
+
+			// const newLineBefore = linesOfEditedRebaseTodo[newLatestBranchCmd.lineNumber].split(" ");
+			// assert.equal(newLineBefore[0], "branch-end-new");
+			// newLineBefore.splice(0, 1, "branch-end-last"); // remove 1st word ("branch-end") and add "branch-end-last"
+			// linesOfEditedRebaseTodo[newLatestBranchCmd.lineNumber] = newLineBefore.join(" ");
+
+			replaceCommandInText(oldLatestBranchCmd, "branch-end-last", "branch-end");
+			replaceCommandInText(newLatestBranchCmd, "branch-end-new", "branch-end-last");
+
+			// eslint-disable-next-line no-inner-declarations
+			function replaceCommandInText(
+				cmd: GoodCommandStacked, //
+				expectedOldName: StackedRebaseEitherCommandOrAlias,
+				newName: StackedRebaseCommand
+			): void {
+				const words = linesOfEditedRebaseTodo[cmd.lineNumber].split(" ");
+				assert.equal(words[0], expectedOldName);
+				words[0] = newName;
+				linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] = words.join(" ");
+			}
+
+			fs.writeFileSync(pathToStackedRebaseTodoFile, linesOfEditedRebaseTodo.join("\n"), { encoding: "utf-8" });
 
 			/**
 			 * it's fine if the new "latest branch" does not have
