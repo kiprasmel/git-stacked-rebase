@@ -21,12 +21,13 @@ import { uniq } from "./util/uniq";
 import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTodoOfStackedRebase";
 import { Termination } from "./util/error";
 import { assertNever } from "./util/assertNever";
+import { Single, Tuple } from "./util/tuple";
 import {
 	GoodCommand,
 	GoodCommandStacked, //
 	namesOfRebaseCommandsThatMakeRebaseExitToPause,
 	StackedRebaseCommand,
-	StackedRebaseEitherCommandOrAlias,
+	StackedRebaseCommandAlias,
 } from "./parse-todo-of-stacked-rebase/validator";
 
 // console.log = () => {};
@@ -608,17 +609,20 @@ export const gitStackedRebase = async (
 			const editedRebaseTodo: string = fs.readFileSync(pathToStackedRebaseTodoFile, { encoding: "utf-8" });
 			const linesOfEditedRebaseTodo: string[] = editedRebaseTodo.split("\n");
 
-			replaceCommandInText(oldLatestBranchCmd, "branch-end-last", "branch-end");
-			replaceCommandInText(newLatestBranchCmd, "branch-end-new", "branch-end-last");
+			replaceCommandInText(oldLatestBranchCmd, ["branch-end-last"], "branch-end");
+			replaceCommandInText(newLatestBranchCmd, ["branch-end-new", "ben"], "branch-end-last");
 
 			// eslint-disable-next-line no-inner-declarations
 			function replaceCommandInText(
 				cmd: GoodCommandStacked, //
-				expectedOldName: StackedRebaseEitherCommandOrAlias,
+				allowedOldName: Single<StackedRebaseCommand> | Tuple<StackedRebaseCommand, StackedRebaseCommandAlias>,
 				newName: StackedRebaseCommand
 			): void {
 				const words = linesOfEditedRebaseTodo[cmd.lineNumber].split(" ");
-				assert.equal(words[0], expectedOldName);
+				assert(
+					allowedOldName.some((n) => n === words[0]),
+					`invalid old name of command in git-rebase-todo file. got "${words[0]}", expected one of "${allowedOldName}".`
+				);
 				words[0] = newName;
 				linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] = words.join(" ");
 			}
