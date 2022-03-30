@@ -1465,7 +1465,6 @@ exit 1
 	 *
 	 */
 	const wantedCommitSHAs: string[] = goodRegularCommands.map((cmd) => {
-		assert(cmd.commandName === "pick");
 		/**
 		 * 1st is the command name
 		 * 2nd is the short commit SHA
