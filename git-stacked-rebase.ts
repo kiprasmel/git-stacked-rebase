@@ -1202,7 +1202,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 			}
 
 			if (i === commitsWithBranchBoundaries.length - 1) {
-				assert(!!branchEnd, "very last commit has a branch.");
+				assert(!!branchEnd, `very last commit has a branch. sha = ${commit.sha()}`);
 
 				return [
 					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
