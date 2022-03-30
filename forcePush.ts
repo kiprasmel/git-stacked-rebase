@@ -58,8 +58,13 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 			 *
 			 * needs to be further explored with our `--sync` (TBD)
 			 *
+			 *
+			 * on --force-if-includes, see:
+			 * - `man git-push`
+			 * - https://stackoverflow.com/a/65839129/9285308
+			 * - https://github.com/gitextensions/gitextensions/issues/8753#issuecomment-763390579
 			 */
-			const forceWithLeaseOrForce: string = "--force-with-lease";
+			const forceWithLeaseOrForce: string = "--force-with-lease --force-if-includes";
 
 			if (!upstreamBranch) {
 				const remotes: string[] = await repo.getRemoteNames();
