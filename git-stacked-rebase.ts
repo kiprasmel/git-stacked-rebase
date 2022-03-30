@@ -594,16 +594,6 @@ export const gitStackedRebase = async (
 			await repo.checkoutBranch(newLatestBranchCmd.targets![0]);
 
 			/**
-			 * need to change to "branch-end", instead of "branch-end-new",
-			 * since obviously the branch already exists
-			 */
-			oldLatestBranchCmd.commandName = "branch-end";
-			oldLatestBranchCmd.commandOrAliasName = "branch-end";
-
-			newLatestBranchCmd.commandName = "branch-end-last";
-			newLatestBranchCmd.commandOrAliasName = "branch-end-last";
-
-			/**
 			 * TODO FIXME don't do this so hackishly lmao
 			 */
 			const editedRebaseTodo: string = fs.readFileSync(pathToStackedRebaseTodoFile, { encoding: "utf-8" });
@@ -624,10 +614,21 @@ export const gitStackedRebase = async (
 					"invalid old name of command in git-rebase-todo file"
 				);
 				words[0] = newName;
+				console.log({ before: linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] });
 				linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] = words.join(" ");
+				console.log({ after: linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] });
 			}
 
 			fs.writeFileSync(pathToStackedRebaseTodoFile, linesOfEditedRebaseTodo.join("\n"), { encoding: "utf-8" });
+
+			/**
+			 * TODO RE-PARSE ALL COMMANDS FROM THE FILE INSTEAD
+			 */
+			oldLatestBranchCmd.commandName = "branch-end";
+			oldLatestBranchCmd.commandOrAliasName = "branch-end";
+
+			newLatestBranchCmd.commandName = "branch-end-last";
+			newLatestBranchCmd.commandOrAliasName = "branch-end-last";
 
 			/**
 			 * it's fine if the new "latest branch" does not have
