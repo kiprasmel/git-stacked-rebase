@@ -293,7 +293,6 @@ type BadCommand = LineNr & {
 };
 
 export type GoodCommandBase = LineNr & {
-	commandOrAliasName: EitherRebaseEitherCommandOrAlias;
 	fullLine: string;
 	rest: string;
 	/**
@@ -306,10 +305,12 @@ export type GoodCommandBase = LineNr & {
 export type GoodCommandRegular = GoodCommandBase & {
 	rebaseKind: "regular";
 	commandName: RegularRebaseCommand;
+	commandOrAliasName: RegularRebaseEitherCommandOrAlias;
 };
 export type GoodCommandStacked = GoodCommandBase & {
 	rebaseKind: "stacked";
 	commandName: StackedRebaseCommand;
+	commandOrAliasName: StackedRebaseEitherCommandOrAlias;
 	commitSHAThatBranchPointsTo: string | null;
 };
 export type GoodCommand = GoodCommandRegular | GoodCommandStacked;
@@ -429,7 +430,6 @@ export function validate(
 			});
 		} else {
 			goodCommands.push({
-				commandOrAliasName,
 				targets,
 				lineNumber,
 				humanLineNumber: lineNumber + 1,
@@ -439,12 +439,14 @@ export function validate(
 				...(commandName in regularRebaseCommands
 					? {
 							rebaseKind: "regular",
+							commandOrAliasName: commandOrAliasName as RegularRebaseEitherCommandOrAlias,
 							commandName: commandName as RegularRebaseCommand,
 					  }
 					: commandName in stackedRebaseCommands
 					? {
 							rebaseKind: "stacked",
 							commandName: commandName as StackedRebaseCommand,
+							commandOrAliasName: commandOrAliasName as StackedRebaseEitherCommandOrAlias,
 							commitSHAThatBranchPointsTo: previousCommitSHA,
 					  }
 					: (() => {
