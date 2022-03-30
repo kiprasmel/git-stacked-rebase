@@ -1475,6 +1475,10 @@ exit 1
 		path.join(regularRebaseDirBackupPath, filenames.gitRebaseTodo)
 	);
 
+	if (fs.existsSync(regularRebaseDirBackupPath)) {
+		fs.rmdirSync(regularRebaseDirBackupPath, { recursive: true });
+	}
+
 	console.log("parsedRegular: %O", goodRegularCommands);
 
 	/**
