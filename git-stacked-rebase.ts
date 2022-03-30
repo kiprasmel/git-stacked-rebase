@@ -1420,6 +1420,7 @@ exit 1
 				"~" /** include self (needed for initialBranch's boundary) */,
 			"--onto",
 			initialBranch.name(),
+			"--autosquash",
 			">/dev/null 2>&1",
 		].join(" ");
 
