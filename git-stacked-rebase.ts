@@ -1456,7 +1456,20 @@ exit 1
 				"~" /** include self (needed for initialBranch's boundary) */,
 			"--onto",
 			initialBranch.name(),
-			"--autosquash",
+			/**
+			 * TODO FIXME need to remove the "--no-autosquash",
+			 * but for that, will need to do further analysis
+			 * to connect the moved commits,
+			 * because if the latest commit was fixed up/squashed/etc
+			 * (which is very common if fixing up, at least for me),
+			 * then the latest branch will point to the updated, earlier location,
+			 * thus newer commits will be lost.
+			 *
+			 * i imagine we could combine this "native git rebase" mechanism
+			 * with our own "CustomImpl" to achieve this,
+			 * but need to do more research.
+			 */
+			"--no-autosquash",
 			">/dev/null 2>&1",
 		].join(" ");
 
