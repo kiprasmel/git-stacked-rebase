@@ -123,16 +123,20 @@ export function parseNewGoodCommands(
 			}
 		};
 
-		if (goodOldCommand.index < goodCommandMinIndex) {
+		/**
+		 * TODO `lineNumber` -- shouldn't it be `nthCommand`?
+		 * need to experiment w/ e.g. "break", and comments.
+		 */
+		if (goodOldCommand.lineNumber < goodCommandMinIndex) {
 			// TODO VERIFY
 			console.warn(
-				`goodCommandOld.index (${goodOldCommand.index}) < goodCommandMinIndex (${goodCommandMinIndex}), continue'ing.`
+				`goodCommandOld.index (${goodOldCommand.lineNumber}) < goodCommandMinIndex (${goodCommandMinIndex}), continue'ing.`
 			);
 
 			// goodCommandMinIndex++;
 
 			continue;
-		} else if (goodOldCommand.index === goodCommandMinIndex) {
+		} else if (goodOldCommand.lineNumber === goodCommandMinIndex) {
 			// perfect?
 			// TODO VERIFY
 			console.info(`index match`);

@@ -260,16 +260,35 @@ export const namesOfRebaseCommandsThatMakeRebaseExitToPause: EitherRebaseCommand
 	(cmd) => cmd.nameButNeverAlias
 );
 
-type BadCommand = {
-	command: string;
+type LineNr = {
+	/**
+	 * indexed from 0.
+	 * counts comments/empty-lines/etc, see `nthCommand` instead
+	 */
 	lineNumber: number;
+
+	/**
+	 * indexed from 1.
+	 * counts comments/empty-lines/etc, see `nthCommand` instead
+	 */
+	humanLineNumber: number;
+
+	/**
+	 * indexed from 0.
+	 * counts only commands
+	 * (both good and bad, though irrelevant, because will error if has bad commands)
+	 */
+	nthCommand: number;
+};
+
+type BadCommand = LineNr & {
+	command: string;
 	fullLine: string;
 	reasons: string[];
 };
 
-export type GoodCommandBase = {
+export type GoodCommandBase = LineNr & {
 	commandOrAliasName: EitherRebaseEitherCommandOrAlias;
-	lineNumber: number;
 	fullLine: string;
 	rest: string;
 	/**
@@ -277,8 +296,6 @@ export type GoodCommandBase = {
 	 * TODO: handle >1
 	 */
 	targets: string[] | null;
-	index: number;
-
 	// commandName: EitherRebaseCommand;
 };
 export type GoodCommandRegular = GoodCommandBase & {
@@ -317,32 +334,36 @@ export function validate(
 		return command in allEitherRebaseCommands || command in allEitherRebaseCommandAliases;
 	}
 
-	let previousCommitSHA: string | null;
+	let previousCommitSHA: string | null = null;
+	let nthCommand: number = -1;
 	/**
 	 * we're not processing command-by-command, we're processing line-by-line.
 	 */
-	linesOfEditedRebaseTodo.forEach((fullLine, index) => {
+	for (let lineNumber = 0; lineNumber < linesOfEditedRebaseTodo.length; lineNumber++) {
+		const fullLine: string = linesOfEditedRebaseTodo[lineNumber];
+
 		if (fullLine.startsWith("#")) {
 			/**
 			 * ignore comments
 			 */
-			return;
+			continue;
 		}
+		nthCommand++;
 
 		const [commandOrAliasName, ..._rest] = fullLine.split(" ");
 		const rest = _rest.join(" ");
 
-		const lineNumber: number = index + 1;
-
 		if (!commandOrAliasExists(commandOrAliasName)) {
 			badCommands.push({
 				command: commandOrAliasName,
+				nthCommand,
 				lineNumber,
+				humanLineNumber: lineNumber + 1,
 				fullLine,
 				reasons: ["unrecognized command"],
 			});
 
-			return;
+			continue;
 		}
 
 		const commandName: EitherRebaseCommand =
@@ -357,7 +378,7 @@ export function validate(
 		const reasonsIfBad: string[] = [];
 
 		if (enforceRequirementsSpecificToStackedRebase) {
-			if (index === 0) {
+			if (nthCommand === 0) {
 				if (commandName !== "branch-end-initial") {
 					reasonsIfBad.push("initial command must be `branch-end-initial`");
 				}
@@ -396,6 +417,8 @@ export function validate(
 			badCommands.push({
 				command: commandName,
 				lineNumber,
+				humanLineNumber: lineNumber + 1,
+				nthCommand,
 				fullLine,
 				reasons: reasonsIfBad,
 			});
@@ -403,8 +426,9 @@ export function validate(
 			goodCommands.push({
 				commandOrAliasName,
 				targets,
-				index,
 				lineNumber,
+				humanLineNumber: lineNumber + 1,
+				nthCommand,
 				fullLine,
 				rest,
 				...(commandName in regularRebaseCommands
@@ -427,7 +451,7 @@ export function validate(
 				previousCommitSHA = targets?.[0] ?? null;
 			}
 		}
-	});
+	}
 
 	if (badCommands.length) {
 		throw new Termination(
@@ -435,7 +459,7 @@ export function validate(
 				joinWith("\n\n")([
 					"found errors in rebase commands:",
 					...badCommands.map((cmd) =>
-						bullets(`  line ${cmd.lineNumber}: ${tick(cmd.command)}`, cmd.reasons, "     - ")
+						bullets(`  line ${cmd.humanLineNumber}: ${tick(cmd.command)}`, cmd.reasons, "     - ")
 					),
 					"to edit & fix, use:",
 					"  git-stacked-rebase -e|--edit-todo\n",
