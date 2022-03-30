@@ -703,7 +703,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 	const rebaseTodo = commitsWithBranchBoundaries
 		.map(({ commit, branchEnd }, i) => {
 			if (i === 0) {
-				assert(!!branchEnd, "very first commit has a branch.");
+				assert(!!branchEnd, `very first commit has a branch (${commit.sha()}).`);
 
 				// return [];
 				return [
@@ -716,7 +716,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 			}
 
 			if (i === commitsWithBranchBoundaries.length - 1) {
-				assert(!!branchEnd, "very last commit has a branch.");
+				assert(!!branchEnd, `very last commit has a branch. sha = ${commit.sha()}`);
 
 				return [
 					`pick ${commit.sha()} ${commit.summary()}`,
