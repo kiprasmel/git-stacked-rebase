@@ -24,8 +24,11 @@ import { assertNever } from "./util/assertNever";
 import { Single, Tuple } from "./util/tuple";
 import {
 	GoodCommand,
+	GoodCommandRegular,
 	GoodCommandStacked, //
 	namesOfRebaseCommandsThatMakeRebaseExitToPause,
+	regularRebaseCommands,
+	RegularRebaseEitherCommandOrAlias,
 	StackedRebaseCommand,
 	StackedRebaseCommandAlias,
 } from "./parse-todo-of-stacked-rebase/validator";
@@ -1152,7 +1155,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 	console.log({ commitsWithBranchBoundaries });
 
 	const rebaseTodo = commitsWithBranchBoundaries
-		.map(({ commit, branchEnd }, i) => {
+		.map(({ commit, commitCommand, branchEnd }, i) => {
 			if (i === 0) {
 				assert(!!branchEnd, `very first commit has a branch (${commit.sha()}).`);
 
@@ -1170,20 +1173,20 @@ async function createInitialEditTodoOfGitStackedRebase(
 				assert(!!branchEnd, `very last commit has a branch. sha = ${commit.sha()}`);
 
 				return [
-					`pick ${commit.sha()} ${commit.summary()}`,
+					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
 					`branch-end-last ${branchEnd.name()}`, //
 				];
 			}
 
 			if (branchEnd) {
 				return [
-					`pick ${commit.sha()} ${commit.summary()}`,
+					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
 					`branch-end ${branchEnd.name()}`, //
 				];
 			}
 
 			return [
-				`pick ${commit.sha()} ${commit.summary()}`, //
+				`${commitCommand} ${commit.sha()} ${commit.summary()}`, //
 			];
 		})
 		.filter((xs) => xs.length)
@@ -1264,6 +1267,7 @@ function callAll(keyToFunctionMap: KeyToFunctionMap) {
 
 type CommitAndBranchBoundary = {
 	commit: Git.Commit;
+	commitCommand: RegularRebaseEitherCommandOrAlias;
 	branchEnd: Git.Reference | null;
 };
 
@@ -1439,9 +1443,16 @@ exit 1
 
 	console.log("rebase -i exited");
 
-	const goodRegularCommands = parseTodoOfStackedRebase(
+	const goodRegularCommands: GoodCommandRegular[] = parseTodoOfStackedRebase(
 		path.join(regularRebaseDirBackupPath, filenames.gitRebaseTodo)
-	);
+	).map((cmd) => {
+		assert(
+			cmd.commandName in regularRebaseCommands,
+			`git-rebase-todo file, created via regular git rebase, contains non-rebase commands (got "${cmd.commandName}")`
+		);
+
+		return cmd as GoodCommandRegular;
+	});
 
 	if (fs.existsSync(regularRebaseDirBackupPath)) {
 		fs.rmdirSync(regularRebaseDirBackupPath, { recursive: true });
@@ -1455,7 +1466,7 @@ exit 1
 	 * now we gotta add the branch boundaries & then continue like regular.
 	 *
 	 */
-	const wantedCommitSHAs: string[] = goodRegularCommands.map((cmd) => {
+	const wantedCommitSHAs: Tuple<RegularRebaseEitherCommandOrAlias, string>[] = goodRegularCommands.map((cmd) => {
 		/**
 		 * 1st is the command name
 		 * 2nd is the short commit SHA
@@ -1463,7 +1474,7 @@ exit 1
 		 */
 		const commitSHAFull: string = cmd.fullLine.split(" ")?.[2] || "";
 		assert(commitSHAFull);
-		return commitSHAFull;
+		return [cmd.commandOrAliasName, commitSHAFull];
 	});
 
 	console.log("wantedCommitSHAs %O", wantedCommitSHAs);
@@ -1471,18 +1482,21 @@ exit 1
 	// const commits: Git.Commit[] = await Promise.all(
 	// 	wantedCommitSHAs.map((sha) => (console.log("sha %s", sha), Git.Commit.lookup(repo, sha)))
 	// );
-	const commits = [];
-	for (const sha of wantedCommitSHAs) {
-		console.log("sha %s", sha);
+	const commits: Git.Commit[] = [];
+	const commandOrAliasNames: RegularRebaseEitherCommandOrAlias[] = [];
+	for (const [commandOrAliasName, sha] of wantedCommitSHAs) {
+		console.log("%s %s", commandOrAliasName, sha);
 		// const oid = await Git.Oid.fromString(sha);
 		const c = await Git.Commit.lookup(repo, sha);
 		commits.push(c);
+		commandOrAliasNames.push(commandOrAliasName);
 	}
 
 	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = await extendCommitsWithBranchEnds(
 		repo,
 		initialBranch,
-		commits
+		commits,
+		commandOrAliasNames
 	);
 
 	console.log("commitsWithBranchBoundaries %O", commitsWithBranchBoundaries);
@@ -1493,14 +1507,23 @@ exit 1
 async function extendCommitsWithBranchEnds(
 	repo: Git.Repository,
 	initialBranch: Git.Reference,
-	commits: Git.Commit[]
+	commits: Git.Commit[],
+	/**
+	 * used for properly assigning the command to a commit,
+	 * if it was already provided,
+	 * e.g. if --autosquash was used and thus some commands
+	 * ended up as `fixup` instead of `pick`.
+	 *
+	 * by default, will be `pick`.
+	 */
+	commandOrAliasNames: RegularRebaseEitherCommandOrAlias[] = []
 ): Promise<CommitAndBranchBoundary[]> {
 	const refNames: string[] = await Git.Reference.list(repo);
 	const refs: Git.Reference[] = await Promise.all(refNames.map((ref) => Git.Reference.lookup(repo, ref)));
 
 	let matchedRefs: Git.Reference[];
 
-	const extend = (c: Git.Commit) => (
+	const extend = (c: Git.Commit, i: number): CommitAndBranchBoundary => (
 		(matchedRefs = refs.filter((ref) => !!ref.target()?.equal(c.id()))),
 		assert(
 			matchedRefs.length <= 1 ||
@@ -1533,6 +1556,7 @@ async function extendCommitsWithBranchEnds(
 		assert(matchedRefs.length <= 1, "refs/heads/ and refs/remotes/*/ replacement went wrong"),
 		{
 			commit: c,
+			commitCommand: commandOrAliasNames[i] || "pick",
 			branchEnd: !matchedRefs.length ? null : matchedRefs[0],
 		}
 	);
