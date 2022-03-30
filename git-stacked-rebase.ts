@@ -614,9 +614,9 @@ export const gitStackedRebase = async (
 					`invalid old name of command in git-rebase-todo file. got "${words[0]}", expected one of "${allowedOldName}".`
 				);
 				words[0] = newName;
-				console.log({ before: linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] });
-				linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] = words.join(" ");
-				console.log({ after: linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] });
+				console.log({ before: linesOfEditedRebaseTodo[cmd.lineNumber] });
+				linesOfEditedRebaseTodo[cmd.lineNumber] = words.join(" ");
+				console.log({ after: linesOfEditedRebaseTodo[cmd.lineNumber] });
 			}
 
 			fs.writeFileSync(pathToStackedRebaseTodoFile, linesOfEditedRebaseTodo.join("\n"), { encoding: "utf-8" });
