@@ -26,6 +26,7 @@ import {
 	GoodCommandStacked, //
 	namesOfRebaseCommandsThatMakeRebaseExitToPause,
 	StackedRebaseCommand,
+	StackedRebaseEitherCommandOrAlias,
 } from "./parse-todo-of-stacked-rebase/validator";
 
 // console.log = () => {};
@@ -592,18 +593,37 @@ export const gitStackedRebase = async (
 			await repo.checkoutBranch(newLatestBranchCmd.targets![0]);
 
 			/**
-			 * TODO update in the actual `git-rebase-todo` file
-			 */
-
-			/**
 			 * need to change to "branch-end", instead of "branch-end-new",
 			 * since obviously the branch already exists
 			 */
-			goodCommands[oldLatestBranchCmdIndex].commandName = "branch-end";
-			goodCommands[oldLatestBranchCmdIndex].commandOrAliasName = "branch-end";
+			oldLatestBranchCmd.commandName = "branch-end";
+			oldLatestBranchCmd.commandOrAliasName = "branch-end";
 
-			goodCommands[newLatestBranchCmdIndex].commandName = "branch-end-last";
-			goodCommands[newLatestBranchCmdIndex].commandOrAliasName = "branch-end-last";
+			newLatestBranchCmd.commandName = "branch-end-last";
+			newLatestBranchCmd.commandOrAliasName = "branch-end-last";
+
+			/**
+			 * TODO FIXME don't do this so hackishly lmao
+			 */
+			const editedRebaseTodo: string = fs.readFileSync(pathToStackedRebaseTodoFile, { encoding: "utf-8" });
+			const linesOfEditedRebaseTodo: string[] = editedRebaseTodo.split("\n");
+
+			replaceCommandInText(oldLatestBranchCmd, "branch-end-last", "branch-end");
+			replaceCommandInText(newLatestBranchCmd, "branch-end-new", "branch-end-last");
+
+			// eslint-disable-next-line no-inner-declarations
+			function replaceCommandInText(
+				cmd: GoodCommandStacked, //
+				expectedOldName: StackedRebaseEitherCommandOrAlias,
+				newName: StackedRebaseCommand
+			): void {
+				const words = linesOfEditedRebaseTodo[cmd.lineNumber].split(" ");
+				assert.equal(words[0], expectedOldName);
+				words[0] = newName;
+				linesOfEditedRebaseTodo[oldLatestBranchCmd.lineNumber] = words.join(" ");
+			}
+
+			fs.writeFileSync(pathToStackedRebaseTodoFile, linesOfEditedRebaseTodo.join("\n"), { encoding: "utf-8" });
 
 			/**
 			 * it's fine if the new "latest branch" does not have

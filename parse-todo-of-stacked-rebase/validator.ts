@@ -144,6 +144,7 @@ export const regularRebaseCommands = {
 } as const;
 
 export type RegularRebaseCommand = keyof typeof regularRebaseCommands;
+export type RegularRebaseEitherCommandOrAlias = RegularRebaseCommand | RegularRebaseCommandAlias;
 
 /**
  * TODO: assert each value is `RegularRebaseCommand`,
@@ -227,8 +228,12 @@ const stackedRebaseCommandAliases = {
 	ben: "branch-end-new",
 } as const;
 
-type StackedRebaseCommandAlias = keyof typeof stackedRebaseCommandAliases;
+export type StackedRebaseCommandAlias = keyof typeof stackedRebaseCommandAliases;
+export type StackedRebaseEitherCommandOrAlias = StackedRebaseCommand | StackedRebaseCommandAlias;
 
+/**
+ * combined
+ */
 export type EitherRebaseCommand = RegularRebaseCommand | StackedRebaseCommand;
 export type EitherRebaseCommandAlias = RegularRebaseCommandAlias | StackedRebaseCommandAlias;
 
