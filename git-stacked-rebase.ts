@@ -1413,10 +1413,16 @@ async function getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 
 	const regularRebaseDirBackupPath: string = pathToRegularRebaseDirInsideDotGit + ".backup-from-1st";
 
+	const editorScriptSuccessIndicator: string = path.join(regularRebaseDirBackupPath, "success");
+	const checkIfSucceeded = (): boolean => fs.existsSync(editorScriptSuccessIndicator);
+
 	/** BEGIN COPY-PASTA */
 
 	const editorScript = `\
 #!/usr/bin/env bash
+
+# remove beforehand
+rm -rf ${editorScriptSuccessIndicator}
 
 printf "yes sir\n\n"
 
@@ -1430,7 +1436,13 @@ cat ${pathToRegularRebaseTodoFile}
 # cat ${pathToRegularRebaseTodoFile} > ${pathToStackedRebaseTodoFile}.regular
 cp -r ${pathToRegularRebaseDirInsideDotGit} ${regularRebaseDirBackupPath}
 
-# abort the rebase before even starting it
+# indicate success (MUST BE THE LAST COMMAND BEFORE EXITING)
+touch ${editorScriptSuccessIndicator}
+
+# abort the rebase before even starting it --
+# we get what we want - the git-rebase-todo file,
+# and we exit so that the rebase won't proceed
+# and wil cleanup instead.
 exit 1
 			`;
 	const editorScriptPath: string = path.join(dotGitDirPath, "editorScript.sh");
@@ -1480,13 +1492,17 @@ exit 1
 				// https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt-sequenceeditor
 				GIT_SEQUENCE_EDITOR: editorScriptPath,
 			},
+			stdio: "pipe",
 		});
 	} catch (e) {
-		// as expected. do nothing.
-		// TODO verify that it actually came from our script exiting intentionally
+		if (!checkIfSucceeded()) {
+			throw e;
+		} else {
+			// as expected. do nothing & continue.
+		}
 	}
 
-	console.log("rebase -i exited");
+	console.log("rebase -i exited successfully");
 
 	/** END COPY-PASTA */
 
