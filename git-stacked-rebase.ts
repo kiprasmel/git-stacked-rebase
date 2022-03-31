@@ -1549,8 +1549,39 @@ async function extendCommitsWithBranchEnds(
 
 	let matchedRefs: Git.Reference[];
 
+	const removeLocalRegex = /^refs\/heads\//;
+	const removeRemoteRegex = /^refs\/remotes\/[^/]*\//;
+
 	const extend = (c: Git.Commit, i: number): CommitAndBranchBoundary => (
 		(matchedRefs = refs.filter((ref) => !!ref.target()?.equal(c.id()))),
+		/**
+		 * if there exists a local branch with the same name as a remote one,
+		 * then get rid of the remote branch ref,
+		 * because the local one will cover it.
+		 * (with the exception of the initial branch (it should always be remote)).
+		 *
+		 * this helps multiple scenarios:
+		 *
+		 * - a new commit is created in the latest branch, but not pushed to a remote yet.
+		 *   (a duplicate remote branch would show up earlier in history,
+		 *    meanwhile, for our purposes, it shouldn't)
+		 *
+		 * - a new latest branch got created (old one was moved previously).
+		 *   here, the old remote branch would point to the latest commit,
+		 *   i.e. in the new latest branch, i.e. it would be ahead when it shouldn't.
+		 *
+		 * - possibly others
+		 *
+		 */
+		(matchedRefs = matchedRefs.filter(
+			(r) =>
+				r.name() === initialBranch.name() ||
+				!r.isRemote() ||
+				!refs
+					.filter((ref) => !ref.isRemote())
+					.map((ref) => ref.name().replace(removeLocalRegex, ""))
+					.includes(r.name().replace(removeRemoteRegex, ""))
+		)),
 		assert(
 			matchedRefs.length <= 1 ||
 				/**
@@ -1563,8 +1594,8 @@ async function extendCommitsWithBranchEnds(
 						matchedRefs.map((r) =>
 							r
 								?.name()
-								.replace(/^refs\/heads\//, "")
-								.replace(/^refs\/remotes\/[^/]*\//, "")
+								.replace(removeLocalRegex, "")
+								.replace(removeRemoteRegex, "")
 						)
 					).length === 1),
 			"" +
