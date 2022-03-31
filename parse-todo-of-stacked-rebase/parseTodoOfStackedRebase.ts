@@ -13,7 +13,5 @@ export function parseTodoOfStackedRebase(
 	const editedRebaseTodo: string = fs.readFileSync(pathToStackedRebaseTodoFile, { encoding: "utf-8" });
 	const linesOfEditedRebaseTodo: string[] = editedRebaseTodo.split("\n").filter((line) => !!line);
 
-	console.log({ linesOfEditedRebaseTodo });
-
 	return validate(linesOfEditedRebaseTodo);
 }
