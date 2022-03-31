@@ -13,7 +13,7 @@ import { filenames } from "./filenames";
 import { configKeys } from "./configKeys";
 import { apply, applyIfNeedsToApply, markThatNeedsToApply as _markThatNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
-import { branchSequencer } from "./branchSequencer";
+import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequencer";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -404,6 +404,10 @@ export const gitStackedRebase = async (
 					pathToStackedRebaseTodoFile,
 					initialBranch,
 					currentBranch,
+					behaviorOfGetBranchBoundaries:
+						BehaviorOfGetBranchBoundaries[
+							"if-stacked-rebase-in-progress-then-parse-not-applied-state-otherwise-simple-branch-traverse"
+						],
 				});
 			} else {
 				/**

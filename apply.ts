@@ -13,6 +13,7 @@ import {
 	branchSequencer,
 	ActionInsideEachCheckedOutBranch,
 	BranchSequencerArgsBase,
+	BehaviorOfGetBranchBoundaries,
 } from "./branchSequencer";
 import { combineRewrittenLists } from "./reducePath";
 
@@ -22,6 +23,7 @@ export const apply: BranchSequencerBase = (args) =>
 		actionInsideEachCheckedOutBranch: defaultApplyAction,
 		// callbackAfterDone: defaultApplyCallback,
 		delayMsBetweenCheckouts: 0,
+		behaviorOfGetBranchBoundaries: BehaviorOfGetBranchBoundaries["parse-from-not-yet-applied-state"],
 	}).then(
 		(ret) => (markThatApplied(args.pathToStackedRebaseDirInsideDotGit), ret) //
 	);

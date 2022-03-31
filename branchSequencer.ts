@@ -3,13 +3,21 @@ import assert from "assert";
 
 import Git from "nodegit";
 
+import { getWantedCommitsWithBranchBoundariesOurCustomImpl } from "./git-stacked-rebase";
+
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { Termination } from "./util/error";
+import { assertNever } from "./util/assertNever";
 
 import { parseNewGoodCommands } from "./parse-todo-of-stacked-rebase/parseNewGoodCommands";
 import { GoodCommand, GoodCommandStacked } from "./parse-todo-of-stacked-rebase/validator";
 
-export type GetBranchesCtx = {
+export type BranchRefs = {
+	initialBranch: Git.Reference;
+	currentBranch: Git.Reference;
+};
+
+export type GetBranchesCtx = BranchRefs & {
 	pathToStackedRebaseDirInsideDotGit: string;
 	rootLevelCommandName: string;
 	repo: Git.Repository;
@@ -24,7 +32,13 @@ export type GetBoundariesInclInitial = (
 	ctx: GetBranchesCtx //
 ) => SimpleBranchAndCommit[] | Promise<SimpleBranchAndCommit[]>;
 
-const defautlGetBoundariesInclInitial: GetBoundariesInclInitial = ({
+export const isStackedRebaseInProgress = ({
+	pathToStackedRebaseDirInsideDotGit,
+}: {
+	pathToStackedRebaseDirInsideDotGit: string;
+}): boolean => fs.existsSync(pathToStackedRebaseDirInsideDotGit);
+
+const getBoundariesInclInitialByParsingNotYetAppliedState: GetBoundariesInclInitial = ({
 	pathToStackedRebaseDirInsideDotGit, //
 	rootLevelCommandName,
 	repo,
@@ -33,7 +47,7 @@ const defautlGetBoundariesInclInitial: GetBoundariesInclInitial = ({
 	/**
 	 * TODO REMOVE / modify this logic (see next comment)
 	 */
-	if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) {
+	if (!isStackedRebaseInProgress({ pathToStackedRebaseDirInsideDotGit })) {
 		throw new Termination(`\n\nno stacked-rebase in progress? (nothing to ${rootLevelCommandName})\n\n`);
 	}
 	// const hasPostRewriteHookInstalledWithLatestVersion = false;
@@ -98,6 +112,94 @@ const defautlGetBoundariesInclInitial: GetBoundariesInclInitial = ({
 		);
 };
 
+const getBoundariesInclInitialWithSipleBranchTraversal: GetBoundariesInclInitial = (argsBase) =>
+	getWantedCommitsWithBranchBoundariesOurCustomImpl(
+		argsBase.repo, //
+		argsBase.initialBranch,
+		argsBase.currentBranch
+	).then((boundaries) =>
+		boundaries
+			.filter((b) => !!b.branchEnd)
+			.map(
+				(boundary): SimpleBranchAndCommit => ({
+					branchEndFullName: boundary.branchEnd!.name(), // TS ok because of the filter
+					commitSHA: boundary.commit.sha(),
+				})
+			)
+	);
+
+/**
+ * not sure if i'm a fan of this indirection tbh..
+ */
+export enum BehaviorOfGetBranchBoundaries {
+	/**
+	 * the default one.
+	 */
+	"parse-from-not-yet-applied-state",
+	/**
+	 * originally used by `--push` - since it wouldn't be allowed to run
+	 * before `--apply` was used,
+	 * having to sync from applied state was more confusion & limiting.
+	 *
+	 * further, we later got rid of the state after `--apply`ing,
+	 * so this became the only option anyway.
+	 */
+	"ignore-unapplied-state-and-use-simple-branch-traversal",
+	/**
+	 * this is the adaptive of the other 2.
+	 * originally intended for `branchSequencerExec` (`--exec`) -
+	 * we don't know what's coming from the user,
+	 * so we cannot make any assumptions.
+	 *
+	 * instead, we simply check if a stacked rebase (our) is in progress,
+	 * if so - we use the 1st option (because we have to),
+	 * otherwise - the 2nd option (because we have to, too!).
+	 */
+	"if-stacked-rebase-in-progress-then-parse-not-applied-state-otherwise-simple-branch-traverse",
+}
+export const defaultGetBranchBoundariesBehavior = BehaviorOfGetBranchBoundaries["parse-from-not-yet-applied-state"];
+
+const pickBoundaryParser = ({
+	behaviorOfGetBranchBoundaries,
+	pathToStackedRebaseDirInsideDotGit,
+}: {
+	/**
+	 * can provide one of the predefined behaviors,
+	 * whom will decide which parser to pick,
+	 *
+	 * or can provide a custom parser function.
+	 */
+	behaviorOfGetBranchBoundaries: BehaviorOfGetBranchBoundaries | GetBoundariesInclInitial;
+	pathToStackedRebaseDirInsideDotGit: string;
+}): GetBoundariesInclInitial => {
+	if (typeof behaviorOfGetBranchBoundaries === "function") {
+		/**
+		 * custom fn
+		 */
+		return behaviorOfGetBranchBoundaries;
+	} else if (behaviorOfGetBranchBoundaries === BehaviorOfGetBranchBoundaries["parse-from-not-yet-applied-state"]) {
+		return getBoundariesInclInitialByParsingNotYetAppliedState;
+	} else if (
+		behaviorOfGetBranchBoundaries ===
+		BehaviorOfGetBranchBoundaries["ignore-unapplied-state-and-use-simple-branch-traversal"]
+	) {
+		return getBoundariesInclInitialWithSipleBranchTraversal;
+	} else if (
+		behaviorOfGetBranchBoundaries ===
+		BehaviorOfGetBranchBoundaries[
+			"if-stacked-rebase-in-progress-then-parse-not-applied-state-otherwise-simple-branch-traverse"
+		]
+	) {
+		if (isStackedRebaseInProgress({ pathToStackedRebaseDirInsideDotGit })) {
+			return getBoundariesInclInitialByParsingNotYetAppliedState;
+		} else {
+			return getBoundariesInclInitialWithSipleBranchTraversal;
+		}
+	} else {
+		assertNever(behaviorOfGetBranchBoundaries);
+	}
+};
+
 /**
  *
  */
@@ -111,25 +213,20 @@ export type ActionInsideEachCheckedOutBranchCtx = {
 };
 export type ActionInsideEachCheckedOutBranch = (ctx: ActionInsideEachCheckedOutBranchCtx) => void | Promise<void>;
 
-export type BranchSequencerArgsBase = {
+export type BranchSequencerArgsBase = BranchRefs & {
 	pathToStackedRebaseDirInsideDotGit: string; //
 	// goodCommands: GoodCommand[];
 	pathToStackedRebaseTodoFile: string;
 	repo: Git.Repository;
 	rootLevelCommandName: string;
 	gitCmd: string;
-	//
-	initialBranch: Git.Reference;
-	currentBranch: Git.Reference;
 };
+
 export type BranchSequencerArgs = BranchSequencerArgsBase & {
 	// callbackBeforeBegin?: CallbackAfterDone; // TODO
 	actionInsideEachCheckedOutBranch: ActionInsideEachCheckedOutBranch;
 	delayMsBetweenCheckouts?: number;
-	/**
-	 *
-	 */
-	getBoundariesInclInitial?: GetBoundariesInclInitial;
+	behaviorOfGetBranchBoundaries?: Parameters<typeof pickBoundaryParser>[0]["behaviorOfGetBranchBoundaries"];
 };
 
 export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<void>;
@@ -145,15 +242,24 @@ export const branchSequencer: BranchSequencer = async ({
 	actionInsideEachCheckedOutBranch,
 	gitCmd,
 	//
-	getBoundariesInclInitial = defautlGetBoundariesInclInitial,
+	behaviorOfGetBranchBoundaries = defaultGetBranchBoundariesBehavior,
+	initialBranch,
+	currentBranch,
 }) => {
 	const execSyncInRepo = createExecSyncInRepo(repo);
+
+	const getBoundariesInclInitial: GetBoundariesInclInitial = pickBoundaryParser({
+		behaviorOfGetBranchBoundaries,
+		pathToStackedRebaseDirInsideDotGit,
+	});
 
 	const branchesAndCommits: SimpleBranchAndCommit[] = await getBoundariesInclInitial({
 		pathToStackedRebaseDirInsideDotGit,
 		pathToStackedRebaseTodoFile,
 		repo,
 		rootLevelCommandName,
+		initialBranch,
+		currentBranch,
 	});
 
 	return checkout(branchesAndCommits.slice(1) as any); // TODO TS
