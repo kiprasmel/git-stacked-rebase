@@ -1451,7 +1451,7 @@ exit 1
 			 * but need to do more research.
 			 */
 			"--no-autosquash",
-			">/dev/null 2>&1",
+			">/dev/null",
 		].join(" ");
 
 		console.log("launching internal rebase with editorScript to create initial todo:\n%s", cmd);
