@@ -586,6 +586,10 @@ export const gitStackedRebase = async (
 			 * this logic implies that we should always be doing `--apply`,
 			 * TODO thus consider.
 			 *
+			 * note 2.2 / 3.1:
+			 * oh, we actually should be doing the `--apply` in a lot more cases,
+			 * e.g. when a local branch is moved (currently we don't!)
+			 *
 			 */
 			const oldLatestBranchCmd: GoodCommandStacked = goodCommands[oldLatestBranchCmdIndex] as GoodCommandStacked; // TODO TS
 			const newLatestBranchCmd: GoodCommandStacked = goodCommands[newLatestBranchCmdIndex] as GoodCommandStacked; // TODO TS
