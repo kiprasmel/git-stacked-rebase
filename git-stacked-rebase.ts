@@ -930,8 +930,6 @@ EOF
 		const editorScript = `\
 #!/usr/bin/env bash	
 
-cat "${preparedRegularRebaseTodoFile}"
-
 mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 
 		`;
@@ -1038,7 +1036,6 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 		const commitShaOfNewCurrentCommit = await getCurrentCommit();
 		const rebaseChangedLocalHistory: boolean = commitShaOfCurrentCommit !== commitShaOfNewCurrentCommit;
 
-		console.log("");
 		console.log({
 			rebaseChangedLocalHistory, //
 			commitShaOfOldCurrentCommit: commitShaOfCurrentCommit,
@@ -1182,7 +1179,6 @@ async function createInitialEditTodoOfGitStackedRebase(
 	// fs.writeFileSync(ff, `${commitsWithBranchBoundaries[last].commit.sha()}`);
 
 	noop(commitsWithBranchBoundaries);
-	console.log({ commitsWithBranchBoundaries });
 
 	const rebaseTodo = commitsWithBranchBoundaries
 		.map(({ commit, commitCommand, branchEnd }, i) => {
@@ -1221,8 +1217,6 @@ async function createInitialEditTodoOfGitStackedRebase(
 		})
 		.filter((xs) => xs.length)
 		.flat();
-
-	console.log({ rebaseTodo });
 
 	fs.writeFileSync(pathToRebaseTodoFile, rebaseTodo.join("\n"));
 
@@ -1521,8 +1515,6 @@ exit 1
 		fs.rmdirSync(regularRebaseDirBackupPath, { recursive: true });
 	}
 
-	console.log("parsedRegular: %O", goodRegularCommands);
-
 	/**
 	 * TODO - would now have to use the logic from `getWantedCommitsWithBranchBoundaries`
 	 * & subsequent utils, though adapted differently - we already have the commits,
@@ -1540,15 +1532,12 @@ exit 1
 		return [cmd.commandOrAliasName, commitSHAFull];
 	});
 
-	console.log("wantedCommitSHAs %O", wantedCommitSHAs);
-
 	// const commits: Git.Commit[] = await Promise.all(
 	// 	wantedCommitSHAs.map((sha) => (console.log("sha %s", sha), Git.Commit.lookup(repo, sha)))
 	// );
 	const commits: Git.Commit[] = [];
 	const commandOrAliasNames: RegularRebaseEitherCommandOrAlias[] = [];
 	for (const [commandOrAliasName, sha] of wantedCommitSHAs) {
-		console.log("%s %s", commandOrAliasName, sha);
 		// const oid = await Git.Oid.fromString(sha);
 		const c = await Git.Commit.lookup(repo, sha);
 		commits.push(c);
@@ -1561,8 +1550,6 @@ exit 1
 		commits,
 		commandOrAliasNames
 	);
-
-	console.log("commitsWithBranchBoundaries %O", commitsWithBranchBoundaries);
 
 	return commitsWithBranchBoundaries;
 }
