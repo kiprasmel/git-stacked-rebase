@@ -4,11 +4,10 @@
 
 import Git from "nodegit";
 
-import { getWantedCommitsWithBranchBoundariesOurCustomImpl } from "./git-stacked-rebase";
 import {
+	BehaviorOfGetBranchBoundaries,
 	branchSequencer, //
 	BranchSequencerBase,
-	SimpleBranchAndCommit,
 	// getBackupPathOfPreviousStackedRebase,
 } from "./branchSequencer";
 
@@ -115,19 +114,11 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 			}
 		},
 		delayMsBetweenCheckouts: 0,
-		getBoundariesInclInitial: () =>
-			getWantedCommitsWithBranchBoundariesOurCustomImpl(
-				argsBase.repo, //
-				argsBase.initialBranch,
-				argsBase.currentBranch
-			).then((boundaries) =>
-				boundaries
-					.filter((b) => !!b.branchEnd)
-					.map(
-						(boundary): SimpleBranchAndCommit => ({
-							branchEndFullName: boundary.branchEnd!.name(), // TS ok because of the filter
-							commitSHA: boundary.commit.sha(),
-						})
-					)
-			),
+
+		/**
+		 * `--push` should not be allowed if `--apply` has not ran yet,
+		 * thus this is the desired behavior.
+		 */
+		behaviorOfGetBranchBoundaries:
+			BehaviorOfGetBranchBoundaries["ignore-unapplied-state-and-use-simple-branch-traversal"],
 	});
