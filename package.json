@@ -12,7 +12,7 @@
 		"prebuild:lean": "node ./script/prebuild.js",
 		"test": "ts-node-dev ./test/run.ts",
 		"build": "yarn test && yarn build:lean",
-		"build:lean": "yarn tsc -b",
+		"build:lean": "yarn tsc -b && yarn --cwd nvim-git-rebase-todo build",
 		"postbuild:lean": "node ./script/postbuild.js",
 		"prepack": "yarn build"
 	},
