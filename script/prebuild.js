@@ -3,4 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 
-fs.rmdirSync(path.join(__dirname, "..", "dist"), { recursive: true });
+const dir = path.join(__dirname, "..", "dist");
+if (fs.existsSync(dir)) {
+	fs.rmdirSync(dir, { recursive: true, force: true });
+}
