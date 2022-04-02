@@ -11,7 +11,7 @@
 	"scripts": {
 		"prebuild": "node ./script/prebuild.js",
 		"test": "ts-node-dev ./test/run.ts",
-		"build": "yarn tsc -b",
+		"build": "yarn test && yarn tsc -b",
 		"postbuild": "node ./script/postbuild.js",
 		"prepack": "yarn build"
 	},
