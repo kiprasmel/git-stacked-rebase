@@ -441,18 +441,18 @@ export const gitStackedRebase = async (
 			initialBranch,
 			currentBranch,
 			// __default__pathToStackedRebaseTodoFile
-			pathToStackedRebaseTodoFile,
-			() =>
-				getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
-					gitCmd: options.gitCmd,
-					repo,
-					initialBranch,
-					currentBranch,
-					dotGitDirPath,
-					pathToRegularRebaseTodoFile,
-					pathToStackedRebaseTodoFile,
-					pathToRegularRebaseDirInsideDotGit,
-				})
+			pathToStackedRebaseTodoFile
+			// () =>
+			// 	getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
+			// 		gitCmd: options.gitCmd,
+			// 		repo,
+			// 		initialBranch,
+			// 		currentBranch,
+			// 		dotGitDirPath,
+			// 		pathToRegularRebaseTodoFile,
+			// 		pathToStackedRebaseTodoFile,
+			// 		pathToRegularRebaseDirInsideDotGit,
+			// 	})
 		);
 
 		console.log("reading after internal rebase call");
@@ -1382,6 +1382,7 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 	return extendCommitsWithBranchEnds(repo, bb, wantedCommits);
 }
 
+noop(getWantedCommitsWithBranchBoundariesUsingNativeGitRebase);
 async function getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 	gitCmd,
 	repo,
@@ -1404,7 +1405,6 @@ async function getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 	const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
 		ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
 
-	// const commitOfInitialBranch: Git.Oid = await referenceToOid(bb);
 	const commitOfInitialBranch: Git.Oid = await referenceToOid(initialBranch);
 	const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
 
@@ -1414,6 +1414,9 @@ async function getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 		commitOfInitialBranch,
 		commitOfCurrentBranch
 	);
+
+	const commit = await Git.Commit.lookup(repo, latestCommitOfOursThatInitialBranchAlreadyHas);
+	// const parentCommit: Git.Commit = await commit.parent(0);
 
 	const regularRebaseDirBackupPath: string = pathToRegularRebaseDirInsideDotGit + ".backup-from-1st";
 
@@ -1466,10 +1469,19 @@ exit 1
 			"-c rebase.instructionFormat='%H'",
 			"rebase",
 			"--interactive",
-			latestCommitOfOursThatInitialBranchAlreadyHas.tostrS() +
-				"~" /** include self (needed for initialBranch's boundary) */,
-			"--onto",
-			initialBranch.name(),
+			commit.sha(),
+			// parentCommit.sha(),
+			// initialBranch.name() + "^",
+
+			// latestCommitOfOursThatInitialBranchAlreadyHas.tostrS() +
+			// 	"~" /** include self (needed for initialBranch's boundary) */,
+
+			// parentCommit.sha(),
+			// // commit.sha(),
+			// // "--keep-base",
+
+			// "--onto",
+			// initialBranch.name(),
 			/**
 			 * TODO FIXME need to remove the "--no-autosquash",
 			 * but for that, will need to do further analysis
@@ -1506,9 +1518,19 @@ exit 1
 
 	console.log("rebase -i exited successfully");
 
-	const goodRegularCommands: GoodCommandRegular[] = parseTodoOfStackedRebase(
-		path.join(regularRebaseDirBackupPath, filenames.gitRebaseTodo)
-	).map((cmd) => {
+	const gitRebaseTodoTmpPath: string = path.join(regularRebaseDirBackupPath, filenames.gitRebaseTodo);
+
+	const lines = fs.readFileSync(gitRebaseTodoTmpPath, { encoding: "utf-8" }).split("\n");
+	const line = lines[0];
+	const words = line.split(" ");
+	const firstCommitFromFile = words[2];
+	if (firstCommitFromFile !== commit.sha()) {
+		console.warn(`1st commit was not included, adding. (${commit.sha()})`);
+		lines.unshift(`pick ${commit.sha().substring(0, words[1].length)} ${commit.sha()}`);
+		fs.writeFileSync(gitRebaseTodoTmpPath, lines.join("\n"), { encoding: "utf-8" });
+	}
+
+	const goodRegularCommands: GoodCommandRegular[] = parseTodoOfStackedRebase(gitRebaseTodoTmpPath).map((cmd) => {
 		assert(
 			cmd.commandName in regularRebaseCommands,
 			`git-rebase-todo file, created via regular git rebase, contains non-rebase commands (got "${cmd.commandName}")`
@@ -1517,9 +1539,17 @@ exit 1
 		return cmd as GoodCommandRegular;
 	});
 
-	if (fs.existsSync(regularRebaseDirBackupPath)) {
-		fs.rmdirSync(regularRebaseDirBackupPath, { recursive: true });
-	}
+	// if (goodRegularCommands[0].targets[0] !== commit.sha()) {
+	// 	goodRegularCommands.unshift({
+	// 		commandName: "pick",
+	// 		commandOrAliasName:"pick",
+	// 		fullLine: ""
+	// 	})
+	// }
+
+	// if (fs.existsSync(regularRebaseDirBackupPath)) {
+	// 	fs.rmdirSync(regularRebaseDirBackupPath, { recursive: true });
+	// }
 
 	/**
 	 * TODO - would now have to use the logic from `getWantedCommitsWithBranchBoundaries`
@@ -1604,13 +1634,15 @@ async function extendCommitsWithBranchEnds(
 		 *
 		 */
 		(matchedRefs = matchedRefs.filter(
-			(r) =>
+			(r) => (
+				console.log({ r: r.name(), initialBranchName: initialBranch.name() }),
 				r.name() === initialBranch.name() ||
-				!r.isRemote() ||
-				!refs
-					.filter((ref) => !ref.isRemote())
-					.map((ref) => ref.name().replace(removeLocalRegex, ""))
-					.includes(r.name().replace(removeRemoteRegex, ""))
+					!r.isRemote() ||
+					!refs
+						.filter((ref) => !ref.isRemote())
+						.map((ref) => ref.name().replace(removeLocalRegex, ""))
+						.includes(r.name().replace(removeRemoteRegex, ""))
+			)
 		)),
 		assert(
 			matchedRefs.length <= 1 ||
