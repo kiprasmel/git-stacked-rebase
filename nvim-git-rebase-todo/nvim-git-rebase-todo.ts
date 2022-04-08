@@ -15,10 +15,6 @@ const execAsync = util.promisify(cp.exec);
  */
 
 export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
-	const { nvim: vim } = plugin;
-
-	plugin.setOptions({ dev: false });
-
 	/**
 	 * TODO make actually configurable
 	 */
@@ -37,6 +33,66 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		closeToLeft: 0,
 		rowLowerIfCloseToLeft: 0,
 	};
+
+	/**
+	 *
+	 */
+
+	const { nvim: vim } = plugin;
+
+	plugin.setOptions({ dev: false });
+
+	const pattern = "git-rebase-todo" as const;
+	const commonOptions: AutocmdOptions = {
+		sync: false, //
+		pattern,
+		eval: 'expand("<afile>")', // i don't know what this does
+	};
+
+	/**
+	 * :help events
+	 */
+	plugin.registerAutocmd(
+		"BufEnter", //
+		() => drawLinesOfCommittishStat(),
+		{
+			...commonOptions,
+		}
+	);
+
+	plugin.registerAutocmd(
+		"BufLeave", //
+		() => hideWindow(),
+		{
+			...commonOptions,
+		}
+	);
+
+	plugin.registerAutocmd(
+		"CursorMoved", //
+		() => drawLinesOfCommittishStat(),
+		{
+			...commonOptions,
+		}
+	);
+
+	/**
+	 * only needed when you create a new line,
+	 * otherwise could get rid...
+	 *
+	 * TODO OPTIMIZE
+	 */
+	plugin.registerAutocmd(
+		"CursorMovedI", //
+		() => drawLinesOfCommittishStat(),
+		{
+			...commonOptions,
+		}
+	);
+
+	/**
+	 *
+	 */
 
 	let gBuffer: Buffer;
 	let gWindow: Window;
@@ -398,56 +454,4 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 			height,
 		});
 	};
-
-	/**
-	 *
-	 */
-
-	const pattern = "git-rebase-todo" as const;
-	const commonOptions: AutocmdOptions = {
-		sync: false, //
-		pattern,
-		eval: 'expand("<afile>")', // i don't know what this does
-	};
-
-	/**
-	 * :help events
-	 */
-	plugin.registerAutocmd(
-		"BufEnter", //
-		() => drawLinesOfCommittishStat(),
-		{
-			...commonOptions,
-		}
-	);
-
-	plugin.registerAutocmd(
-		"BufLeave", //
-		() => hideWindow(),
-		{
-			...commonOptions,
-		}
-	);
-
-	plugin.registerAutocmd(
-		"CursorMoved", //
-		() => drawLinesOfCommittishStat(),
-		{
-			...commonOptions,
-		}
-	);
-
-	/**
-	 * only needed when you create a new line,
-	 * otherwise could get rid...
-	 *
-	 * TODO OPTIMIZE
-	 */
-	plugin.registerAutocmd(
-		"CursorMovedI", //
-		() => drawLinesOfCommittishStat(),
-		{
-			...commonOptions,
-		}
-	);
 }
