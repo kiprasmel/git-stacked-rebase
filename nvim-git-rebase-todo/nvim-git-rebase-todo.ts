@@ -232,7 +232,7 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		return committish;
 	};
 
-	let count: number = 0;
+	let gParseStatCount: number = 0;
 	/**
 	 * TODO consider an option where we precompute stats for all commits,
 	 * set the window to the the longest height out of them,
@@ -267,12 +267,11 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 				? []
 				: x.stdout.split("\n")
 		);
+
+		gParseStatCount++;
+
 		if (!stat.length) {
 			return [];
-		}
-
-		if (config.showStatParsingCount) {
-			stat.unshift((count++).toString());
 		}
 
 		return stat;
@@ -281,16 +280,34 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 	type Committish = string | null;
 	type State = {
 		committish: Committish;
+
+		/**
+		 * will not include the extra "informational" lines;
+		 * use `getExtraInfoLines` for that.
+		 */
 		lines: string[];
+
 		width: number;
 		height: number;
+	};
+	type CommitStateOpts = {
+		isCacheHit: boolean; //
 	};
 
 	let prevState: State | null = null;
 	const committishToStatCache: Map<NonNullable<Committish>, State> = new Map();
-	const commitState = (state: State): Promise<State> =>
+	const commitState = (
+		state: State,
+		{
+			isCacheHit = false, //
+		}: Partial<CommitStateOpts> = {}
+	): Promise<State> =>
 		Promise.resolve()
-			.then(() => updateBuffer(state.lines))
+			.then((): string[] => [
+				...getExtraInfoLines({ isCacheHit }),
+				...state.lines, // do not mutate state.lines
+			])
+			.then((lines) => updateBuffer(lines))
 			.then((buffer) =>
 				updateWindow({
 					buffer, //
@@ -300,6 +317,19 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 			)
 			.then(() => state.committish && committishToStatCache.set(state.committish, state))
 			.then(() => (prevState = state));
+
+	function getExtraInfoLines(opts: CommitStateOpts): string[] {
+		const extra: string[] = [];
+
+		if (config.showStatParsingCount) {
+			extra.push(gParseStatCount.toString());
+		}
+		if (config.showCacheHitOrMiss && opts.isCacheHit) {
+			extra.push("cache hit");
+		}
+
+		return extra;
+	}
 
 	const drawLinesOfCommittishStat = async (): Promise<State> => {
 		const committish: Committish = await getCommittishOfCurrentLine();
@@ -319,17 +349,9 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 
 		let tmp: State | undefined;
 		if ((tmp = committishToStatCache.get(committish))) {
-			if (!config.showCacheHitOrMiss) {
-				return commitState(tmp);
-			}
-
-			const cacheHit = "cache hit";
-			if (!tmp.lines[0].includes(cacheHit)) {
-				tmp.lines.unshift("");
-			}
-			tmp.lines[0] = cacheHit;
-
-			return commitState(tmp);
+			return commitState(tmp, {
+				isCacheHit: true, //
+			});
 		}
 
 		const stat: string[] = await getStatLines(committish);
