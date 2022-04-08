@@ -1,4 +1,5 @@
 /* eslint-disable indent */
+/* eslint-disable no-cond-assign */
 
 import cp from "child_process";
 import util from "util";
@@ -27,6 +28,7 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		maxWidth: 60,
 		fixedWidth: 60,
 		showStatParsingCount: false,
+		showCacheHitOrMiss: false,
 
 		// relativeToCursor: true,
 		// closeToLeft: 5,
@@ -277,45 +279,64 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 	};
 
 	type Committish = string | null;
-	let previousCommittish: Committish;
+	type State = {
+		committish: Committish;
+		lines: string[];
+		width: number;
+		height: number;
+	};
 
-	const drawLinesOfCommittishStat = async (): Promise<Committish> => {
+	let prevState: State | null = null;
+	const committishToStatCache: Map<NonNullable<Committish>, State> = new Map();
+	const commitState = (state: State): Promise<State> =>
+		Promise.resolve()
+			.then(() => updateBuffer(state.lines))
+			.then((buffer) =>
+				updateWindow({
+					buffer, //
+					width: state.width,
+					height: state.height,
+				})
+			)
+			.then(() => state.committish && committishToStatCache.set(state.committish, state))
+			.then(() => (prevState = state));
+
+	const drawLinesOfCommittishStat = async (): Promise<State> => {
 		const committish: Committish = await getCommittishOfCurrentLine();
 
-		if (committish === previousCommittish) {
-			return previousCommittish;
+		if (committish === prevState?.committish) {
+			return prevState;
 		}
-
-		/**
-		 * TODO OPTIMIZE
-		 * could cache already computed Committish'es
-		 * see also the above idea for pre-computing all lines in the file
-		 */
-		const commitState = async (opts: Omit<InitWindowOpts, "buffer"> & { lines: string[] }): Promise<Committish> => {
-			const { lines, ...rest } = opts;
-
-			const buffer: Buffer = await updateBuffer(lines); //
-			await updateWindow({
-				buffer,
-				...rest,
-			});
-
-			previousCommittish = committish;
-			return committish;
-		};
 
 		if (!committish) {
 			return commitState({
+				committish,
 				lines: [],
 				width: 0,
 				height: 0,
 			});
 		}
 
+		let tmp: State | undefined;
+		if ((tmp = committishToStatCache.get(committish))) {
+			if (!config.showCacheHitOrMiss) {
+				return commitState(tmp);
+			}
+
+			const cacheHit = "cache hit";
+			if (!tmp.lines[0].includes(cacheHit)) {
+				tmp.lines.unshift("");
+			}
+			tmp.lines[0] = cacheHit;
+
+			return commitState(tmp);
+		}
+
 		const stat: string[] = await getStatLines(committish);
 
 		if (!stat.length) {
 			return commitState({
+				committish,
 				lines: [],
 				width: 0,
 				height: 0,
@@ -326,6 +347,7 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 
 		if (longestLineLength === 0) {
 			return commitState({
+				committish,
 				lines: [],
 				width: 0,
 				height: 0,
@@ -348,6 +370,7 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		const height: number = Math.max(stat.length, config.minHeight + Number(!!config.showStatParsingCount));
 
 		return commitState({
+			committish,
 			lines: stat,
 			width,
 			height,
