@@ -4,22 +4,39 @@ on: [push, workflow_dispatch]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-preventing-a-specific-failing-matrix-job-from-failing-a-workflow-run
     continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         node: [12, 14]
         experimental: [false]
         include:
-          - node: 10
+          - os: ubuntu-latest
+            node: 10
             experimental: true
-          # v16 should work fine; there're some issues in CI with `krb5-config`
-          - node: 16
+          - os: ubuntu-latest
+            # v16 should work fine; there're some issues in CI with `krb5-config`
+            node: 16
             experimental: true
-          - node: 18
+          - os: ubuntu-latest
+            node: 18
+            experimental: true
+          
+          # test windows, w/ wanted versions
+          - os: windows-latest
+            node: 12
+            experimental: true
+          - os: windows-latest
+            node: 14
+            experimental: true
+
+          # test macos - for some reason, internet conn fails @ github actions
+          - os: macos-latest
+            node: 12
             experimental: true
 
     steps:
