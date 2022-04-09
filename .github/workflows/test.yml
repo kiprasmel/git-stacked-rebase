@@ -5,9 +5,22 @@ on: [push, workflow_dispatch]
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-preventing-a-specific-failing-matrix-job-from-failing-a-workflow-run
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
+      fail-fast: false
       matrix:
-        node: [12, 14, 16]
+        node: [12, 14]
+        experimental: [false]
+        include:
+          - node: 10
+            experimental: true
+          # v16 should work fine; there're some issues in CI with `krb5-config`
+          - node: 16
+            experimental: true
+          - node: 18
+            experimental: true
 
     steps:
       - uses: actions/checkout@v2
