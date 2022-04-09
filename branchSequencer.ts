@@ -71,6 +71,7 @@ export const branchSequencer: BranchSequencer = async ({
 	actionInsideEachCheckedOutBranch,
 	callbackAfterDone = (): void => {},
 	rewrittenListFile = filenames.rewrittenList,
+	gitCmd,
 }) => {
 	if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) {
 		throw new Termination(`\n\nno stacked-rebase in progress? (nothing to ${rootLevelCommandName})\n\n`);
@@ -157,8 +158,11 @@ export const branchSequencer: BranchSequencer = async ({
 		 */
 		const isFinalCheckout: boolean = cmds.length === 1;
 
+		/**
+		 * https://libgit2.org/libgit2/#HEAD/group/checkout/git_checkout_head
+		 */
 		// await Git.Checkout.tree(repo, targetBranch as any); // TODO TS FIXME
-		execSyncInRepo(`git checkout ${targetBranch}`); // f this
+		execSyncInRepo(`${gitCmd} checkout ${targetBranch}`); // f this
 
 		await actionInsideEachCheckedOutBranch({
 			repo, //
