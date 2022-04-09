@@ -351,7 +351,7 @@ export const gitStackedRebase = async (
 
 		console.log({ commitShaOfInitialBranch });
 
-		await repo.checkoutRef(initialBranch);
+		await repo.checkoutRef(initialBranch); /** TODO wtf */
 		// repo.rebaseBranches()
 
 		// const headName: string = (await (await repo.getHeadCommit()).sha()) + "\n";
