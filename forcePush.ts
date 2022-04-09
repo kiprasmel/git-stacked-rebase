@@ -38,5 +38,4 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 			execSyncInRepo(`${argsBase.gitCmd} push --force`);
 		},
 		delayMsBetweenCheckouts: 0,
-		rewrittenListFile: "rewritten-list.applied",
 	});
