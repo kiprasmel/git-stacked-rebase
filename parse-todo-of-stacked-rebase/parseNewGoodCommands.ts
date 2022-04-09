@@ -14,14 +14,13 @@ import { GoodCommand, stackedRebaseCommands } from "./validator";
 
 export function parseNewGoodCommands(
 	repo: Git.Repository,
-	pathToStackedRebaseTodoFile: string, //
-	rewrittenListFile: typeof filenames.rewrittenList | typeof filenames.rewrittenListApplied
+	pathToStackedRebaseTodoFile: string //
 ): GoodCommand[] {
 	const oldGoodCommands: GoodCommand[] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
 
 	logGoodCmds(oldGoodCommands);
 
-	const pathOfRewrittenList: string = path.join(repo.path(), "stacked-rebase", rewrittenListFile);
+	const pathOfRewrittenList: string = path.join(repo.path(), "stacked-rebase", filenames.rewrittenList);
 	const rewrittenList: string = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
 	const rewrittenListLines: string[] = rewrittenList.split("\n").filter((line) => !!line);
 
@@ -36,7 +35,7 @@ export function parseNewGoodCommands(
 		const fromToSHA = line.split(" ");
 		assert(
 			fromToSHA.length === 2,
-			`from and to SHAs, coming from ${rewrittenListFile}, are written properly (1 space total).`
+			`from and to SHAs, coming from ${filenames.rewrittenList}, are written properly (1 space total).`
 		);
 
 		const [oldSHA, newSHA] = fromToSHA;
