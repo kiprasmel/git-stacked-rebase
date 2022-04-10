@@ -143,7 +143,7 @@ export const regularRebaseCommands = {
 	// m: standardCommand,
 } as const;
 
-type RegularRebaseCommand = keyof typeof regularRebaseCommands;
+export type RegularRebaseCommand = keyof typeof regularRebaseCommands;
 
 /**
  * TODO: assert each value is `RegularRebaseCommand`,
@@ -219,7 +219,7 @@ export const stackedRebaseCommands = {
 	}),
 } as const;
 
-type StackedRebaseCommand = keyof typeof stackedRebaseCommands;
+export type StackedRebaseCommand = keyof typeof stackedRebaseCommands;
 
 // const allowedCommandAliasesFromGitStackedRebase: { [key: string]: AllowedGitStackedRebaseCommand } = {
 const stackedRebaseCommandAliases = {
@@ -229,10 +229,10 @@ const stackedRebaseCommandAliases = {
 
 type StackedRebaseCommandAlias = keyof typeof stackedRebaseCommandAliases;
 
-type EitherRebaseCommand = RegularRebaseCommand | StackedRebaseCommand;
-type EitherRebaseCommandAlias = RegularRebaseCommandAlias | StackedRebaseCommandAlias;
+export type EitherRebaseCommand = RegularRebaseCommand | StackedRebaseCommand;
+export type EitherRebaseCommandAlias = RegularRebaseCommandAlias | StackedRebaseCommandAlias;
 
-type EitherRebaseEitherCommandOrAlias = EitherRebaseCommand | EitherRebaseCommandAlias;
+export type EitherRebaseEitherCommandOrAlias = EitherRebaseCommand | EitherRebaseCommandAlias;
 
 type MapOfAllowedRebaseCommands = {
 	[key in EitherRebaseCommand]: Command;
