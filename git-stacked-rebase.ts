@@ -22,6 +22,7 @@ import { parseTodoOfStackedRebase } from "./parse-todo-of-stacked-rebase/parseTo
 import { Termination } from "./util/error";
 import { assertNever } from "./util/assertNever";
 import { Single, Tuple } from "./util/tuple";
+import { isDirEmptySync } from "./util/fs";
 import {
 	GoodCommand,
 	GoodCommandRegular,
@@ -463,6 +464,14 @@ export const gitStackedRebase = async (
 					execSyncInRepo(`${options.editor} ${pathToStackedRebaseTodoFile}`);
 				}
 			} catch (_e) {
+				/**
+				 * cleanup
+				 */
+				fs.unlinkSync(pathToStackedRebaseTodoFile);
+				if (isDirEmptySync(pathToStackedRebaseDirInsideDotGit)) {
+					fs.rmdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
+				}
+
 				throw new Termination(`error: There was a problem with the editor '${options.editor}'.\n`);
 			}
 		}
