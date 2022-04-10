@@ -46,8 +46,14 @@ export function parseNewGoodCommands(
 		const last = newCommits.length - 1;
 
 		if (newCommits.length && newSHA === newCommits[last].newSHA) {
+			/**
+			 * accumulating - if multiple commits got molded into 1
+			 */
 			newCommits[last].oldSHAs.push(oldSHA);
 		} else {
+			/**
+			 * initializing a new commit
+			 */
 			newCommits.push({
 				newSHA,
 				oldSHAs: [oldSHA],
