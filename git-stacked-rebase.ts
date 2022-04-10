@@ -346,11 +346,15 @@ export const gitStackedRebase = async (
 		);
 
 		if (!wasRegularRebaseInProgress || options.viewTodoOnly) {
-			if (options.editor instanceof Function) {
-				await options.editor({ filePath: pathToStackedRebaseTodoFile });
-			} else {
-				process.stdout.write("\nhint: Waiting for your editor to close the file... ");
-				execSyncInRepo(`${options.editor} ${pathToStackedRebaseTodoFile}`);
+			try {
+				if (options.editor instanceof Function) {
+					await options.editor({ filePath: pathToStackedRebaseTodoFile });
+				} else {
+					process.stdout.write("\nhint: Waiting for your editor to close the file... ");
+					execSyncInRepo(`${options.editor} ${pathToStackedRebaseTodoFile}`);
+				}
+			} catch (_e) {
+				throw new Termination(`error: There was a problem with the editor '${options.editor}'.\n`);
 			}
 		}
 
