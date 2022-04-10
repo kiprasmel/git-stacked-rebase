@@ -249,90 +249,28 @@ export const gitStackedRebase = async (
 
 		console.log({ wasRegularRebaseInProgress });
 
-		if (!wasRegularRebaseInProgress) {
-			// await createInitialEditTodoOfGitStackedRebase(
-			// 	repo, //
-			// 	initialBranch,
-			// 	currentBranch,
-			// 	// __default__pathToStackedRebaseTodoFile
-			// 	pathToStackedRebaseTodoFile
-			// );
-
-			const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
-				ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
-
-			// const commitOfInitialBranch: Git.Oid = await referenceToOid(bb);
-			const commitOfInitialBranch: Git.Oid = await referenceToOid(initialBranch);
-			const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
-
-			// https://stackoverflow.com/a/1549155/9285308
-			const latestCommitOfOursThatInitialBranchAlreadyHas: Git.Oid = await Git.Merge.base(
-				repo, //
-				commitOfInitialBranch,
-				commitOfCurrentBranch
-			);
-
-			const editorScript = `\
-#!/usr/bin/env bash
-
-printf "yes sir\n\n"
-
-pushd "${dotGitDirPath}"
-
-printf "pwd: $(pwd)\n"
-
-# cat rebase-merge/git-rebase-todo
-cat ${pathToRegularRebaseTodoFile}
-
-# cat ${pathToRegularRebaseTodoFile} > ${pathToStackedRebaseTodoFile}.regular
-cp -r ${pathToRegularRebaseDirInsideDotGit} ${pathToRegularRebaseDirInsideDotGit}.bp
-
-# abort the rebase before even starting it
-exit 1
-			`;
-			const editorScriptPath: string = path.join(dotGitDirPath, "editorScript.sh");
-			fs.writeFileSync(editorScriptPath, editorScript, { mode: 0o777 });
-
-			try {
-				execSyncInRepo(
-					[
-						options.gitCmd,
-						"rebase",
-						"--interactive",
-						latestCommitOfOursThatInitialBranchAlreadyHas.tostrS(),
-						"--onto",
-						initialBranch.name(),
-						">/dev/null 2>&1",
-					].join(" "),
-					{
-						env: {
-							// https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt-sequenceeditor
-							GIT_SEQUENCE_EDITOR: editorScriptPath,
-						},
-					}
-				);
-			} catch (e) {
-				// as expected. do nothing.
-				// TODO verify that it actually came from our script exiting intentionally
-			}
-
-			console.log("rebase -i exited");
-
-			const [_exit, goodRegularCommands] = parseTodoOfStackedRebase(
-				path.join(pathToRegularRebaseDirInsideDotGit + ".bp", filenames.gitRebaseTodo)
-			);
-
-			console.log("parsedRegular: %O", _exit, goodRegularCommands);
-
-			execSyncInRepo("read");
-
-			/**
-			 * TODO - would now have to use the logic from `getWantedCommitsWithBranchBoundaries`
-			 * & subsequent utils, though adapted differently - we already have the commits,
-			 * now we gotta add the branch boundaries & then continue like regular.
-			 *
-			 */
+		if (wasRegularRebaseInProgress) {
+			throw new Termination("regular rebase already in progress");
 		}
+
+		await createInitialEditTodoOfGitStackedRebase(
+			repo, //
+			initialBranch,
+			currentBranch,
+			// __default__pathToStackedRebaseTodoFile
+			pathToStackedRebaseTodoFile,
+			() =>
+				getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
+					gitCmd: options.gitCmd,
+					repo,
+					initialBranch,
+					currentBranch,
+					dotGitDirPath,
+					pathToRegularRebaseTodoFile,
+					pathToStackedRebaseTodoFile,
+					pathToRegularRebaseDirInsideDotGit,
+				})
+		);
 
 		if (!wasRegularRebaseInProgress || options.viewTodoOnly) {
 			if (options.editor instanceof Function) {
@@ -357,6 +295,10 @@ exit 1
 		const goodCommands: GoodCommand[] = parseTodoOfStackedRebase(pathToStackedRebaseTodoFile);
 
 		const proms: Promise<void>[] = goodCommands.map(async (cmd) => {
+			// if (cmd.commandName === "pick") {
+
+			// }
+
 			if (cmd.rebaseKind === "regular") {
 				regularRebaseTodoLines.push(cmd.fullLine);
 			} else if (cmd.rebaseKind === "stacked") {
@@ -413,80 +355,80 @@ exit 1
 			pathToRegularRebaseTodoFile,
 		});
 
-		fs.mkdirSync(pathToRegularRebaseDirInsideDotGit, { recursive: true });
+		// fs.mkdirSync(pathToRegularRebaseDirInsideDotGit, { recursive: true });
 
-		fs.writeFileSync(pathToRegularRebaseTodoFile, regularRebaseTodo);
-		fs.writeFileSync(pathToRegularRebaseTodoFile + ".backup", regularRebaseTodo);
+		// fs.writeFileSync(pathToRegularRebaseTodoFile, regularRebaseTodo);
+		// fs.writeFileSync(pathToRegularRebaseTodoFile + ".backup", regularRebaseTodo);
 
-		/**
-		 * writing the rebase todo is not enough.
-		 * follow https://github.com/git/git/blob/abe6bb3905392d5eb6b01fa6e54d7e784e0522aa/sequencer.c#L53-L170
-		 */
+		// /**
+		// * writing the rebase todo is not enough.
+		// * follow https://github.com/git/git/blob/abe6bb3905392d5eb6b01fa6e54d7e784e0522aa/sequencer.c#L53-L170
+		// */
 
-		// (await initialBranch.peel(Git.Object.TYPE.COMMIT))
-		const commitShaOfInitialBranch: string = (await (await getCommitOfBranch(repo, initialBranch)).sha()) + "\n";
+		// // (await initialBranch.peel(Git.Object.TYPE.COMMIT))
+		// const commitShaOfInitialBranch: string = (await (await getCommitOfBranch(repo, initialBranch)).sha()) + "\n";
 
 		const getCurrentCommit = (): Promise<string> => repo.getHeadCommit().then((c) => c.sha());
 
 		const commitShaOfCurrentCommit: string = await getCurrentCommit();
 
-		console.log({ commitShaOfInitialBranch });
+		// console.log({ commitShaOfInitialBranch });
 
-		await repo.checkoutRef(initialBranch); /** TODO wtf */
-		// repo.rebaseBranches()
+		// await repo.checkoutRef(initialBranch);
+		// // repo.rebaseBranches()
 
-		// const headName: string = (await (await repo.getHeadCommit()).sha()) + "\n";
-		// const headName: string = initialBranch.name() + "\n";
-		const headName: string = currentBranch.name() + "\n";
-		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "head-name"), headName);
+		// // const headName: string = (await (await repo.getHeadCommit()).sha()) + "\n";
+		// // const headName: string = initialBranch.name() + "\n";
+		// const headName: string = currentBranch.name() + "\n";
+		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "head-name"), headName);
 
-		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-name"), commitShaOfInitialBranch);
-
-		fs.writeFileSync(
-			path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
-			commitShaOfInitialBranch
-		);
+		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-name"), commitShaOfInitialBranch);
 
 		// fs.writeFileSync(
-		// 	path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
-		// 	commitShaOfInitialBranch
+		// path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
+		// commitShaOfInitialBranch
 		// );
-		/**
-		 * TODO - is this even needed? seems only a nodegit thing
-		 */
+
+		// // fs.writeFileSync(
+		// // 	path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
+		// // 	commitShaOfInitialBranch
+		// // );
+		// /**
+		// * TODO - is this even needed? seems only a nodegit thing
+		// */
+		// // fs.writeFileSync(
+		// // 	path.join(pathToRegularRebaseDirInsideDotGit, "onto_name"), //
+		// // 	initialBranch.name() + "\n"
+		// // );
+		// // fs.writeFileSync(
+		// // 	path.join(pathToRegularRebaseDirInsideDotGit, "cmt.1"), //
+		// // 	commitShaOfInitialBranch
+		// // );
+
 		// fs.writeFileSync(
-		// 	path.join(pathToRegularRebaseDirInsideDotGit, "onto_name"), //
-		// 	initialBranch.name() + "\n"
+		// // path.join(dotGitDirPath, "HEAD"), //
+		// path.join(pathToRegularRebaseDirInsideDotGit, "head"),
+		// commitShaOfInitialBranch
 		// );
+
+		// // fs.writeFileSync(path.join(dotGitDirPath, "ORIG_HEAD"), commitShaOfInitialBranch);
+		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-head"), commitShaOfCurrentCommit + "\n");
+
+		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "interactive"), "");
+
+		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "done"), "");
+
 		// fs.writeFileSync(
-		// 	path.join(pathToRegularRebaseDirInsideDotGit, "cmt.1"), //
-		// 	commitShaOfInitialBranch
+		// path.join(pathToRegularRebaseDirInsideDotGit, "end"), //
+		// (regularRebaseTodoLines.length + 1).toString() + "\n"
 		// );
 
-		fs.writeFileSync(
-			// path.join(dotGitDirPath, "HEAD"), //
-			path.join(pathToRegularRebaseDirInsideDotGit, "head"),
-			commitShaOfInitialBranch
-		);
+		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "msgnum"), "1");
 
-		// fs.writeFileSync(path.join(dotGitDirPath, "ORIG_HEAD"), commitShaOfInitialBranch);
-		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-head"), commitShaOfCurrentCommit + "\n");
-
-		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "interactive"), "");
-
-		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "done"), "");
-
-		fs.writeFileSync(
-			path.join(pathToRegularRebaseDirInsideDotGit, "end"), //
-			(regularRebaseTodoLines.length + 1).toString() + "\n"
-		);
-
-		fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "msgnum"), "1");
-
-		if (configValues.gpgSign) {
-			const gpgSignOpt = "-S" as const;
-			fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "gpg_sign_opt"), gpgSignOpt);
-		}
+		// if (configValues.gpgSign) {
+		// const gpgSignOpt = "-S" as const;
+		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "gpg_sign_opt"), gpgSignOpt);
+		// }
 
 		/**
 		 * end rebase initial setup.
@@ -583,16 +525,65 @@ cp "$REWRITTEN_LIST_FILE_PATH" "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 			process.stdout.write("\nwarning - overwrote post-rewrite script in .git/hooks/, saved backup.\n\n");
 		}
 
-		/**
-		 * too bad libgit2 is limited. oh well, i've seen worse.
-		 *
-		 * this passes it off to the user.
-		 *
-		 * they'll come back to us once they're done,
-		 * with --apply or whatever.
-		 *
-		 */
-		execSyncInRepo(`${options.gitCmd} rebase --continue`);
+		// /**
+		//  * too bad libgit2 is limited. oh well, i've seen worse.
+		//  *
+		//  * this passes it off to the user.
+		//  *
+		//  * they'll come back to us once they're done,
+		//  * with --apply or whatever.
+		//  *
+		//  */
+		// execSyncInRepo(`${options.gitCmd} rebase --continue`);
+
+		const preparedRegularRebaseTodoFile = path.join(
+			pathToStackedRebaseDirInsideDotGit,
+			filenames.gitRebaseTodo + ".ready"
+		);
+		fs.writeFileSync(preparedRegularRebaseTodoFile, regularRebaseTodo);
+
+		const editorScript = `\
+#!/usr/bin/env bash	
+
+cat "${preparedRegularRebaseTodoFile}"
+
+mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
+
+		`;
+		const editorScriptPath: string = path.join(dotGitDirPath, "editorScript.doActualRebase.sh");
+		fs.writeFileSync(editorScriptPath, editorScript, { mode: "777" });
+
+		const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
+			ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
+
+		const commitOfInitialBranch: Git.Oid = await referenceToOid(initialBranch); // bb
+		const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
+
+		// https://stackoverflow.com/a/1549155/9285308
+		const latestCommitOfOursThatInitialBranchAlreadyHas: Git.Oid = await Git.Merge.base(
+			repo, //
+			commitOfInitialBranch,
+			commitOfCurrentBranch
+		);
+
+		execSyncInRepo(
+			[
+				options.gitCmd, //
+				"rebase",
+				"--interactive",
+				latestCommitOfOursThatInitialBranchAlreadyHas.tostrS(),
+				"--onto",
+				initialBranch.name(),
+			].join(" "),
+			{
+				env: {
+					// https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt-sequenceeditor
+					GIT_SEQUENCE_EDITOR: editorScriptPath,
+				},
+			}
+		);
+		console.log("big buns - the proper rebase returned");
+
 		/**
 		 * if the rebase finishes and ONLY THEN EXITS,
 		 * it's fine and we continue.
@@ -753,12 +744,17 @@ export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
 	);
 }
 
-noop(createInitialEditTodoOfGitStackedRebase);
 async function createInitialEditTodoOfGitStackedRebase(
 	repo: Git.Repository, //
 	initialBranch: Git.Reference,
 	currentBranch: Git.Reference,
-	pathToRebaseTodoFile: string
+	pathToRebaseTodoFile: string,
+	getCommitsWithBranchBoundaries: () => Promise<CommitAndBranchBoundary[]> = () =>
+		getWantedCommitsWithBranchBoundariesOurCustomImpl(
+			repo, //
+			initialBranch,
+			currentBranch
+		)
 ): Promise<void> {
 	// .catch(logErr);
 
@@ -767,13 +763,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 	// 	return;
 	// }
 
-	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = (
-		await getWantedCommitsWithBranchBoundaries(
-			repo, //
-			initialBranch,
-			currentBranch
-		)
-	).reverse();
+	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = await getCommitsWithBranchBoundaries();
 
 	// /**
 	//  * TODO: FIXME HACK for nodegit rebase
@@ -907,15 +897,12 @@ type CommitAndBranchBoundary = {
 	branchEnd: Git.Reference | null;
 };
 
-async function getWantedCommitsWithBranchBoundaries(
+async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 	repo: Git.Repository, //
 	/** beginningBranch */
 	bb: Git.Reference,
 	currentBranch: Git.Reference
 ): Promise<CommitAndBranchBoundary[]> {
-	const refNames: string[] = await Git.Reference.list(repo);
-	const refs: Git.Reference[] = await Promise.all(refNames.map((ref) => Git.Reference.lookup(repo, ref)));
-
 	/**
 	 * BEGIN check e.g. fork & origin/fork
 	 */
@@ -980,56 +967,214 @@ async function getWantedCommitsWithBranchBoundaries(
 			 * TODO FIXME - this is done later, but probably should be done directly
 			 * in the underlying function to avoid confusion.
 			 */
-			commits
+			commits.reverse()
 		)
 	);
+
+	return extendCommitsWithBranchEnds(repo, bb, wantedCommits);
+}
+
+async function getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
+	gitCmd,
+	repo,
+	initialBranch,
+	currentBranch,
+	dotGitDirPath,
+	pathToRegularRebaseTodoFile,
+	pathToStackedRebaseTodoFile,
+	pathToRegularRebaseDirInsideDotGit,
+}: {
+	gitCmd: string;
+	repo: Git.Repository; //
+	initialBranch: Git.Reference;
+	currentBranch: Git.Reference;
+	dotGitDirPath: string;
+	pathToRegularRebaseTodoFile: string;
+	pathToStackedRebaseTodoFile: string;
+	pathToRegularRebaseDirInsideDotGit: string;
+}) {
+	const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
+		ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
+
+	// const commitOfInitialBranch: Git.Oid = await referenceToOid(bb);
+	const commitOfInitialBranch: Git.Oid = await referenceToOid(initialBranch);
+	const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
+
+	// https://stackoverflow.com/a/1549155/9285308
+	const latestCommitOfOursThatInitialBranchAlreadyHas: Git.Oid = await Git.Merge.base(
+		repo, //
+		commitOfInitialBranch,
+		commitOfCurrentBranch
+	);
+
+	const regularRebaseDirBackupPath: string = pathToRegularRebaseDirInsideDotGit + ".backup-from-1st";
+
+	/** BEGIN COPY-PASTA */
+
+	const editorScript = `\
+#!/usr/bin/env bash
+
+printf "yes sir\n\n"
+
+pushd "${dotGitDirPath}"
+
+printf "pwd: $(pwd)\n"
+
+# cat rebase-merge/git-rebase-todo
+cat ${pathToRegularRebaseTodoFile}
+
+# cat ${pathToRegularRebaseTodoFile} > ${pathToStackedRebaseTodoFile}.regular
+cp -r ${pathToRegularRebaseDirInsideDotGit} ${regularRebaseDirBackupPath}
+
+# abort the rebase before even starting it
+exit 1
+			`;
+	const editorScriptPath: string = path.join(dotGitDirPath, "editorScript.sh");
+	fs.writeFileSync(editorScriptPath, editorScript, { mode: "777" });
+	console.log("wrote editorScript");
+
+	try {
+		const execSyncInRepo = createExecSyncInRepo(repo);
+
+		const cmd = [
+			gitCmd,
+			/**
+			 * we need the full SHA.
+			 *
+			 * https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt-rebaseinstructionFormat
+			 * https://git-scm.com/docs/git-log#Documentation/git-log.txt-emHem
+			 *
+			 */
+			"-c rebase.instructionFormat='%H'",
+			"rebase",
+			"--interactive",
+			latestCommitOfOursThatInitialBranchAlreadyHas.tostrS() +
+				"~" /** include self (needed for initialBranch's boundary) */,
+			"--onto",
+			initialBranch.name(),
+			">/dev/null 2>&1",
+		].join(" ");
+
+		console.log("launching internal rebase with editorScript to create initial todo:\n%s", cmd);
+
+		execSyncInRepo(cmd, {
+			env: {
+				// https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt-sequenceeditor
+				GIT_SEQUENCE_EDITOR: editorScriptPath,
+			},
+		});
+	} catch (e) {
+		// as expected. do nothing.
+		// TODO verify that it actually came from our script exiting intentionally
+	}
+
+	console.log("rebase -i exited");
+
+	/** END COPY-PASTA */
+
+	const goodRegularCommands = parseTodoOfStackedRebase(
+		path.join(regularRebaseDirBackupPath, filenames.gitRebaseTodo)
+	);
+
+	if (fs.existsSync(regularRebaseDirBackupPath)) {
+		fs.rmdirSync(regularRebaseDirBackupPath, { recursive: true });
+	}
+
+	console.log("parsedRegular: %O", goodRegularCommands);
+
+	/**
+	 * TODO - would now have to use the logic from `getWantedCommitsWithBranchBoundaries`
+	 * & subsequent utils, though adapted differently - we already have the commits,
+	 * now we gotta add the branch boundaries & then continue like regular.
+	 *
+	 */
+	const wantedCommitSHAs: string[] = goodRegularCommands.map((cmd) => {
+		assert(cmd.commandName === "pick");
+		/**
+		 * 1st is the command name
+		 * 2nd is the short commit SHA
+		 * 3rd is the long commit SHA, because of our custom `-c rebase.instructionFormat='%H'`
+		 */
+		const commitSHAFull: string = cmd.fullLine.split(" ")?.[2] || "";
+		assert(commitSHAFull);
+		return commitSHAFull;
+	});
+
+	console.log("wantedCommitSHAs %O", wantedCommitSHAs);
+
+	// const commits: Git.Commit[] = await Promise.all(
+	// 	wantedCommitSHAs.map((sha) => (console.log("sha %s", sha), Git.Commit.lookup(repo, sha)))
+	// );
+	const commits = [];
+	for (const sha of wantedCommitSHAs) {
+		console.log("sha %s", sha);
+		// const oid = await Git.Oid.fromString(sha);
+		const c = await Git.Commit.lookup(repo, sha);
+		commits.push(c);
+	}
+
+	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = await extendCommitsWithBranchEnds(
+		repo,
+		initialBranch,
+		commits
+	);
+
+	console.log("commitsWithBranchBoundaries %O", commitsWithBranchBoundaries);
+
+	return commitsWithBranchBoundaries;
+}
+
+async function extendCommitsWithBranchEnds(
+	repo: Git.Repository,
+	initialBranch: Git.Reference,
+	commits: Git.Commit[]
+): Promise<CommitAndBranchBoundary[]> {
+	const refNames: string[] = await Git.Reference.list(repo);
+	const refs: Git.Reference[] = await Promise.all(refNames.map((ref) => Git.Reference.lookup(repo, ref)));
 
 	let matchedRefs: Git.Reference[];
 
-	const wantedCommitsWithBranchEnds: CommitAndBranchBoundary[] = await Promise.all(
-		wantedCommits.map(
-			(c: Git.Commit) => (
-				(matchedRefs = refs.filter((ref) => !!ref.target()?.equal(c.id()))),
-				assert(
-					matchedRefs.length <= 1 ||
-						/**
-						 * if it's more than 1,
-						 * it's only allowed all of the branches are the same ones,
-						 * just on different remotes.
-						 */
-						(matchedRefs.length > 1 &&
-							uniq(
-								matchedRefs.map((r) =>
-									r
-										?.name()
-										.replace(/^refs\/heads\//, "")
-										.replace(/^refs\/remotes\/[^/]*\//, "")
-								)
-							).length === 1),
-					"" +
-						"2 (or more) branches for the same commit, both in the same path - cannot continue" +
-						"(until explicit branch specifying is implemented)" +
-						"\n\n" +
-						"matchedRefs = " +
-						matchedRefs.map((mr) => mr?.name()) +
-						"\n"
-				),
-				matchedRefs.length > 1 &&
-					(matchedRefs = matchedRefs.some((r) => r?.name() === bb.name())
-						? [bb]
-						: matchedRefs.filter((r) => !r?.isRemote() /* r?.name().includes("refs/heads/") */)),
-				assert(matchedRefs.length <= 1, "refs/heads/ and refs/remotes/*/ replacement went wrong"),
-				{
-					commit: c,
-					branchEnd: !matchedRefs.length ? null : matchedRefs[0],
-				}
-			)
-		)
+	const extend = (c: Git.Commit) => (
+		(matchedRefs = refs.filter((ref) => !!ref.target()?.equal(c.id()))),
+		assert(
+			matchedRefs.length <= 1 ||
+				/**
+				 * if it's more than 1,
+				 * it's only allowed all of the branches are the same ones,
+				 * just on different remotes.
+				 */
+				(matchedRefs.length > 1 &&
+					uniq(
+						matchedRefs.map((r) =>
+							r
+								?.name()
+								.replace(/^refs\/heads\//, "")
+								.replace(/^refs\/remotes\/[^/]*\//, "")
+						)
+					).length === 1),
+			"" +
+				"2 (or more) branches for the same commit, both in the same path - cannot continue" +
+				"(until explicit branch specifying is implemented)" +
+				"\n\n" +
+				"matchedRefs = " +
+				matchedRefs.map((mr) => mr?.name()) +
+				"\n"
+		),
+		matchedRefs.length > 1 &&
+			(matchedRefs = matchedRefs.some((r) => r?.name() === initialBranch.name())
+				? [initialBranch]
+				: matchedRefs.filter((r) => !r?.isRemote() /* r?.name().includes("refs/heads/") */)),
+		assert(matchedRefs.length <= 1, "refs/heads/ and refs/remotes/*/ replacement went wrong"),
+		{
+			commit: c,
+			branchEnd: !matchedRefs.length ? null : matchedRefs[0],
+		}
 	);
 
-	return wantedCommitsWithBranchEnds;
+	return commits.map(extend);
 }
 
+noop(getCommitOfBranch);
 async function getCommitOfBranch(repo: Git.Repository, branchReference: Git.Reference) {
 	const branchOid: Git.Oid = await (await branchReference.peel(Git.Object.TYPE.COMMIT)).id();
 	return await Git.Commit.lookup(repo, branchOid);
