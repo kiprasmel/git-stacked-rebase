@@ -4,6 +4,7 @@ import path from "path";
 import Git from "nodegit";
 
 import { createQuestion } from "./util/createQuestion";
+import { isDirEmptySync } from "./util/fs";
 
 import { filenames } from "./filenames";
 import { configKeys } from "./configKeys";
@@ -178,7 +179,7 @@ export const markThatApplied = (pathToStackedRebaseDirInsideDotGit: string): voi
 			// // 	  })(),
 			fs.existsSync(rewrittenListPath) && fs.unlinkSync(rewrittenListPath),
 			fs.existsSync(gitRebaseTodoPath) && fs.unlinkSync(gitRebaseTodoPath),
-			fs.readdirSync(pathToStackedRebaseDirInsideDotGit).length === 0 &&
+			isDirEmptySync(pathToStackedRebaseDirInsideDotGit) &&
 				fs.rmdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true }),
 			void 0
 		)
