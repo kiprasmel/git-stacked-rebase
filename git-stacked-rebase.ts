@@ -441,21 +441,21 @@ exit 1
 			commitShaOfInitialBranch
 		);
 
-		fs.writeFileSync(
-			path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
-			commitShaOfInitialBranch
-		);
+		// fs.writeFileSync(
+		// 	path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
+		// 	commitShaOfInitialBranch
+		// );
 		/**
 		 * TODO - is this even needed? seems only a nodegit thing
 		 */
-		fs.writeFileSync(
-			path.join(pathToRegularRebaseDirInsideDotGit, "onto_name"), //
-			initialBranch.name() + "\n"
-		);
-		fs.writeFileSync(
-			path.join(pathToRegularRebaseDirInsideDotGit, "cmt.1"), //
-			commitShaOfInitialBranch
-		);
+		// fs.writeFileSync(
+		// 	path.join(pathToRegularRebaseDirInsideDotGit, "onto_name"), //
+		// 	initialBranch.name() + "\n"
+		// );
+		// fs.writeFileSync(
+		// 	path.join(pathToRegularRebaseDirInsideDotGit, "cmt.1"), //
+		// 	commitShaOfInitialBranch
+		// );
 
 		fs.writeFileSync(
 			// path.join(dotGitDirPath, "HEAD"), //
