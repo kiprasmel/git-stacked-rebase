@@ -10,13 +10,14 @@
 	},
 	"scripts": {
 		"prebuild": "node ./script/prebuild.js",
+		"test": "ts-node-dev ./test/run.ts",
 		"build": "yarn tsc -b",
 		"postbuild": "node ./script/postbuild.js",
 		"prepack": "yarn build"
 	},
 	"devDependencies": {
 		"@types/node": "16.11.11",
-		"@types/nodegit": "0.27.6",
+		"@types/nodegit": "0.27.8",
 		"ts-node-dev": "1.1.8",
 		"typescript": "4.5.2"
 	},
