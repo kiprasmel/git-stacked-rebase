@@ -159,6 +159,12 @@ export async function setupRepo() {
 	await config.setString("user.name", "tester");
 
 	/**
+	 * gpg signing in tests not possible i believe,
+	 * at least wasn't working.
+	 */
+	await config.setBool(configKeys.gpgSign, Git.Config.MAP.FALSE);
+
+	/**
 	 * fixups / not implemented in libgit2.
 	 * though, would be better if received empty/minimal config by default..
 	 */
