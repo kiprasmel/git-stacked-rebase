@@ -942,6 +942,7 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 				latestCommitOfOursThatInitialBranchAlreadyHas.tostrS(),
 				"--onto",
 				initialBranch.name(),
+				configValues.gpgSign ? "--gpg-sign" : "",
 			].join(" "),
 			{
 				env: {
