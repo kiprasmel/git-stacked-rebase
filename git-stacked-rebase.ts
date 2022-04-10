@@ -349,6 +349,7 @@ export const gitStackedRebase = async (
 			if (options.editor instanceof Function) {
 				await options.editor({ filePath: pathToStackedRebaseTodoFile });
 			} else {
+				process.stdout.write("\nhint: Waiting for your editor to close the file... ");
 				execSyncInRepo(`${options.editor} ${pathToStackedRebaseTodoFile}`);
 			}
 		}
