@@ -307,7 +307,11 @@ export function combineRewrittenLists(rewrittenListFileContent: string): Combine
 		}
 
 		prev = []
-	}
+	} 
+
+	if (!lastRebaseList) {
+		throw new Error(`NOT IMPLEMENTED - did not find any "rebase"(s).`)
+	} 
 
 	/**
 	 * TODO handle multiple rebases
@@ -317,7 +321,7 @@ export function combineRewrittenLists(rewrittenListFileContent: string): Combine
 
 	console.log("mergedReducedRewrittenLists", mergedReducedRewrittenLists)
 
-	const combinedRewrittenList = Object.entries(mergedReducedRewrittenLists[0].mapping).map(([k, v]) => k + " " + v).join("\n") + "\n"
+	const combinedRewrittenList = Object.entries(lastRebaseList.mapping).map(([k, v]) => k + " " + v).join("\n") + "\n"
 	// fs.writeFileSync("rewritten-list", combinedRewrittenList)
 
 	return {
