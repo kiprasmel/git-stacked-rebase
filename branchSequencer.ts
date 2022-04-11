@@ -264,62 +264,18 @@ export const branchSequencer: BranchSequencer = async ({
 		pathToStackedRebaseDirInsideDotGit,
 	});
 
-	const branchesAndCommits: SimpleBranchAndCommit[] = await getBoundariesInclInitial({
-		pathToStackedRebaseDirInsideDotGit,
-		pathToStackedRebaseTodoFile,
-		repo,
-		rootLevelCommandName,
-		initialBranch,
-		currentBranch,
-	});
-
-	/**
-	 * remove the initial branch
-	 */
-	branchesAndCommits.shift();
-
-	const originalBoundariesLength: number = branchesAndCommits.length;
-
-	const latestBoundary: SimpleBranchAndCommit = branchesAndCommits[branchesAndCommits.length - 1];
-
-	if (reverseCheckoutOrder) {
-		branchesAndCommits.reverse();
-	}
-
-	return checkout(branchesAndCommits);
-
-	async function checkout(boundaries: SimpleBranchAndCommit[]): Promise<void> {
-		if (!boundaries.length) {
-			/**
-			 * done.
-			 *
-			 * now just checkout to the latest branch
-			 */
-
-			await repo.checkoutBranch(latestBoundary.branchEndFullName);
-
-			return;
-		}
-
-		console.log("\ncheckout", boundaries.length, reverseCheckoutOrder ? "(reversed)" : "");
-
-		const goNext = () =>
-			new Promise<void>((r) => {
-				setTimeout(() => {
-					checkout(boundaries.slice(1)).then(() => r());
-				}, delayMsBetweenCheckouts);
-			});
-
-		const boundary = boundaries[0];
-		const branch = boundary.branchEndFullName;
-		const targetCommitSHA: string | null = boundary.commitSHA;
-
-		if (!targetCommitSHA) {
-			return goNext();
-		}
-
-		let targetBranch = branch.replace("refs/heads/", "");
-		assert(targetBranch);
+	const branchesAndCommits: SimpleBranchAndCommit[] = (
+		await getBoundariesInclInitial({
+			pathToStackedRebaseDirInsideDotGit,
+			pathToStackedRebaseTodoFile,
+			repo,
+			rootLevelCommandName,
+			initialBranch,
+			currentBranch,
+		})
+	).map((boundary) => {
+		boundary.branchEndFullName = boundary.branchEndFullName.replace("refs/heads/", "");
+		assert(boundary.branchEndFullName);
 
 		/**
 		 * if we only have the remote branch, but it's not checked out locally,
@@ -330,7 +286,7 @@ export const branchSequencer: BranchSequencer = async ({
 		// if (!Git.Branch.lookup(repo, targetBranch, Git.Branch.BRANCH.LOCAL)) {
 		// 	execSyncInRepo();
 		// }
-		if (targetBranch.startsWith("refs/remotes/")) {
+		if (boundary.branchEndFullName.startsWith("refs/remotes/")) {
 			/**
 			 * TODO - probably should handle this "checkout remote branch locally" logic
 			 * in a better place than here,
@@ -368,10 +324,58 @@ export const branchSequencer: BranchSequencer = async ({
 			 * before doing the checkouts.
 			 *
 			 */
-			targetBranch = targetBranch.replace(/refs\/remotes\/[^/]+\//, "");
+			boundary.branchEndFullName = boundary.branchEndFullName.replace(/refs\/remotes\/[^/]+\//, "");
 		}
 
 		// console.log({ targetCommitSHA, target: targetBranch });
+		return boundary;
+	});
+
+	/**
+	 * remove the initial branch
+	 */
+	branchesAndCommits.shift();
+
+	const originalBoundariesLength: number = branchesAndCommits.length;
+
+	const latestBoundary: SimpleBranchAndCommit = branchesAndCommits[branchesAndCommits.length - 1];
+
+	if (reverseCheckoutOrder) {
+		branchesAndCommits.reverse();
+	}
+
+	return checkout(branchesAndCommits);
+
+	async function checkout(boundaries: SimpleBranchAndCommit[]): Promise<void> {
+		if (!boundaries.length) {
+			/**
+			 * done.
+			 *
+			 * now just checkout to the latest branch
+			 */
+
+			// await repo.checkoutBranch(latestBoundary.branchEndFullName);
+			execSyncInRepo(`${gitCmd} checkout ${latestBoundary.branchEndFullName}`);
+
+			return;
+		}
+
+		console.log("\ncheckout", boundaries.length, reverseCheckoutOrder ? "(reversed)" : "");
+
+		const goNext = () =>
+			new Promise<void>((r) => {
+				setTimeout(() => {
+					checkout(boundaries.slice(1)).then(() => r());
+				}, delayMsBetweenCheckouts);
+			});
+
+		const boundary = boundaries[0];
+		const targetBranch = boundary.branchEndFullName;
+		const targetCommitSHA: string | null = boundary.commitSHA;
+
+		if (!targetCommitSHA) {
+			return goNext();
+		}
 
 		const isLatestBranch: boolean = reverseCheckoutOrder
 			? boundaries.length === originalBoundariesLength
