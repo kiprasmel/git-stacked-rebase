@@ -208,7 +208,7 @@ export type ActionInsideEachCheckedOutBranchCtx = {
 	repo: Git.Repository; //
 	targetBranch: string;
 	targetCommitSHA: string;
-	isFinalCheckout: boolean;
+	isLatestBranch: boolean;
 	execSyncInRepo: ReturnType<typeof createExecSyncInRepo>;
 };
 export type ActionInsideEachCheckedOutBranch = (ctx: ActionInsideEachCheckedOutBranchCtx) => void | Promise<void>;
@@ -341,10 +341,7 @@ export const branchSequencer: BranchSequencer = async ({
 
 		// console.log({ targetCommitSHA, target: targetBranch });
 
-		/**
-		 * meaning we're on the latest branch
-		 */
-		const isFinalCheckout: boolean = boundaries.length === 1;
+		const isLatestBranch: boolean = boundaries.length === 1;
 
 		/**
 		 * https://libgit2.org/libgit2/#HEAD/group/checkout/git_checkout_head
@@ -356,7 +353,7 @@ export const branchSequencer: BranchSequencer = async ({
 			repo, //
 			targetBranch,
 			targetCommitSHA,
-			isFinalCheckout,
+			isLatestBranch,
 			execSyncInRepo,
 		});
 
