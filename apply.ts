@@ -39,13 +39,13 @@ const defaultApplyAction: ActionInsideEachCheckedOutBranch = async ({
 
 	console.log({ isFinalCheckout });
 
-	// if (!isFinalCheckout) {
-	await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
+	if (!isFinalCheckout) {
+		await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
 
-	// if (previousTargetBranchName) {
-	// execSyncInRepo(`/usr/bin/env git rebase ${previousTargetBranchName}`);
-	// }
-	// }
+		// if (previousTargetBranchName) {
+		// execSyncInRepo(`/usr/bin/env git rebase ${previousTargetBranchName}`);
+		// }
+	}
 };
 
 export const getBackupPathOfPreviousStackedRebase = (pathToStackedRebaseDirInsideDotGit: string): string =>
