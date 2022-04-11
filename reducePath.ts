@@ -112,6 +112,8 @@ export function combineRewrittenLists(rewrittenListFileContent: string): Combine
 	let prev                       : RewrittenListBlockAmend[]  = []
 	let mergedReducedRewrittenLists: RewrittenListBlockRebase[] = []
 
+	let lastRebaseList: RewrittenListBlockRebase | null = null
+
 	for (const list of rewrittenLists) {
 		if (list.type === "amend") {
 			prev.push(list)
@@ -278,10 +280,35 @@ export function combineRewrittenLists(rewrittenListFileContent: string): Combine
 			prev = []
 			reducePath(list.mapping)
 			mergedReducedRewrittenLists.push(list)
+			lastRebaseList = list
 		} else {
 			throw new Error(`invalid list type (got "${(list as any).type}")`)
 		}
 	}
+
+	if (prev.length) {
+		/**
+		 * likely a rebase happenend first,
+		 * it was not `--apply`ied,
+		 * and then a `commit --amend` happend.
+		 * 
+		 * if we don't handle this case,
+		 * the changes done in the `--amend`
+		 * would be lost.
+		 */
+
+		if (!lastRebaseList) {
+			throw new Error(`NOT IMPLEMENTED - found "amend"(s) in rewritten-list, but did not find any "rebase"(s).`)
+		} 
+	
+		for (const amend of prev) {
+			Object.assign(lastRebaseList.mapping, amend.mapping)
+			reducePath(lastRebaseList.mapping)
+		}
+
+		prev = []
+	}
+
 	/**
 	 * TODO handle multiple rebases
 	 * or, multiple separate files for each new rebase,
