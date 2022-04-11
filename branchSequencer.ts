@@ -280,6 +280,8 @@ export const branchSequencer: BranchSequencer = async ({
 
 	const originalBoundariesLength: number = branchesAndCommits.length;
 
+	const latestBoundary: SimpleBranchAndCommit = branchesAndCommits[branchesAndCommits.length - 1];
+
 	if (reverseCheckoutOrder) {
 		branchesAndCommits.reverse();
 	}
@@ -288,6 +290,14 @@ export const branchSequencer: BranchSequencer = async ({
 
 	async function checkout(boundaries: SimpleBranchAndCommit[]): Promise<void> {
 		if (!boundaries.length) {
+			/**
+			 * done.
+			 *
+			 * now just checkout to the latest branch
+			 */
+
+			await repo.checkoutBranch(latestBoundary.branchEndFullName);
+
 			return;
 		}
 
