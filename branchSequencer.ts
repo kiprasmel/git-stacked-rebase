@@ -227,6 +227,15 @@ export type BranchSequencerArgs = BranchSequencerArgsBase & {
 	actionInsideEachCheckedOutBranch: ActionInsideEachCheckedOutBranch;
 	delayMsBetweenCheckouts?: number;
 	behaviorOfGetBranchBoundaries?: Parameters<typeof pickBoundaryParser>[0]["behaviorOfGetBranchBoundaries"];
+
+	/**
+	 * normally, you checkout to the 1st partial branch in the stack,
+	 * then the 2nd, etc, up until you reach the latest branch.
+	 *
+	 * use `reverseCheckoutOrder` to do the opposite.
+	 *
+	 */
+	reverseCheckoutOrder: boolean;
 };
 
 export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<void>;
@@ -245,6 +254,8 @@ export const branchSequencer: BranchSequencer = async ({
 	behaviorOfGetBranchBoundaries = defaultGetBranchBoundariesBehavior,
 	initialBranch,
 	currentBranch,
+	//
+	reverseCheckoutOrder = false,
 }) => {
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
@@ -261,6 +272,10 @@ export const branchSequencer: BranchSequencer = async ({
 		initialBranch,
 		currentBranch,
 	});
+	if (reverseCheckoutOrder) {
+		branchesAndCommits.reverse();
+	}
+	const originalBoundariesLength: number = branchesAndCommits.length;
 
 	return checkout(branchesAndCommits.slice(1) as any); // TODO TS
 
@@ -269,7 +284,7 @@ export const branchSequencer: BranchSequencer = async ({
 			return;
 		}
 
-		console.log("\ncheckout", boundaries.length);
+		console.log("\ncheckout", boundaries.length, reverseCheckoutOrder ? "(reversed)" : "");
 
 		const goNext = () =>
 			new Promise<void>((r) => {
@@ -341,7 +356,9 @@ export const branchSequencer: BranchSequencer = async ({
 
 		// console.log({ targetCommitSHA, target: targetBranch });
 
-		const isLatestBranch: boolean = boundaries.length === 1;
+		const isLatestBranch: boolean = reverseCheckoutOrder
+			? boundaries.length === originalBoundariesLength
+			: boundaries.length === 1;
 
 		/**
 		 * https://libgit2.org/libgit2/#HEAD/group/checkout/git_checkout_head
