@@ -33,16 +33,16 @@ const defaultApplyAction: ActionInsideEachCheckedOutBranch = async ({
 	repo, //
 	// targetBranch,
 	targetCommitSHA,
-	isFinalCheckout,
+	isLatestBranch,
 	// execSyncInRepo,
 }) => {
 	const commit: Git.Commit = await Git.Commit.lookup(repo, targetCommitSHA);
 
 	console.log("will reset to commit", commit.sha(), "(" + commit.summary() + ")");
 
-	console.log({ isFinalCheckout });
+	console.log({ isLatestBranch });
 
-	if (!isFinalCheckout) {
+	if (!isLatestBranch) {
 		await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
 
 		// if (previousTargetBranchName) {
