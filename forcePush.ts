@@ -121,4 +121,16 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 		 */
 		behaviorOfGetBranchBoundaries:
 			BehaviorOfGetBranchBoundaries["ignore-unapplied-state-and-use-simple-branch-traversal"],
+
+		/**
+		 * (experimental)
+		 *
+		 * github just closed (emptily merged) one of the PRs
+		 * because some commit was now already part of some other branch.
+		 *
+		 * pretty sure that pushing newest branches first, and oldest later,
+		 * instead of the current "oldest first, then newest",
+		 * would solve this.
+		 */
+		reverseCheckoutOrder: true,
 	});
