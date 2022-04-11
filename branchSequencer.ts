@@ -272,12 +272,19 @@ export const branchSequencer: BranchSequencer = async ({
 		initialBranch,
 		currentBranch,
 	});
+
+	/**
+	 * remove the initial branch
+	 */
+	branchesAndCommits.shift();
+
+	const originalBoundariesLength: number = branchesAndCommits.length;
+
 	if (reverseCheckoutOrder) {
 		branchesAndCommits.reverse();
 	}
-	const originalBoundariesLength: number = branchesAndCommits.length;
 
-	return checkout(branchesAndCommits.slice(1) as any); // TODO TS
+	return checkout(branchesAndCommits);
 
 	async function checkout(boundaries: SimpleBranchAndCommit[]): Promise<void> {
 		if (!boundaries.length) {
