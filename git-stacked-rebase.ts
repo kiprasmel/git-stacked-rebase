@@ -408,6 +408,7 @@ export const gitStackedRebase = async (
 						BehaviorOfGetBranchBoundaries[
 							"if-stacked-rebase-in-progress-then-parse-not-applied-state-otherwise-simple-branch-traverse"
 						],
+					reverseCheckoutOrder: false,
 				});
 			} else {
 				/**

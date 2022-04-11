@@ -25,6 +25,7 @@ export const apply: BranchSequencerBase = (args) =>
 		// callbackAfterDone: defaultApplyCallback,
 		delayMsBetweenCheckouts: 0,
 		behaviorOfGetBranchBoundaries: BehaviorOfGetBranchBoundaries["parse-from-not-yet-applied-state"],
+		reverseCheckoutOrder: false,
 	}).then(
 		(ret) => (markThatApplied(args.pathToStackedRebaseDirInsideDotGit), ret) //
 	);
