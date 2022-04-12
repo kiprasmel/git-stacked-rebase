@@ -163,10 +163,11 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		width, //
 		height,
 	}: SetWindowRelativeToCursorOpts): Promise<OpenWindowOptions> => {
-		const cursor = await vim.window.cursor;
-
-		const relWin = await vim.window;
-		const col: number = config.closeToLeft || (await relWin.width);
+		const [relWin, cursor, col] = await Promise.all([
+			vim.window,
+			vim.window.cursor,
+			config.closeToLeft || vim.window.width,
+		]);
 
 		return {
 			// relative: "cursor",
@@ -195,26 +196,35 @@ export default function nvimGitRebaseTodo(plugin: NvimPlugin): void {
 		 * instead of taking it in as param
 		 */
 
-		const relWin: Window = await vim.getWindow();
-		const col: number = config.closeToLeft || (await relWin.width);
+		let relWin: Window;
+		let col: number;
+		let opts: OpenWindowOptions;
 
-		const opts: OpenWindowOptions = config.relativeToCursor
-			? {
-					...(await getRelativeWindowOptions({ width, height })),
-			  }
-			: ({
-					relative: "win",
-					win: relWin.id,
-					//
-					width,
-					height,
-					//
-					// anchor: "NE", // TODO is this needed?
-					row: 0 + (config.closeToLeft ? config.rowLowerIfCloseToLeft : 0),
-					col,
-					//
-					style: "minimal",
-			  } as const);
+		if (config.relativeToCursor) {
+			[relWin, col, opts] = await Promise.all([
+				vim.window, //
+				vim.window.width,
+				getRelativeWindowOptions({ width, height }),
+			]);
+		} else {
+			[relWin, col] = await Promise.all([
+				vim.window, //
+				vim.window.width,
+			]);
+			opts = {
+				relative: "win",
+				win: relWin.id,
+				//
+				width,
+				height,
+				//
+				// anchor: "NE", // TODO is this needed?
+				row: 0 + (config.closeToLeft ? config.rowLowerIfCloseToLeft : 0),
+				col,
+				//
+				style: "minimal",
+			};
+		}
 
 		const enter = false;
 		const window: number | Window = await vim.openWindow(buffer, enter, opts);
