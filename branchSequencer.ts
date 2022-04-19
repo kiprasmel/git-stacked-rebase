@@ -157,7 +157,10 @@ export enum BehaviorOfGetBranchBoundaries {
 	 */
 	"if-stacked-rebase-in-progress-then-parse-not-applied-state-otherwise-simple-branch-traverse",
 }
-export const defaultGetBranchBoundariesBehavior = BehaviorOfGetBranchBoundaries["parse-from-not-yet-applied-state"];
+export const defaultGetBranchBoundariesBehavior =
+	BehaviorOfGetBranchBoundaries[
+		"if-stacked-rebase-in-progress-then-parse-not-applied-state-otherwise-simple-branch-traverse"
+	];
 
 const pickBoundaryParser = ({
 	behaviorOfGetBranchBoundaries,
