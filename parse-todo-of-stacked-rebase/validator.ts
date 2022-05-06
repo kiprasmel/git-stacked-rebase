@@ -27,12 +27,14 @@ type Command = {
 	parseTargets: ParseTargets;
 
 	makesGitRebaseExitToPause: boolean;
+	willDisappearFromCommandsListInNextGitRebaseTodoFile: boolean;
 };
 
 const createCommand = (
 	nameButNeverAlias: string,
 	{
 		makesGitRebaseExitToPause,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile,
 		parseTargets = ({ split }) => {
 			assert(
 				split.length >= 2,
@@ -57,6 +59,11 @@ const createCommand = (
 		 */
 		makesGitRebaseExitToPause: boolean;
 
+		/**
+		 * TODO RENAME
+		 */
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: boolean;
+
 		// nameOrAlias: EitherRebaseEitherCommandOrAlias, //
 		parseTargets?: Command["parseTargets"];
 		maxUseCount?: number;
@@ -68,23 +75,33 @@ const createCommand = (
 	nameButNeverAlias: nameButNeverAlias as EitherRebaseCommand, // TODO: TS
 	parseTargets,
 	makesGitRebaseExitToPause,
+	willDisappearFromCommandsListInNextGitRebaseTodoFile,
 });
 
 export const regularRebaseCommands = {
-	pick: createCommand("pick", { makesGitRebaseExitToPause: false }),
+	pick: createCommand("pick", {
+		makesGitRebaseExitToPause: false,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false, //
+	}),
 	// p: standardCommand,
 	reword: createCommand("reword", {
 		makesGitRebaseExitToPause: false /** opens editor & then continues, w/o exiting in between */,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
 	}),
 	// r: standardCommand,
-	edit: createCommand("edit", { makesGitRebaseExitToPause: true }),
+	edit: createCommand("edit", {
+		makesGitRebaseExitToPause: true,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false, //
+	}),
 	// e: standardCommand,
 	squash: createCommand("squash", {
 		makesGitRebaseExitToPause: false /** opens editor & then continues, w/o exiting in between */,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
 	}),
 	// s: standardCommand,
 	fixup: createCommand("fixup", {
 		makesGitRebaseExitToPause: false /** opens editor & then continues, w/o exiting in between */,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
 
 		parseTargets: ({ split }) => {
 			/**
@@ -102,20 +119,35 @@ export const regularRebaseCommands = {
 	// f: standardCommand,
 	exec: createCommand("exec", {
 		makesGitRebaseExitToPause: false, //
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: true,
 
 		parseTargets: ({ rest }) => [rest],
 	}),
 	// x: standardCommand,
-	break: createCommand("break", { makesGitRebaseExitToPause: true, parseTargets: () => null }),
+	break: createCommand("break", {
+		makesGitRebaseExitToPause: true,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: true, //
+		parseTargets: () => null,
+	}),
 	// b: standardCommand,
-	drop: createCommand("drop", { makesGitRebaseExitToPause: false }),
+	drop: createCommand("drop", {
+		makesGitRebaseExitToPause: false,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false, // TODO
+	}),
 	// d: standardCommand,
-	label: createCommand("label", { makesGitRebaseExitToPause: false /** TODO VERIFY */ }),
+	label: createCommand("label", {
+		makesGitRebaseExitToPause: false /** TODO VERIFY */,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false, // TODO VERIFY
+	}),
 	// l: standardCommand,
-	reset: createCommand("reset", { makesGitRebaseExitToPause: false /** TODO VERIFY */ }),
+	reset: createCommand("reset", {
+		makesGitRebaseExitToPause: false /** TODO VERIFY */,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false, // TODO VERIFY
+	}),
 	// t: standardCommand,
 	merge: createCommand("merge", {
 		makesGitRebaseExitToPause: false /** TODO VERIFY */,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false, // TODO VERIFY
 
 		parseTargets: ({ split }) => {
 			if (["-C", "-c"].includes(split[1])) {
@@ -192,6 +224,7 @@ const branchValidator: Validator = ({ rest, reasonsIfBad: reasonsWhyInvalid }) =
 export const stackedRebaseCommands = {
 	"branch-end": createCommand("branch-end", {
 		makesGitRebaseExitToPause: false,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
 
 		maxUseCount: Infinity,
 		isRestValid: branchValidator,
@@ -199,6 +232,7 @@ export const stackedRebaseCommands = {
 	}),
 	"branch-end-new": createCommand("branch-end-new", {
 		makesGitRebaseExitToPause: false,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
 
 		maxUseCount: Infinity,
 		isRestValid: branchValidator,
@@ -206,6 +240,7 @@ export const stackedRebaseCommands = {
 	}),
 	"branch-end-initial": createCommand("branch-end-initial", {
 		makesGitRebaseExitToPause: false,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
 
 		maxUseCount: 1,
 		isRestValid: branchValidator,
@@ -213,6 +248,7 @@ export const stackedRebaseCommands = {
 	}),
 	"branch-end-last": createCommand("branch-end-last", {
 		makesGitRebaseExitToPause: false,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
 
 		maxUseCount: 1,
 		isRestValid: branchValidator,
@@ -260,8 +296,14 @@ const allEitherRebaseCommandAliases = {
 export const rebaseCommandsThatMakeRebaseExitToPause: Command[] = Object.values(allEitherRebaseCommands).filter(
 	(cmd) => cmd.makesGitRebaseExitToPause
 );
-
 export const namesOfRebaseCommandsThatMakeRebaseExitToPause: EitherRebaseCommand[] = rebaseCommandsThatMakeRebaseExitToPause.map(
+	(cmd) => cmd.nameButNeverAlias
+);
+
+export const rebaseCommandsThatWillDisappearFromCommandList: Command[] = Object.values(allEitherRebaseCommands).filter(
+	(cmd) => cmd.willDisappearFromCommandsListInNextGitRebaseTodoFile
+);
+export const namesOfRebaseCommandsThatWillDisappearFromCommandList: EitherRebaseCommand[] = rebaseCommandsThatWillDisappearFromCommandList.map(
 	(cmd) => cmd.nameButNeverAlias
 );
 
