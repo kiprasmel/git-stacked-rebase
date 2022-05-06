@@ -43,7 +43,7 @@ export type OptionsForGitStackedRebase = {
 	/**
 	 * editor name, or a function that opens the file inside some editor.
 	 */
-	editor: string | ((ctx: { filePath: string }) => Promise<void>);
+	editor: string | ((ctx: { filePath: string }) => void | Promise<void>);
 
 	/**
 	 * for executing raw git commands
