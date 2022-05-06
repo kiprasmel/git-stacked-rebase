@@ -5,6 +5,19 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"name": "node dist/git-stacked-rebase.js origin/master --apply",
+			"program": "${workspaceFolder}/dist/git-stacked-rebase.js",
+			"request": "launch",
+			"args": [
+				"origin/master", //
+				"--apply"
+			],
+			"skipFiles": [
+				"<node_internals>/**" //
+			],
+			"type": "node"
+		},
+		{
 			"name": "ts-node tests",
 			"type": "node",
 			"request": "launch",
