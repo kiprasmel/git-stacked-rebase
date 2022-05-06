@@ -3,6 +3,7 @@
 import { testCase } from "./experiment.spec";
 import reducePathTC from "../reducePath.spec";
 
+import { parseNewGoodCommandsSpec } from "../parse-todo-of-stacked-rebase/parseNewGoodCommands.spec";
 import { sequentialResolve } from "../util/sequentialResolve";
 
 main();
@@ -11,6 +12,7 @@ function main() {
 	sequentialResolve([
 		testCase, //
 		async () => reducePathTC(),
+		parseNewGoodCommandsSpec,
 	])
 		.then(() => process.stdout.write("\nsuccess\n\n"))
 		.catch((e) => {
