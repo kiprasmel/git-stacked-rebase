@@ -10,7 +10,11 @@ import { filenames } from "../filenames";
 import { readRewrittenListNotAppliedOrAppliedOrError } from "../apply";
 
 import { parseTodoOfStackedRebase } from "./parseTodoOfStackedRebase";
-import { GoodCommand, stackedRebaseCommands } from "./validator";
+import {
+	GoodCommand, //
+	namesOfRebaseCommandsThatWillDisappearFromCommandList,
+	stackedRebaseCommands,
+} from "./validator";
 
 export function parseNewGoodCommands(
 	repo: Git.Repository,
@@ -94,6 +98,13 @@ export function parseNewGoodCommands(
 		const oldCommit: OldCommit = oldCommits[i];
 
 		const oldCommandAtIdx: GoodCommand = oldGoodCommands[goodCommandMinIndex];
+
+		if (namesOfRebaseCommandsThatWillDisappearFromCommandList.includes(oldCommandAtIdx.commandName)) {
+			goodCommandMinIndex++; // the command should disappear,
+			i--; // but the commit should not be lost.
+
+			continue;
+		}
 
 		if (oldCommandAtIdx.commandName in stackedRebaseCommands) {
 			goodNewCommands.push({
@@ -184,7 +195,10 @@ export function parseNewGoodCommands(
 		["stackedRebaseCommandsNew.length"]: stackedRebaseCommandsNew.length,
 	});
 
-	assert(stackedRebaseCommandsOld.length === stackedRebaseCommandsNew.length);
+	const oldCommandCount: number = stackedRebaseCommandsOld.length;
+	const newCommandCount: number = stackedRebaseCommandsNew.length;
+
+	assert.equal(oldCommandCount, newCommandCount);
 
 	return stackedRebaseCommandsNew;
 }
