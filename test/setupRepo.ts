@@ -109,6 +109,15 @@ export async function setupRepo({
 	const dir: string = createTmpdir(tmpdir);
 
 	const foldersToDeletePath: string = path.join(__dirname, "folders-to-delete");
+	if (!fs.existsSync(foldersToDeletePath)) {
+		fs.writeFileSync(foldersToDeletePath, "");
+	}
+	const deletables = fs.readFileSync(foldersToDeletePath, { encoding: "utf-8" }).split("\n");
+	for (const d of deletables) {
+		if (fs.existsSync(d)) {
+			fs.rmdirSync(d, { recursive: true });
+		}
+	}
 	fs.appendFileSync(foldersToDeletePath, dir + "\n", { encoding: "utf-8" });
 
 	/**
