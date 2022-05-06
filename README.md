@@ -2,6 +2,15 @@
 
 stacked diffs in git, seamlessly.
 
+<div align="center">
+	<img src="Documentation/assets/git-rebase-todo.png"></img>
+	<p>
+		<code>git-stacked-rebase</code>
+		is like <code>git rebase -i</code>,
+		but it allows you to rebase stacked branches as well.
+	</p>
+</div>
+
 why jump through branches manually, when we can extend `git rebase -i` instead?
 
 a branch is just a reference to some commit (literally, it's a single-line file that contains a 40-character commit SHA -- check your `.git/refs/` folder). why not just work on your latest feature branch, rebase comfortably, and then have your tool automatically update the partial branches to make them point to the correct new commits?

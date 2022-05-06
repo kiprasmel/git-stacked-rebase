@@ -1,0 +1,24 @@
+branch-end-initial origin/master
+pick 4db230eac83756b1ebd813b999bb8ef3ce6e05ac feat: rebase with `--gpg-sign` if gpgSign enabled
+pick 6a9274c6bf2f92046a5bd2ef561ec97930d98d79 fix: disable gpgSign in tests
+branch-end feat/gpg-sign
+pick 39362110a80daefb82cc04f9df7647defe546911 print interactive rebase's hint that we're waiting the editor to close the file
+pick a11224c05b9f232692e978830b5d5193023cb315 exit with clear message if editor exits with error, instead of blowing up
+pick 72ce4dafb99af5fd3dcc58d20283e84374b16305 cleanup stacked-rebase dir if editor exits with error
+branch-end feat/editor-exit
+pick a690bdf21082cdec81dcb72fa86ce620f5d59263 refactor: rename `isFinalCheckout` to `isLatestBranch` (prereq)
+pick ee5691084155c3e658494625bd0997c97e45796e feat: implement `reverseCheckoutOrder` in `branchSequencer`
+pick 2000d00cafc70a4c40d852008f739f13c913c3d9 fix: use `reverseCheckoutOrder` in `forcePush`
+pick 6e294d0e24ca8f8aa8cece07e0f196761972db6d fix: remove initial branch; do use the latest branch
+pick 152b8875e5771af6bb125aa7f3309e0b1f30ba23 fix: checkout to the latest branch (since if reversed, would end up at initial)
+pick 64e8caa7e95886eb5ac8f57d5595341e3b4603c2 fix: move up the branch name fixing logic, use exec for final checkout too
+branch-end feat/allow-reverse-checkout-order
+pick 541ee5ed7986ddcba5a70dda7a60ed16b1ba748f use adaptive branch boundary finder behavior as the default in `branchSequencer`
+branch-end feat/pull
+pick d36df25ca4ae66877ccdee359b8abc95149c90e8 fix: expect only persistant commands to persist
+pick d86bcd98a38e92c949498106ad1c80e9ceca0d2c setup debug script to run --apply w/ built gsr for vscode
+pick ab049404d18a89ab980bebbbb263e56f9e7b9307 extract `setupRepo` and `humanOp` from experiment.spec.ts
+pick 2b48d674ea51631455076f675fc3666e7defb232 instead of Promise.all, resolve sequentially in test run because not concurrent-safe
+pick 586659263ca36465fa82c8d17a06fea5730f5f65 create test case for parseNewGoodCommands
+pick 9ba7444523cae9f247bb5608c836118b82b65de4 make tests cleanup deletable dirs in test/
+branch-end-last fix/expect-only-persistant-commands-to-persist
