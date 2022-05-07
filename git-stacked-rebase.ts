@@ -681,34 +681,7 @@ export const gitStackedRebase = async (
 		 * and quite outdated...
 		 * (checked C version too - same story).
 		 *
-		 * thus, looks like we'll have to reverse-engineer git itself.
-		 *
 		 */
-
-		/** BEGIN LIBGIT2 REBASE ATTEMPT */
-
-		// const annotatedCommitOfCurrentBranch: Git.AnnotatedCommit = await Git.AnnotatedCommit.fromRef(
-		// 	repo,
-		// 	currentBranch
-		// );
-		// const annotatedCommitOfInitialBranch: Git.AnnotatedCommit = await Git.AnnotatedCommit.fromRef(
-		// 	repo,
-		// 	initialBranch
-		// );
-
-		// const rebase: Git.Rebase = await Git.Rebase.init(
-		// 	repo, //
-		// 	annotatedCommitOfCurrentBranch,
-		// 	annotatedCommitOfInitialBranch,
-		// 	annotatedCommitOfInitialBranch // TODO VERIFY
-		// 	// (null as unknown) as Git.AnnotatedCommit // TODO TS
-		// 	// Git.Rebase.initOptions()
-		// );
-
-		// const currentOp: number = rebase.operationCurrent();
-		// console.log({ rebase, currentOp });
-
-		/** END LIBGIT2 REBASE ATTEMPT */
 
 		const regularRebaseTodo: string = regularRebaseTodoLines.join("\n") + "\n";
 
@@ -717,24 +690,9 @@ export const gitStackedRebase = async (
 			pathToRegularRebaseTodoFile,
 		});
 
-		// fs.mkdirSync(pathToRegularRebaseDirInsideDotGit, { recursive: true });
-
-		// fs.writeFileSync(pathToRegularRebaseTodoFile, regularRebaseTodo);
-		// fs.writeFileSync(pathToRegularRebaseTodoFile + ".backup", regularRebaseTodo);
-
-		// /**
-		// * writing the rebase todo is not enough.
-		// * follow https://github.com/git/git/blob/abe6bb3905392d5eb6b01fa6e54d7e784e0522aa/sequencer.c#L53-L170
-		// */
-
-		// // (await initialBranch.peel(Git.Object.TYPE.COMMIT))
-		// const commitShaOfInitialBranch: string = (await (await getCommitOfBranch(repo, initialBranch)).sha()) + "\n";
-
 		const getCurrentCommit = (): Promise<string> => repo.getHeadCommit().then((c) => c.sha());
 
 		const commitShaOfCurrentCommit: string = await getCurrentCommit();
-
-		// console.log({ commitShaOfInitialBranch });
 
 		/**
 		 * begin setup to handle post-rebase shenanigans.
