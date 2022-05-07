@@ -11,6 +11,21 @@ stacked diffs in git, seamlessly.
 	</p>
 </div>
 
+previously, if you wanted to adopt a stacked branch workflow, you'd have to do a lot of manual work every time you'd update anything in your stack -- jump thru each branch, re-rebase it on top of the previous one, get rid of duplicate commits, resolve conflicts, try to remember what the next branch was, and repeat...
+
+there must be a better way. and that's exactly how git-stacked-rebase came to be. 
+
+
+
+(prehistory?)
+i was working on a big feature, wanted to split it out into multiple smaller steps. it was easy to create branch boundaries
+
+(old)
+ to have stacked branches, you'd have to do a lot of jumping thru each branch and rebasing it on top of the previous one - everytime you'd want to edit some
+
+(use cases? & tests for them)
+
+(explain thru prior art? i.e. i wanted to use it the same way i use git rebase -i)
 why jump through branches manually, when we can extend `git rebase -i` instead?
 
 a branch is just a reference to some commit (literally, it's a single-line file that contains a 40-character commit SHA -- check your `.git/refs/` folder). why not just work on your latest feature branch, rebase comfortably, and then have your tool automatically update the partial branches to make them point to the correct new commits?
@@ -24,6 +39,8 @@ from those partial branches, you can create pull requests. with this workflow, y
 it's not only a CLI either - it's first and foremost a javascript library, and the CLI is just a tool that builds on top of the library.
 
 in the future, we could create host-specific adapters. they could be used to automate some simple tasks, such as creating a pull request, or changing the base branch of a pull request, etc.
+
+there are bigger plans as well, such as creating a browser extension to improve the experience of exploring stacked PRs.
 
 ## Progress
 
@@ -55,3 +72,5 @@ cd repo/
 # then:
 
 git-stacked-rebase --help
+```
+
