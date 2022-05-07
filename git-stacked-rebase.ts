@@ -736,64 +736,7 @@ export const gitStackedRebase = async (
 
 		// console.log({ commitShaOfInitialBranch });
 
-		// await repo.checkoutRef(initialBranch);
-		// // repo.rebaseBranches()
-
-		// // const headName: string = (await (await repo.getHeadCommit()).sha()) + "\n";
-		// // const headName: string = initialBranch.name() + "\n";
-		// const headName: string = currentBranch.name() + "\n";
-		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "head-name"), headName);
-
-		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-name"), commitShaOfInitialBranch);
-
-		// fs.writeFileSync(
-		// path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
-		// commitShaOfInitialBranch
-		// );
-
-		// // fs.writeFileSync(
-		// // 	path.join(pathToRegularRebaseDirInsideDotGit, "onto"), //
-		// // 	commitShaOfInitialBranch
-		// // );
-		// /**
-		// * TODO - is this even needed? seems only a nodegit thing
-		// */
-		// // fs.writeFileSync(
-		// // 	path.join(pathToRegularRebaseDirInsideDotGit, "onto_name"), //
-		// // 	initialBranch.name() + "\n"
-		// // );
-		// // fs.writeFileSync(
-		// // 	path.join(pathToRegularRebaseDirInsideDotGit, "cmt.1"), //
-		// // 	commitShaOfInitialBranch
-		// // );
-
-		// fs.writeFileSync(
-		// // path.join(dotGitDirPath, "HEAD"), //
-		// path.join(pathToRegularRebaseDirInsideDotGit, "head"),
-		// commitShaOfInitialBranch
-		// );
-
-		// // fs.writeFileSync(path.join(dotGitDirPath, "ORIG_HEAD"), commitShaOfInitialBranch);
-		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "orig-head"), commitShaOfCurrentCommit + "\n");
-
-		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "interactive"), "");
-
-		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "done"), "");
-
-		// fs.writeFileSync(
-		// path.join(pathToRegularRebaseDirInsideDotGit, "end"), //
-		// (regularRebaseTodoLines.length + 1).toString() + "\n"
-		// );
-
-		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "msgnum"), "1");
-
-		// if (configValues.gpgSign) {
-		// const gpgSignOpt = "-S" as const;
-		// fs.writeFileSync(path.join(pathToRegularRebaseDirInsideDotGit, "gpg_sign_opt"), gpgSignOpt);
-		// }
-
 		/**
-		 * end rebase initial setup.
 		 * begin setup to handle post-rebase shenanigans.
 		 */
 
