@@ -8,55 +8,6 @@ import { execSync } from "child_process"
 
 export type StringFromToMap = { [key: string]: string }
 
-/**
- * mutates `obj` and returns it too
- */
-export function reducePath(obj: StringFromToMap): StringFromToMap {
-	let prevSize             : number             = -Infinity
-	let entries              : [string, string][]
-	let keysMarkedForDeletion: Set<string>        = new Set<string>()
-
-	// as long as it continues to improve
-	while (keysMarkedForDeletion.size > prevSize) {
-		prevSize = keysMarkedForDeletion.size
-		entries = Object.entries(obj)
-
-		for (const [key, value] of entries) {
-			const keyIsValue = key === value
-			if (keyIsValue) {
-				// would delete itself, thus skip
-				continue
-			}
-
-			// const gotReducedAlready = !(key in obj)
-			// if (gotReducedAlready) {
-			// 	continue
-			// }
-
-			const valueIsAnotherKey = value in obj
-			if (valueIsAnotherKey) {
-				console.log("reducing. old:", key, "->", value, ";", value, "->", obj[value], "new:", key, "->", obj[value])
-				// reduce
-				obj[key] = obj[value]
-				keysMarkedForDeletion.add(value)
-			}
-		}
-	}
-
-	for (const key of keysMarkedForDeletion.keys()) {
-		delete obj[key]
-	}
-
-	/**
-	 * we mutate the object, so NOT returning it makes it clear
-	 * that this function causes a side-effect (mutates the original object).
-	 * 
-	 * but, in multiple cases when mapping, we forget to return the object,
-	 * so instead we'll do it here:
-	 */
-	return obj
-}
-
 export type RewrittenListBlockBase = {
 	mapping: StringFromToMap
 }
@@ -87,6 +38,7 @@ export type CombineRewrittenListsRet = {
 	 */
 	combinedRewrittenList: string,
 }
+
 export function combineRewrittenLists(rewrittenListFileContent: string): CombineRewrittenListsRet {
 	/**
 	 * $1 (amend/rebase)
@@ -328,6 +280,55 @@ export function combineRewrittenLists(rewrittenListFileContent: string): Combine
 		mergedReducedRewrittenLists,
 		combinedRewrittenList,
 	}
+}
+
+/**
+ * mutates `obj` and returns it too
+ */
+export function reducePath(obj: StringFromToMap): StringFromToMap {
+	let prevSize             : number             = -Infinity
+	let entries              : [string, string][]
+	let keysMarkedForDeletion: Set<string>        = new Set<string>()
+
+	// as long as it continues to improve
+	while (keysMarkedForDeletion.size > prevSize) {
+		prevSize = keysMarkedForDeletion.size
+		entries = Object.entries(obj)
+
+		for (const [key, value] of entries) {
+			const keyIsValue = key === value
+			if (keyIsValue) {
+				// would delete itself, thus skip
+				continue
+			}
+
+			// const gotReducedAlready = !(key in obj)
+			// if (gotReducedAlready) {
+			// 	continue
+			// }
+
+			const valueIsAnotherKey = value in obj
+			if (valueIsAnotherKey) {
+				console.log("reducing. old:", key, "->", value, ";", value, "->", obj[value], "new:", key, "->", obj[value])
+				// reduce
+				obj[key] = obj[value]
+				keysMarkedForDeletion.add(value)
+			}
+		}
+	}
+
+	for (const key of keysMarkedForDeletion.keys()) {
+		delete obj[key]
+	}
+
+	/**
+	 * we mutate the object, so NOT returning it makes it clear
+	 * that this function causes a side-effect (mutates the original object).
+	 * 
+	 * but, in multiple cases when mapping, we forget to return the object,
+	 * so instead we'll do it here:
+	 */
+	return obj
 }
 
 if (!module.parent) {
