@@ -1422,11 +1422,12 @@ async function extendCommitsWithBranchEnds(
 								.replace(removeLocalRegex, "")
 								.replace(removeRemoteRegex, "")
 						)
-					).length === 1) ||
-				/**
-				 * or, if it's the root branch
-				 */
-				!c.id().cmp(currentBranchCommit),
+					).length === 1),
+			// ||
+			// /**
+			//  * or, if it's the root branch
+			//  */
+			// !c.id().cmp(currentBranchCommit),
 			"" +
 				"2 (or more) branches for the same commit, both in the same path - cannot continue" +
 				"(until explicit branch specifying is implemented)" +
