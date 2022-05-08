@@ -1457,7 +1457,8 @@ async function extendCommitsWithBranchEnds(
 		}
 	);
 
-	return commits.map(extend);
+	const e = commits.map(extend);
+	return e;
 }
 
 noop(getCommitOfBranch);
