@@ -41,12 +41,24 @@ dependencies:
 - git
 - something else i probably forgot
 
+<!-- REMOVED because i'm dogfooding like never before. use nightly instead. -->
+<!--
 ```sh
 npm i -g git-stacked-rebase
 
 # optional:
 git config --global alias.stacked-rebase git-stacked-rebase
 git config --global alias.rr             git-stacked-rebase
+```
+-->
+
+```sh
+git clone https://github.com/kiprasmel/git-stacked-rebase
+# or:  git clone git@github.com:kiprasmel/git-stacked-rebase.git
+
+cd git-stacked-rebase
+
+./nightly-setup-and-update
 ```
 
 ## Usage
