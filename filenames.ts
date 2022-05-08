@@ -7,6 +7,7 @@ export const filenames = {
 	//
 	gitRebaseTodo: "git-rebase-todo",
 	//
+	postStackedRebaseHook: "post-stacked-rebase",
 
 	/**
 	 * TODO extract others into here
