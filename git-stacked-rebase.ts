@@ -1436,7 +1436,14 @@ async function extendCommitsWithBranchEnds(
 			(matchedRefs = matchedRefs.some((r) => r?.name() === initialBranch.name())
 				? [initialBranch]
 				: matchedRefs.filter((r) => !r?.isRemote() /* r?.name().includes("refs/heads/") */)),
-		assert(matchedRefs.length <= 1, "refs/heads/ and refs/remotes/*/ replacement went wrong"),
+		assert(
+			matchedRefs.length <= 1,
+			"refs/heads/ and refs/remotes/*/ replacement went wrong." +
+				bullets(
+					"\nmatchedRefs:",
+					matchedRefs.map((r) => r.toString())
+				)
+		),
 		{
 			commit: c,
 			commitCommand: commandOrAliasNames[i] || "pick",
