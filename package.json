@@ -2,6 +2,7 @@
 	"name": "git-stacked-rebase",
 	"version": "0.6.1",
 	"main": "dist/git-stacked-rebase.js",
+	"types": "dist/git-stacked-rebase.d.ts",
 	"repository": "git@github.com:kiprasmel/git-stacked-rebase.git",
 	"author": "Kipras Melnikovas <kipras@kipras.org> (https://kipras.org/)",
 	"license": "UNLICENSED",
@@ -12,7 +13,7 @@
 		"prebuild:lean": "node ./script/prebuild.js",
 		"test": "ts-node-dev ./test/run.ts",
 		"build": "yarn test && yarn build:lean",
-		"build:lean": "yarn tsc -b && yarn --cwd nvim-git-rebase-todo build",
+		"build:lean": "yarn tsc -b && yarn --cwd nvim-git-rebase-todo build && yarn --cwd git-reconcile-rewritten-list build",
 		"postbuild:lean": "node ./script/postbuild.js",
 		"prepack": "yarn build"
 	},
