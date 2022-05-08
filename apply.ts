@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 
 import Git from "nodegit";
+import { combineRewrittenLists } from "./git-reconcile-rewritten-list/reducePath";
 
 import { createQuestion } from "./util/createQuestion";
 import { isDirEmptySync } from "./util/fs";
@@ -16,7 +17,6 @@ import {
 	BranchSequencerArgsBase,
 	BehaviorOfGetBranchBoundaries,
 } from "./branchSequencer";
-import { combineRewrittenLists } from "./reducePath";
 
 export const apply: BranchSequencerBase = (args) =>
 	branchSequencer({
