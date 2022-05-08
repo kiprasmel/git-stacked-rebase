@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 
 import Git from "nodegit";
-import { combineRewrittenLists } from "./git-reconcile-rewritten-list/reducePath";
+import { combineRewrittenLists } from "./git-reconcile-rewritten-list/combineRewrittenLists";
 
 import { createQuestion } from "./util/createQuestion";
 import { isDirEmptySync } from "./util/fs";

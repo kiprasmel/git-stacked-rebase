@@ -1,6 +1,6 @@
 import assert from "assert";
 
-import { reducePath } from "./reducePath";
+import { reducePath } from "./combineRewrittenLists";
 
 export default function testcase() {
 	const obj1 = {
