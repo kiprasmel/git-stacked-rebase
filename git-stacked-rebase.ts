@@ -905,16 +905,14 @@ async function createInitialEditTodoOfGitStackedRebase(
 
 				return [
 					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
-					// `branch-end-last ${branchEnd.name()}`, //
-					`branch-end-last ${initialBranch.name()}`,
+					`branch-end-last ${currentBranch.name()}`, //
 				];
 			}
 
 			if (branchEnd?.length) {
 				return [
 					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
-					// `branch-end ${branchEnd.name()}`, //
-					`branch-end ${currentBranch.name()}`, //
+					...branchEnd.map((x) => `branch-end ${x.name()}`), //
 				];
 			}
 
