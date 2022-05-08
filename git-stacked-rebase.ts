@@ -681,6 +681,11 @@ export const gitStackedRebase = async (
 			}
 		}
 
+		setupPostRewriteHookFor("git-stacked-rebase", {
+			dotGitDirPathForInstallingTheHook: dotGitDirPath,
+			rewrittenListOutputDirPathThatWillBeInsideDotGitDir: path.basename(pathToStackedRebaseDirInsideDotGit),
+		});
+
 		/**
 		 * libgit2's git rebase is sadly not very powerful
 		 * and quite outdated...
@@ -698,11 +703,6 @@ export const gitStackedRebase = async (
 		const getCurrentCommit = (): Promise<string> => repo.getHeadCommit().then((c) => c.sha());
 
 		const commitShaOfCurrentCommit: string = await getCurrentCommit();
-
-		setupPostRewriteHookFor("git-stacked-rebase", {
-			dotGitDirPathForInstallingTheHook: dotGitDirPath,
-			rewrittenListOutputDirPathThatWillBeInsideDotGitDir: path.basename(pathToStackedRebaseDirInsideDotGit),
-		});
 
 		// /**
 		//  * too bad libgit2 is limited. oh well, i've seen worse.
