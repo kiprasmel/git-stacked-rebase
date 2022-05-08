@@ -1,7 +1,7 @@
 #!/usr/bin/env ts-node-dev
 
 import { testCase } from "./experiment.spec";
-import reducePathTC from "../reducePath.spec";
+import reducePathTC from "../git-reconcile-rewritten-list/reducePath.spec";
 
 import { parseNewGoodCommandsSpec } from "../parse-todo-of-stacked-rebase/parseNewGoodCommands.spec";
 import { sequentialResolve } from "../util/sequentialResolve";
