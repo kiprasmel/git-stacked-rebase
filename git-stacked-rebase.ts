@@ -638,9 +638,6 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 		const editorScriptPath: string = path.join(dotGitDirPath, "editorScript.doActualRebase.sh");
 		fs.writeFileSync(editorScriptPath, editorScript, { mode: "777" });
 
-		const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
-			ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
-
 		const commitOfInitialBranch: Git.Oid = await referenceToOid(initialBranch); // bb
 		const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
 
@@ -832,6 +829,10 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 		throw e; // TODO FIXME - no try/catch at all?
 	}
 };
+
+function referenceToOid(ref: Git.Reference): Promise<Git.Oid> {
+	return ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
+}
 
 export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
 	object: Partial<T> //
@@ -1033,9 +1034,6 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 		resolved: (await bb.resolve()).name(),
 	});
 
-	const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
-		ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
-
 	const commitOfInitialBranch: Git.Oid = await referenceToOid(bb);
 	const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
 
@@ -1072,7 +1070,7 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 		)
 	);
 
-	return extendCommitsWithBranchEnds(repo, bb, wantedCommits);
+	return extendCommitsWithBranchEnds(repo, bb, currentBranch, wantedCommits);
 }
 
 noop(getWantedCommitsWithBranchBoundariesUsingNativeGitRebase);
@@ -1251,6 +1249,7 @@ exit 1
 	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = await extendCommitsWithBranchEnds(
 		repo,
 		initialBranch,
+		currentBranch,
 		commits,
 		commandOrAliasNames
 	);
@@ -1261,6 +1260,7 @@ exit 1
 async function extendCommitsWithBranchEnds(
 	repo: Git.Repository,
 	initialBranch: Git.Reference,
+	currentBranch: Git.Reference,
 	commits: Git.Commit[],
 	/**
 	 * used for properly assigning the command to a commit,
@@ -1279,6 +1279,8 @@ async function extendCommitsWithBranchEnds(
 
 	const removeLocalRegex = /^refs\/heads\//;
 	const removeRemoteRegex = /^refs\/remotes\/[^/]*\//;
+
+	const currentBranchCommit: Git.Oid = await referenceToOid(currentBranch);
 
 	const extend = (c: Git.Commit, i: number): CommitAndBranchBoundary => (
 		(matchedRefs = refs.filter((ref) => !!ref.target()?.equal(c.id()))),
@@ -1314,7 +1316,7 @@ async function extendCommitsWithBranchEnds(
 			matchedRefs.length <= 1 ||
 				/**
 				 * if it's more than 1,
-				 * it's only allowed all of the branches are the same ones,
+				 * it's only allowed if all of the branches are the same ones,
 				 * just on different remotes.
 				 */
 				(matchedRefs.length > 1 &&
@@ -1325,7 +1327,11 @@ async function extendCommitsWithBranchEnds(
 								.replace(removeLocalRegex, "")
 								.replace(removeRemoteRegex, "")
 						)
-					).length === 1),
+					).length === 1) ||
+				/**
+				 * or, if it's the root branch
+				 */
+				!c.id().cmp(currentBranchCommit),
 			"" +
 				"2 (or more) branches for the same commit, both in the same path - cannot continue" +
 				"(until explicit branch specifying is implemented)" +
