@@ -120,7 +120,7 @@ const getBoundariesInclInitialWithSipleBranchTraversal: GetBoundariesInclInitial
 		argsBase.currentBranch
 	).then((boundaries) =>
 		boundaries
-			.filter((b) => !!b.branchEnd)
+			.filter((b) => !!b.branchEnd?.length)
 			.map(
 				(boundary): SimpleBranchAndCommit => ({
 					branchEndFullName: boundary.branchEnd!.map((x) => x.name()), // TS ok because of the filter
