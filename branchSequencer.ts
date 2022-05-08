@@ -383,22 +383,22 @@ export const branchSequencer: BranchSequencer = async ({
 			? boundaries.length === originalBoundariesLength
 			: boundaries.length === 1;
 
-		/**
-		 * https://libgit2.org/libgit2/#HEAD/group/checkout/git_checkout_head
-		 */
-		// await Git.Checkout.tree(repo, targetBranch as any); // TODO TS FIXME
-		execSyncInRepo(`${gitCmd} checkout ${targetBranch}`); // f this
-
 		await sequentialResolve(
-			targetBranch.map((x) => async () =>
+			targetBranch.map((x) => async () => {
+				/**
+				 * https://libgit2.org/libgit2/#HEAD/group/checkout/git_checkout_head
+				 */
+				// await Git.Checkout.tree(repo, targetBranch as any); // TODO TS FIXME
+				execSyncInRepo(`${gitCmd} checkout ${x}`); // f this
+
 				await actionInsideEachCheckedOutBranch({
 					repo, //
 					targetBranch: x,
 					targetCommitSHA,
 					isLatestBranch,
 					execSyncInRepo,
-				})
-			)
+				});
+			})
 		);
 
 		return goNext();
