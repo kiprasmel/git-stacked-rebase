@@ -1,0 +1,18 @@
+{
+	"name": "git-reconcile-rewritten-list",
+	"version": "0.0.0",
+	"main": "dist/git-reconcile-rewritten-list.js",
+	"types": "dist/git-reconcile-rewritten-list.d.ts",
+	"author": "Kipras Melnikovas <kipras@kipras.org> (https://kipras.org/)",
+	"license": "UNLICENSED",
+	"bin": {
+		"git-reconcile-rewritten-list": "./dist/git-reconcile-rewritten-list.js"
+	},
+	"scripts": {
+		"build": "yarn tsc -b",
+		"prepack": "yarn build"
+	},
+	"devDependencies": {
+		"typescript": "4.6.3"
+	}
+}
