@@ -1376,6 +1376,7 @@ async function extendCommitsWithBranchEnds(
 	const removeRemoteRegex = /^refs\/remotes\/[^/]*\//;
 
 	const currentBranchCommit: Git.Oid = await referenceToOid(currentBranch);
+	noop(currentBranchCommit);
 
 	const extend = (c: Git.Commit, i: number): CommitAndBranchBoundary => (
 		(matchedRefs = refs.filter((ref) => !!ref.target()?.equal(c.id()))),
@@ -1407,35 +1408,36 @@ async function extendCommitsWithBranchEnds(
 					.map((ref) => ref.name().replace(removeLocalRegex, ""))
 					.includes(r.name().replace(removeRemoteRegex, ""))
 		)),
-		assert(
-			matchedRefs.length <= 1 ||
-				/**
-				 * if it's more than 1,
-				 * it's only allowed if all of the branches are the same ones,
-				 * just on different remotes.
-				 */
-				(matchedRefs.length > 1 &&
-					uniq(
-						matchedRefs.map((r) =>
-							r
-								?.name()
-								.replace(removeLocalRegex, "")
-								.replace(removeRemoteRegex, "")
-						)
-					).length === 1),
-			// ||
-			// /**
-			//  * or, if it's the root branch
-			//  */
-			// !c.id().cmp(currentBranchCommit),
-			"" +
-				"2 (or more) branches for the same commit, both in the same path - cannot continue" +
-				"(until explicit branch specifying is implemented)" +
-				"\n\n" +
-				"matchedRefs = " +
-				matchedRefs.map((mr) => mr?.name()) +
-				"\n"
-		),
+		// assert(
+		// 	matchedRefs.length <= 1 ||
+		// 		/**
+		// 		 * if it's more than 1,
+		// 		 * it's only allowed if all of the branches are the same ones,
+		// 		 * just on different remotes.
+		// 		 */
+		// 		(matchedRefs.length > 1 &&
+		// 			uniq(
+		// 				matchedRefs.map((r) =>
+		// 					r
+		// 						?.name()
+		// 						.replace(removeLocalRegex, "")
+		// 						.replace(removeRemoteRegex, "")
+		// 				)
+		// 			).length === 1),
+		// 	// ||
+		// 	// /**
+		// 	//  * or, if it's the root branch
+		// 	//  */
+		// 	// !c.id().cmp(currentBranchCommit),
+		// 	"" +
+		// 		"2 (or more) branches for the same commit, both in the same path - cannot continue" +
+		// 		"(until explicit branch specifying is implemented)" +
+		// 		"\n\n" +
+		// 		"matchedRefs = " +
+		// 		matchedRefs.map((mr) => mr?.name()) +
+		// 		"\n"
+		// ),
+		noop(uniq),
 		matchedRefs.length > 1 &&
 			(matchedRefs = matchedRefs.some((r) => r?.name() === initialBranch.name())
 				? [initialBranch]
