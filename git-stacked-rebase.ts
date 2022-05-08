@@ -643,6 +643,15 @@ cat "$REWRITTEN_LIST_FILE_PATH" > "$REWRITTEN_LIST_BACKUP_FILE_PATH"
 			}
 		}
 
+		/**
+		 * execute the post-stacked-rebase hook if exists.
+		 * will only happen if the rebase went thru, and in our control.
+		 */
+		const postStackedRebaseHook: string = path.join(dotGitDirPath, "hooks", filenames.postStackedRebaseHook);
+		if (fs.existsSync(postStackedRebaseHook)) {
+			execSyncInRepo(postStackedRebaseHook);
+		}
+
 		return;
 	} catch (e) {
 		throw e; // TODO FIXME - no try/catch at all?
