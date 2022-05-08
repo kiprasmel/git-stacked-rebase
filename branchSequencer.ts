@@ -8,6 +8,7 @@ import { getWantedCommitsWithBranchBoundariesOurCustomImpl } from "./git-stacked
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { Termination } from "./util/error";
 import { assertNever } from "./util/assertNever";
+import { sequentialResolve } from "./util/sequentialResolve";
 
 import { parseNewGoodCommands } from "./parse-todo-of-stacked-rebase/parseNewGoodCommands";
 import { GoodCommand, GoodCommandStacked } from "./parse-todo-of-stacked-rebase/validator";
@@ -25,7 +26,7 @@ export type GetBranchesCtx = BranchRefs & {
 };
 export type SimpleBranchAndCommit = {
 	commitSHA: string | null;
-	branchEndFullName: string;
+	branchEndFullName: string[];
 	// branchExistsYet: boolean; // TODO
 };
 export type GetBoundariesInclInitial = (
@@ -107,7 +108,7 @@ const getBoundariesInclInitialByParsingNotYetAppliedState: GetBoundariesInclInit
 		.map(
 			(cmd): SimpleBranchAndCommit => ({
 				commitSHA: cmd.commitSHAThatBranchPointsTo,
-				branchEndFullName: cmd.targets![0],
+				branchEndFullName: [cmd.targets![0]],
 			})
 		);
 };
@@ -122,7 +123,7 @@ const getBoundariesInclInitialWithSipleBranchTraversal: GetBoundariesInclInitial
 			.filter((b) => !!b.branchEnd)
 			.map(
 				(boundary): SimpleBranchAndCommit => ({
-					branchEndFullName: boundary.branchEnd!.name(), // TS ok because of the filter
+					branchEndFullName: boundary.branchEnd!.map((x) => x.name()), // TS ok because of the filter
 					commitSHA: boundary.commit.sha(),
 				})
 			)
@@ -277,7 +278,7 @@ export const branchSequencer: BranchSequencer = async ({
 			currentBranch,
 		})
 	).map((boundary) => {
-		boundary.branchEndFullName = boundary.branchEndFullName.replace("refs/heads/", "");
+		boundary.branchEndFullName = boundary.branchEndFullName.map((x) => x.replace("refs/heads/", ""));
 		assert(boundary.branchEndFullName);
 
 		/**
@@ -289,7 +290,7 @@ export const branchSequencer: BranchSequencer = async ({
 		// if (!Git.Branch.lookup(repo, targetBranch, Git.Branch.BRANCH.LOCAL)) {
 		// 	execSyncInRepo();
 		// }
-		if (boundary.branchEndFullName.startsWith("refs/remotes/")) {
+		if (boundary.branchEndFullName.some((x) => x.startsWith("refs/remotes/"))) {
 			/**
 			 * TODO - probably should handle this "checkout remote branch locally" logic
 			 * in a better place than here,
@@ -327,7 +328,7 @@ export const branchSequencer: BranchSequencer = async ({
 			 * before doing the checkouts.
 			 *
 			 */
-			boundary.branchEndFullName = boundary.branchEndFullName.replace(/refs\/remotes\/[^/]+\//, "");
+			boundary.branchEndFullName = boundary.branchEndFullName.map((x) => x.replace(/refs\/remotes\/[^/]+\//, ""));
 		}
 
 		// console.log({ targetCommitSHA, target: targetBranch });
@@ -390,13 +391,17 @@ export const branchSequencer: BranchSequencer = async ({
 		// await Git.Checkout.tree(repo, targetBranch as any); // TODO TS FIXME
 		execSyncInRepo(`${gitCmd} checkout ${targetBranch}`); // f this
 
-		await actionInsideEachCheckedOutBranch({
-			repo, //
-			targetBranch,
-			targetCommitSHA,
-			isLatestBranch,
-			execSyncInRepo,
-		});
+		await sequentialResolve(
+			targetBranch.map((x) => async () =>
+				await actionInsideEachCheckedOutBranch({
+					repo, //
+					targetBranch: x,
+					targetCommitSHA,
+					isLatestBranch,
+					execSyncInRepo,
+				})
+			)
+		);
 
 		return goNext();
 	}

@@ -983,7 +983,8 @@ async function createInitialEditTodoOfGitStackedRebase(
 	const rebaseTodo = commitsWithBranchBoundaries
 		.map(({ commit, commitCommand, branchEnd }, i) => {
 			if (i === 0) {
-				assert(!!branchEnd, `very first commit has a branch (${commit.sha()}).`);
+				assert(!!branchEnd?.length, `very first commit has a branch (${commit.sha()}).`);
+				assert.strictEqual(branchEnd.length, 1, "must be only a single initial branch");
 
 				// return [];
 				return [
@@ -991,23 +992,25 @@ async function createInitialEditTodoOfGitStackedRebase(
 					/**
 					 * TODO refs/REMOTES/* instead of refs/HEADS/*
 					 */
-					`branch-end-initial ${branchEnd.name()}`, //
+					`branch-end-initial ${branchEnd[0].name()}`, //
 				];
 			}
 
 			if (i === commitsWithBranchBoundaries.length - 1) {
-				assert(!!branchEnd, `very last commit has a branch. sha = ${commit.sha()}`);
+				assert(!!branchEnd?.length, `very last commit has a branch. sha = ${commit.sha()}`);
 
 				return [
 					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
-					`branch-end-last ${branchEnd.name()}`, //
+					// `branch-end-last ${branchEnd.name()}`, //
+					`branch-end-last ${initialBranch.name()}`,
 				];
 			}
 
-			if (branchEnd) {
+			if (branchEnd?.length) {
 				return [
 					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
-					`branch-end ${branchEnd.name()}`, //
+					// `branch-end ${branchEnd.name()}`, //
+					`branch-end ${currentBranch.name()}`, //
 				];
 			}
 
@@ -1092,7 +1095,7 @@ function callAll(keyToFunctionMap: KeyToFunctionMap) {
 type CommitAndBranchBoundary = {
 	commit: Git.Commit;
 	commitCommand: RegularRebaseEitherCommandOrAlias;
-	branchEnd: Git.Reference | null;
+	branchEnd: Git.Reference[] | null;
 };
 
 export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
@@ -1447,7 +1450,7 @@ async function extendCommitsWithBranchEnds(
 		{
 			commit: c,
 			commitCommand: commandOrAliasNames[i] || "pick",
-			branchEnd: !matchedRefs.length ? null : matchedRefs[0],
+			branchEnd: !matchedRefs.length ? null : matchedRefs,
 		}
 	);
 
