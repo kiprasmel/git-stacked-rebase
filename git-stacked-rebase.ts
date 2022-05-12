@@ -19,6 +19,7 @@ import { configKeys } from "./configKeys";
 import { apply, applyIfNeedsToApply, markThatNeedsToApply as _markThatNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequencer";
+import { autosquash } from "./autosquash";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -247,6 +248,7 @@ export const gitStackedRebase = async (
 		const configValues = {
 			gpgSign: !!(await config.getBool(configKeys.gpgSign).catch(() => 0)),
 			autoApplyIfNeeded: !!(await config.getBool(configKeys.autoApplyIfNeeded).catch(() => 0)),
+			autoSquash: !!(await config.getBool(configKeys.autoSquash).catch(() => 0)),
 		} as const;
 
 		console.log({ configValues });
@@ -414,6 +416,17 @@ export const gitStackedRebase = async (
 							"if-stacked-rebase-in-progress-then-parse-not-applied-state-otherwise-simple-branch-traverse"
 						],
 					reverseCheckoutOrder: false,
+
+					/**
+					 * `branchSequencer` does not perform the rebase operation
+					 * and thus cannot fully modify local commit history,
+					 * thus `autoSquash` is disabled
+					 * (it would produce incorrect results otherwise).
+					 *
+					 * TODO further investigation
+					 *
+					 */
+					autoSquash: false,
 				});
 			} else {
 				/**
@@ -447,7 +460,8 @@ export const gitStackedRebase = async (
 			initialBranch,
 			currentBranch,
 			// __default__pathToStackedRebaseTodoFile
-			pathToStackedRebaseTodoFile
+			pathToStackedRebaseTodoFile,
+			configValues.autoSquash
 			// () =>
 			// 	getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 			// 		gitCmd: options.gitCmd,
@@ -944,16 +958,31 @@ export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
 	);
 }
 
+/**
+ * should commits with "squash!" and "fixup!" subjects be autosquashed.
+ *
+ * if an actual rebase operation is NOT being performed
+ * (i.e. commits are not being rewritten),
+ * then SHALL BE set to `false`.
+ *
+ * otherwise, should be configured in some way -- most likely
+ * via the git config, and/or the CLI.
+ *
+ */
+export type AutoSquash = boolean;
+
 async function createInitialEditTodoOfGitStackedRebase(
 	repo: Git.Repository, //
 	initialBranch: Git.Reference,
 	currentBranch: Git.Reference,
 	pathToRebaseTodoFile: string,
+	autoSquash: AutoSquash,
 	getCommitsWithBranchBoundaries: () => Promise<CommitAndBranchBoundary[]> = () =>
 		getWantedCommitsWithBranchBoundariesOurCustomImpl(
 			repo, //
 			initialBranch,
-			currentBranch
+			currentBranch,
+			autoSquash
 		)
 ): Promise<void> {
 	// .catch(logErr);
@@ -1090,7 +1119,7 @@ function callAll(keyToFunctionMap: KeyToFunctionMap) {
 	);
 }
 
-type CommitAndBranchBoundary = {
+export type CommitAndBranchBoundary = {
 	commit: Git.Commit;
 	commitCommand: RegularRebaseEitherCommandOrAlias;
 	branchEnd: Git.Reference[] | null;
@@ -1100,7 +1129,8 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 	repo: Git.Repository, //
 	/** beginningBranch */
 	bb: Git.Reference,
-	currentBranch: Git.Reference
+	currentBranch: Git.Reference,
+	autoSquash: boolean
 ): Promise<CommitAndBranchBoundary[]> {
 	/**
 	 * BEGIN check e.g. fork & origin/fork
@@ -1167,7 +1197,20 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 		)
 	);
 
-	return extendCommitsWithBranchEnds(repo, bb, currentBranch, wantedCommits);
+	const extended: CommitAndBranchBoundary[] = await extendCommitsWithBranchEnds(
+		repo,
+		bb,
+		currentBranch,
+		wantedCommits
+	);
+
+	if (!autoSquash) {
+		return extended;
+	}
+
+	await autosquash(repo, extended);
+
+	return extended;
 }
 
 noop(getWantedCommitsWithBranchBoundariesUsingNativeGitRebase);
