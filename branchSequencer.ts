@@ -3,7 +3,7 @@ import assert from "assert";
 
 import Git from "nodegit";
 
-import { getWantedCommitsWithBranchBoundariesOurCustomImpl } from "./git-stacked-rebase";
+import { AutoSquash, getWantedCommitsWithBranchBoundariesOurCustomImpl } from "./git-stacked-rebase";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { Termination } from "./util/error";
@@ -23,6 +23,7 @@ export type GetBranchesCtx = BranchRefs & {
 	rootLevelCommandName: string;
 	repo: Git.Repository;
 	pathToStackedRebaseTodoFile: string;
+	autoSquash: boolean;
 };
 export type SimpleBranchAndCommit = {
 	commitSHA: string | null;
@@ -117,7 +118,8 @@ const getBoundariesInclInitialWithSipleBranchTraversal: GetBoundariesInclInitial
 	getWantedCommitsWithBranchBoundariesOurCustomImpl(
 		argsBase.repo, //
 		argsBase.initialBranch,
-		argsBase.currentBranch
+		argsBase.currentBranch,
+		argsBase.autoSquash
 	).then((boundaries) =>
 		boundaries
 			.filter((b) => !!b.branchEnd?.length)
@@ -240,6 +242,14 @@ export type BranchSequencerArgs = BranchSequencerArgsBase & {
 	 *
 	 */
 	reverseCheckoutOrder: boolean;
+
+	/**
+	 * almost feels like it should default to `false`,
+	 * or even shouldn't be selectable here & always be `false`.
+	 *
+	 * TODO further investigation
+	 */
+	autoSquash: AutoSquash;
 };
 
 export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<void>;
@@ -260,6 +270,8 @@ export const branchSequencer: BranchSequencer = async ({
 	currentBranch,
 	//
 	reverseCheckoutOrder = false,
+	//
+	autoSquash,
 }) => {
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
@@ -276,6 +288,7 @@ export const branchSequencer: BranchSequencer = async ({
 			rootLevelCommandName,
 			initialBranch,
 			currentBranch,
+			autoSquash,
 		})
 	).map((boundary) => {
 		boundary.branchEndFullName = boundary.branchEndFullName.map((x) => x.replace("refs/heads/", ""));
