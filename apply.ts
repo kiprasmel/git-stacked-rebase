@@ -26,14 +26,6 @@ export const apply: BranchSequencerBase = (args) =>
 		delayMsBetweenCheckouts: 0,
 		behaviorOfGetBranchBoundaries: BehaviorOfGetBranchBoundaries["parse-from-not-yet-applied-state"],
 		reverseCheckoutOrder: false,
-
-		/**
-		 * `apply` does not perform the rebase operation
-		 * and thus cannot fully modify local commit history,
-		 * thus `autoSquash` is disabled
-		 * (it would produce incorrect results otherwise).
-		 */
-		autoSquash: false,
 	}).then(
 		(ret) => (markThatApplied(args.pathToStackedRebaseDirInsideDotGit), ret) //
 	);

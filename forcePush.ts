@@ -133,12 +133,4 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 		 * would solve this.
 		 */
 		reverseCheckoutOrder: true,
-
-		/**
-		 * `forcePush` does not perform the rebase operation
-		 * and thus cannot fully modify local commit history,
-		 * thus `autoSquash` is disabled
-		 * (it would produce incorrect results otherwise).
-		 */
-		autoSquash: false,
 	});

@@ -416,17 +416,6 @@ export const gitStackedRebase = async (
 							"if-stacked-rebase-in-progress-then-parse-not-applied-state-otherwise-simple-branch-traverse"
 						],
 					reverseCheckoutOrder: false,
-
-					/**
-					 * `branchSequencer` does not perform the rebase operation
-					 * and thus cannot fully modify local commit history,
-					 * thus `autoSquash` is disabled
-					 * (it would produce incorrect results otherwise).
-					 *
-					 * TODO further investigation
-					 *
-					 */
-					autoSquash: false,
 				});
 			} else {
 				/**
@@ -958,31 +947,17 @@ export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
 	);
 }
 
-/**
- * should commits with "squash!" and "fixup!" subjects be autosquashed.
- *
- * if an actual rebase operation is NOT being performed
- * (i.e. commits are not being rewritten),
- * then SHALL BE set to `false`.
- *
- * otherwise, should be configured in some way -- most likely
- * via the git config, and/or the CLI.
- *
- */
-export type AutoSquash = boolean;
-
 async function createInitialEditTodoOfGitStackedRebase(
 	repo: Git.Repository, //
 	initialBranch: Git.Reference,
 	currentBranch: Git.Reference,
 	pathToRebaseTodoFile: string,
-	autoSquash: AutoSquash,
+	autoSquash: boolean,
 	getCommitsWithBranchBoundaries: () => Promise<CommitAndBranchBoundary[]> = () =>
 		getWantedCommitsWithBranchBoundariesOurCustomImpl(
 			repo, //
 			initialBranch,
-			currentBranch,
-			autoSquash
+			currentBranch
 		)
 ): Promise<void> {
 	// .catch(logErr);
@@ -1008,6 +983,10 @@ async function createInitialEditTodoOfGitStackedRebase(
 	// fs.writeFileSync(ff, `${commitsWithBranchBoundaries[last].commit.sha()}`);
 
 	noop(commitsWithBranchBoundaries);
+
+	if (autoSquash) {
+		await autosquash(repo, commitsWithBranchBoundaries);
+	}
 
 	const rebaseTodo = commitsWithBranchBoundaries
 		.map(({ commit, commitCommand, branchEnd }, i) => {
@@ -1129,8 +1108,7 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 	repo: Git.Repository, //
 	/** beginningBranch */
 	bb: Git.Reference,
-	currentBranch: Git.Reference,
-	autoSquash: boolean
+	currentBranch: Git.Reference
 ): Promise<CommitAndBranchBoundary[]> {
 	/**
 	 * BEGIN check e.g. fork & origin/fork
@@ -1197,20 +1175,7 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 		)
 	);
 
-	const extended: CommitAndBranchBoundary[] = await extendCommitsWithBranchEnds(
-		repo,
-		bb,
-		currentBranch,
-		wantedCommits
-	);
-
-	if (!autoSquash) {
-		return extended;
-	}
-
-	await autosquash(repo, extended);
-
-	return extended;
+	return extendCommitsWithBranchEnds(repo, bb, currentBranch, wantedCommits);
 }
 
 noop(getWantedCommitsWithBranchBoundariesUsingNativeGitRebase);
