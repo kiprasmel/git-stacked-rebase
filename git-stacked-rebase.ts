@@ -967,7 +967,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 	// 	return;
 	// }
 
-	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = await getCommitsWithBranchBoundaries();
+	let commitsWithBranchBoundaries: CommitAndBranchBoundary[] = await getCommitsWithBranchBoundaries();
 
 	// /**
 	//  * TODO: FIXME HACK for nodegit rebase
@@ -985,7 +985,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 	noop(commitsWithBranchBoundaries);
 
 	if (autoSquash) {
-		await autosquash(repo, commitsWithBranchBoundaries);
+		commitsWithBranchBoundaries = await autosquash(repo, commitsWithBranchBoundaries);
 	}
 
 	const rebaseTodo = commitsWithBranchBoundaries

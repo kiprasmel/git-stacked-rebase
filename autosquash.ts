@@ -33,13 +33,32 @@ import { assertNever } from "./util/assertNever";
  * `getWantedCommitsWithBranchBoundariesUsingNativeGitRebase` function.
  *
  */
-export async function autosquash(repo: Git.Repository, extendedCommits: CommitAndBranchBoundary[]): Promise<void> {
+export async function autosquash(
+	repo: Git.Repository, //
+	extendedCommits: CommitAndBranchBoundary[]
+): Promise<CommitAndBranchBoundary[]> {
 	// type SHA = string;
 	// const commitLookupTable: Map<SHA, Git.Commit> = new Map();
+
 	const autoSquashableSummaryPrefixes = ["squash!", "fixup!"] as const;
 
-	for (let i = 0; i < extendedCommits.length; i++) {
-		const commit = extendedCommits[i];
+	/**
+	 * we want to re-order the commits,
+	 * but we do NOT want the branches to follow them.
+	 *
+	 * the easiest way to do this is to "un-attach" the branches from the commits,
+	 * do the re-ordering,
+	 * and then re-attach the branches to the new commits that are previous to the branch.
+	 */
+	const unattachedCommitsAndBranches: UnAttachedCommitOrBranch[] = unAttachBranchesFromCommits(extendedCommits);
+
+	for (let i = 0; i < unattachedCommitsAndBranches.length; i++) {
+		const commitOrBranch: UnAttachedCommitOrBranch = unattachedCommitsAndBranches[i];
+
+		if (isBranch(commitOrBranch)) {
+			continue;
+		}
+		const commit: UnAttachedCommit = commitOrBranch;
 
 		const summary: string = commit.commit.summary();
 		const hasAutoSquashablePrefix = (prefix: string): boolean => summary.startsWith(prefix);
@@ -75,7 +94,9 @@ export async function autosquash(repo: Git.Repository, extendedCommits: CommitAn
 			throw new Termination(msg);
 		}
 
-		const indexOfTargetCommit: number = extendedCommits.findIndex((c) => !target.id().cmp(c.commit.id()));
+		const indexOfTargetCommit: number = unattachedCommitsAndBranches.findIndex(
+			(c) => !isBranch(c) && !target.id().cmp(c.commit.id())
+		);
 		const wasNotFound = indexOfTargetCommit === -1;
 
 		if (wasNotFound) {
@@ -117,7 +138,106 @@ export async function autosquash(repo: Git.Repository, extendedCommits: CommitAn
 		 * TODO optimal implementation with a linked list + a map
 		 *
 		 */
-		extendedCommits.splice(i, 1); // remove 1 element (`commit`)
-		extendedCommits.splice(indexOfTargetCommit + 1, 0, commit); // insert the `commit` in the new position
+		unattachedCommitsAndBranches.splice(i, 1); // remove 1 element (`commit`)
+		unattachedCommitsAndBranches.splice(indexOfTargetCommit + 1, 0, commit); // insert the `commit` in the new position
 	}
+
+	const reattached: CommitAndBranchBoundary[] = reAttachBranchesToCommits(unattachedCommitsAndBranches);
+
+	return reattached;
+}
+
+type UnAttachedCommit = Omit<CommitAndBranchBoundary, "branchEnd">;
+type UnAttachedBranch = Pick<CommitAndBranchBoundary, "branchEnd">;
+type UnAttachedCommitOrBranch = UnAttachedCommit | UnAttachedBranch;
+
+function isBranch(commitOrBranch: UnAttachedCommitOrBranch): commitOrBranch is UnAttachedBranch {
+	return "branchEnd" in commitOrBranch;
+}
+
+function unAttachBranchesFromCommits(attached: CommitAndBranchBoundary[]): UnAttachedCommitOrBranch[] {
+	const unattached: UnAttachedCommitOrBranch[] = [];
+
+	for (const { branchEnd, ...c } of attached) {
+		unattached.push(c);
+
+		if (branchEnd?.length) {
+			unattached.push({ branchEnd });
+		}
+	}
+
+	return unattached;
+}
+
+/**
+ * the key to remember here is that commits could've been moved around
+ * (that's the whole purpose of unattaching and reattaching the branches)
+ * (specifically, commits can only be moved back in history,
+ *  because you cannot specify a SHA of a commit in the future),
+ *
+ * and thus multiple `branchEnd` could end up pointing to a single commit,
+ * which just needs to be handled.
+ *
+ */
+function reAttachBranchesToCommits(unattached: UnAttachedCommitOrBranch[]): CommitAndBranchBoundary[] {
+	const reattached: CommitAndBranchBoundary[] = [];
+
+	let branchEndsForCommit: NonNullable<UnAttachedBranch["branchEnd"]>[] = [];
+
+	for (let i = unattached.length - 1; i >= 0; i--) {
+		const commitOrBranch = unattached[i];
+
+		if (isBranch(commitOrBranch) && commitOrBranch.branchEnd?.length) {
+			/**
+			 * it's a branchEnd. remember the above consideration
+			 * that multiple of them can accumulate for a single commit,
+			 * thus buffer them, until we reach a commit.
+			 */
+			branchEndsForCommit.push(commitOrBranch.branchEnd);
+		} else {
+			/**
+			 * we reached a commit.
+			 */
+
+			let combinedBranchEnds: NonNullable<UnAttachedBranch["branchEnd"]> = [];
+
+			/**
+			 * they are added in reverse order (i--). let's reverse branchEndsForCommit
+			 */
+			for (let j = branchEndsForCommit.length - 1; j >= 0; j--) {
+				const branchEnd: Git.Reference[] = branchEndsForCommit[j];
+				combinedBranchEnds = combinedBranchEnds.concat(branchEnd);
+			}
+
+			const restoredCommitWithBranchEnds: CommitAndBranchBoundary = {
+				...(commitOrBranch as UnAttachedCommit), // TODO TS assert
+				branchEnd: [...combinedBranchEnds],
+			};
+
+			reattached.push(restoredCommitWithBranchEnds);
+			branchEndsForCommit = [];
+		}
+	}
+
+	/**
+	 * we were going backwards - restore correct order.
+	 * reverses in place.
+	 */
+	reattached.reverse();
+
+	if (branchEndsForCommit.length) {
+		/**
+		 * TODO should never happen,
+		 * or we should assign by default to the 1st commit
+		 */
+
+		const msg =
+			`\nhave leftover branches without a commit to attach onto:` +
+			`\n${branchEndsForCommit.join("\n")}` +
+			`\n\n`;
+
+		throw new Termination(msg);
+	}
+
+	return reattached;
 }
