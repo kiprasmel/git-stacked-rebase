@@ -1378,8 +1378,8 @@ async function extendCommitsWithBranchEnds(
 
 	let matchedRefs: Git.Reference[];
 
-	const removeLocalRegex = /^refs\/heads\//;
-	const removeRemoteRegex = /^refs\/remotes\/[^/]*\//;
+	// const removeLocalRegex = /^refs\/heads\//;
+	// const removeRemoteRegex = /^refs\/remotes\/[^/]*\//;
 
 	const currentBranchCommit: Git.Oid = await referenceToOid(currentBranch);
 	noop(currentBranchCommit);
@@ -1405,15 +1405,17 @@ async function extendCommitsWithBranchEnds(
 		 * - possibly others
 		 *
 		 */
-		(matchedRefs = matchedRefs.filter(
-			(r) =>
-				r.name() === initialBranch.name() ||
-				!r.isRemote() ||
-				!refs
-					.filter((ref) => !ref.isRemote())
-					.map((ref) => ref.name().replace(removeLocalRegex, ""))
-					.includes(r.name().replace(removeRemoteRegex, ""))
-		)),
+
+		// (matchedRefs = matchedRefs.filter(
+		// 	(r) =>
+		// 		r.name() === initialBranch.name() ||
+		// 		!r.isRemote() ||
+		// 		!refs
+		// 			.filter((ref) => !ref.isRemote())
+		// 			.map((ref) => ref.name().replace(removeLocalRegex, ""))
+		// 			.includes(r.name().replace(removeRemoteRegex, ""))
+		// )),
+
 		// assert(
 		// 	matchedRefs.length <= 1 ||
 		// 		/**

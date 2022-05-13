@@ -26,6 +26,7 @@ export async function setupRepoWithStackedBranches({
 		config,
 		sig,
 		dir,
+		execSyncInRepo,
 	} = await setupRepo(rest);
 
 	const commitOidsInInitial: Git.Oid[] = [];
@@ -38,8 +39,6 @@ export async function setupRepoWithStackedBranches({
 		0
 	);
 	await repo.checkoutBranch(latestStackedBranch);
-
-	const execSyncInRepo = createExecSyncInRepo(repo);
 
 	const read = (): void => (blockWithRead ? void execSyncInRepo("read") : void 0);
 
@@ -89,11 +88,11 @@ export async function setupRepoWithStackedBranches({
 		config,
 		sig,
 		dir,
+		execSyncInRepo,
 
 		commitOidsInInitial,
 		initialBranch,
 		latestStackedBranch,
-		execSyncInRepo,
 		read,
 		commitOidsInLatestStacked,
 		newPartialBranches,
@@ -157,12 +156,15 @@ export async function setupRepo({
 
 	console.log("initial commit %s", initialCommit.tostrS());
 
+	const execSyncInRepo = createExecSyncInRepo(repo);
+
 	return {
 		dir,
 		repo,
 		config,
 		sig,
 		initialCommit,
+		execSyncInRepo,
 	} as const;
 }
 
@@ -179,7 +181,7 @@ function createTmpdir(random: boolean = true): string {
 	return dir;
 }
 
-async function appendCommitsTo(
+export async function appendCommitsTo(
 	alreadyExistingCommits: Git.Oid[],
 	n: number,
 	repo: Git.Repository, //
