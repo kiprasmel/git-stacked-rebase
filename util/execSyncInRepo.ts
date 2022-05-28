@@ -3,6 +3,10 @@ import { execSync } from "child_process";
 import Git from "nodegit";
 import { pipestdio } from "pipestdio";
 
+export type CreateExecSyncInRepoConfig = {
+	logCmd?: boolean;
+};
+
 /**
  * always use this when doing git commands,
  * because if user is in a different directory
@@ -12,10 +16,11 @@ import { pipestdio } from "pipestdio";
  * as opposted to the actual target repo (would be very bad!)
  */
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-export const createExecSyncInRepo = (repo: Git.Repository) => (
+export const createExecSyncInRepo = (repo: Git.Repository, { logCmd = false }: CreateExecSyncInRepoConfig = {}) => (
 	command: string,
 	extraOptions: Parameters<typeof execSync>[1] = {}
-) =>
+) => (
+	logCmd && console.log(`execSync: ${command}`),
 	execSync(command, {
 		...pipestdio(),
 		...extraOptions,
@@ -25,4 +30,5 @@ export const createExecSyncInRepo = (repo: Git.Repository) => (
 		 * TODO TS - enforce
 		 */
 		cwd: repo.workdir(),
-	});
+	})
+);
