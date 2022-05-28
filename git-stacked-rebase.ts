@@ -522,7 +522,9 @@ export const gitStackedRebase = async (
 			/**
 			 * move the old "latest branch" earlier to it's target
 			 */
-			await repo.checkoutBranch(oldLatestBranchCmd.targets![0]);
+			const oldTarget: string = oldLatestBranchCmd.targets![0].replace(removeLocalRegex, "");
+			execSyncInRepo(`${options.gitCmd} checkout ${oldTarget}`);
+
 			const commit: Git.Commit = await Git.Commit.lookup(repo, oldLatestBranchCmd.commitSHAThatBranchPointsTo!);
 			// await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
 			execSyncInRepo(`${options.gitCmd} reset --hard ${commit.sha()}`);
@@ -530,7 +532,8 @@ export const gitStackedRebase = async (
 			/**
 			 * go to the new "latest branch".
 			 */
-			await repo.checkoutBranch(newLatestBranchCmd.targets![0]);
+			const newTarget: string = newLatestBranchCmd.targets![0].replace(removeLocalRegex, "");
+			execSyncInRepo(`${options.gitCmd} checkout ${newTarget}`);
 
 			/**
 			 * TODO FIXME don't do this so hackishly lmao
@@ -1267,6 +1270,10 @@ exit 1
 	return commitsWithBranchBoundaries;
 }
 
+const removeLocalRegex = /^refs\/heads\//;
+const removeRemoteRegex = /^refs\/remotes\/[^/]*\//;
+noop(removeRemoteRegex);
+
 async function extendCommitsWithBranchEnds(
 	repo: Git.Repository,
 	initialBranch: Git.Reference,
@@ -1286,9 +1293,6 @@ async function extendCommitsWithBranchEnds(
 	const refs: Git.Reference[] = await Promise.all(refNames.map((ref) => Git.Reference.lookup(repo, ref)));
 
 	let matchedRefs: Git.Reference[];
-
-	const removeLocalRegex = /^refs\/heads\//;
-	const removeRemoteRegex = /^refs\/remotes\/[^/]*\//;
 
 	const currentBranchCommit: Git.Oid = await referenceToOid(currentBranch);
 	noop(currentBranchCommit);

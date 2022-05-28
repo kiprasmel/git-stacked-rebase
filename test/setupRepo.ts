@@ -4,7 +4,7 @@ import assert from "assert";
 
 import Git from "nodegit";
 
-import { gitStackedRebase } from "../git-stacked-rebase";
+import { defaultGitCmd, gitStackedRebase } from "../git-stacked-rebase";
 import { configKeys } from "../configKeys";
 import { humanOpAppendLineAfterNthCommit } from "../humanOp";
 
@@ -26,20 +26,16 @@ export async function setupRepoWithStackedBranches({
 		config,
 		sig,
 		dir,
+		execSyncInRepo,
 	} = await setupRepo(rest);
 
 	const commitOidsInInitial: Git.Oid[] = [];
 	const initialBranch: Git.Reference = await appendCommitsTo(commitOidsInInitial, 3, repo, sig);
 
-	const latestStackedBranch: Git.Reference = await Git.Branch.create(
-		repo,
-		"stack-latest",
-		await repo.getHeadCommit(),
-		0
-	);
-	await repo.checkoutBranch(latestStackedBranch);
-
-	const execSyncInRepo = createExecSyncInRepo(repo);
+	const latestStackedBranchName = "stack-latest";
+	const headCommit: Git.Commit = await repo.getHeadCommit();
+	const createBranchCmd = `${defaultGitCmd} checkout -b ${latestStackedBranchName} ${headCommit}`;
+	execSyncInRepo(createBranchCmd);
 
 	const read = (): void => (blockWithRead ? void execSyncInRepo("read") : void 0);
 
@@ -92,7 +88,7 @@ export async function setupRepoWithStackedBranches({
 
 		commitOidsInInitial,
 		initialBranch,
-		latestStackedBranch,
+		latestStackedBranchName,
 		execSyncInRepo,
 		read,
 		commitOidsInLatestStacked,
@@ -141,12 +137,6 @@ export async function setupRepo({
 	 */
 	await config.setBool(configKeys.gpgSign, Git.Config.MAP.FALSE);
 
-	/**
-	 * fixups / not implemented in libgit2.
-	 * though, would be better if received empty/minimal config by default..
-	 */
-	await config.setString("merge.conflictStyle", "diff3"); // zdiff3
-
 	const sig: Git.Signature = await Git.Signature.default(repo);
 	console.log("sig %s", sig);
 
@@ -157,12 +147,15 @@ export async function setupRepo({
 
 	console.log("initial commit %s", initialCommit.tostrS());
 
+	const execSyncInRepo = createExecSyncInRepo(repo);
+
 	return {
 		dir,
 		repo,
 		config,
 		sig,
 		initialCommit,
+		execSyncInRepo,
 	} as const;
 }
 
