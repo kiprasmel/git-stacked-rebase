@@ -527,6 +527,7 @@ export const gitStackedRebase = async (
 
 		if (isThereANewLatestBranch) {
 			let newLatestBranchCmdIndex: number | null = null;
+			let userOnlyReorderedWithoutCreatingNew: boolean = false;
 			for (let i = goodCommands.length - 1; i >= 0; i--) {
 				const cmd = goodCommands[i];
 				if (cmd.commandName === "branch-end-new") {
@@ -535,19 +536,30 @@ export const gitStackedRebase = async (
 				}
 			}
 			if (newLatestBranchCmdIndex === null || newLatestBranchCmdIndex <= oldLatestBranchCmdIndex) {
-				// TODO validator
-				const when =
-					newLatestBranchCmdIndex === null
-						? "at all"
-						: newLatestBranchCmdIndex <= oldLatestBranchCmdIndex
-						? "after the branch-end-latest command"
-						: ""; // assertNever(newLatestBranchCmdIndex);
+				/**
+				 * check if wanted to re-order w/o creating a new branch
+				 */
+				const hasExistingBranchAsLatest: boolean =
+					goodCommands[goodCommands.length - 1].commandName === "branch-end";
 
-				throw new Termination(
-					"\n" +
-						`apparently a new latest branch was attempted (by adding commands _after_ the "branch-end-last")` +
-						`\nbut there was no "branch-end-new" command (${when})`
-				);
+				if (newLatestBranchCmdIndex === null && hasExistingBranchAsLatest) {
+					newLatestBranchCmdIndex = goodCommands.length - 1;
+					userOnlyReorderedWithoutCreatingNew = true;
+				} else {
+					// TODO validator
+					const when =
+						newLatestBranchCmdIndex === null
+							? "at all"
+							: newLatestBranchCmdIndex <= oldLatestBranchCmdIndex
+							? "after the branch-end-latest command"
+							: ""; // assertNever(newLatestBranchCmdIndex);
+
+					throw new Termination(
+						"\n" +
+							`apparently a new latest branch was attempted (by adding commands _after_ the "branch-end-last")` +
+							`\nbut there was no "branch-end-new" command (${when})`
+					);
+				}
 			}
 
 			/**
@@ -610,10 +622,12 @@ export const gitStackedRebase = async (
 			const oldLatestBranchCmd: GoodCommandStacked = goodCommands[oldLatestBranchCmdIndex] as GoodCommandStacked; // TODO TS
 			const newLatestBranchCmd: GoodCommandStacked = goodCommands[newLatestBranchCmdIndex] as GoodCommandStacked; // TODO TS
 
-			/**
-			 * create the new "latest branch"
-			 */
-			await createBranchForCommand(newLatestBranchCmd as any); // TODO TS
+			if (!userOnlyReorderedWithoutCreatingNew) {
+				/**
+				 * create the new "latest branch"
+				 */
+				await createBranchForCommand(newLatestBranchCmd as any); // TODO TS
+			}
 
 			/**
 			 * move the old "latest branch" earlier to it's target
@@ -634,7 +648,11 @@ export const gitStackedRebase = async (
 			const linesOfEditedRebaseTodo: string[] = editedRebaseTodo.split("\n");
 
 			replaceCommandInText(oldLatestBranchCmd, ["branch-end-last"], "branch-end");
-			replaceCommandInText(newLatestBranchCmd, ["branch-end-new", "ben"], "branch-end-last");
+			replaceCommandInText(
+				newLatestBranchCmd, //
+				userOnlyReorderedWithoutCreatingNew ? ["branch-end", "be"] : ["branch-end-new", "ben"],
+				"branch-end-last"
+			);
 
 			// eslint-disable-next-line no-inner-declarations
 			function replaceCommandInText(
