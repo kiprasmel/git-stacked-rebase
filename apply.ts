@@ -32,10 +32,11 @@ export const apply: BranchSequencerBase = (args) =>
 
 const defaultApplyAction: ActionInsideEachCheckedOutBranch = async ({
 	repo, //
+	gitCmd,
 	// targetBranch,
 	targetCommitSHA,
 	isLatestBranch,
-	// execSyncInRepo,
+	execSyncInRepo,
 }) => {
 	const commit: Git.Commit = await Git.Commit.lookup(repo, targetCommitSHA);
 
@@ -44,7 +45,14 @@ const defaultApplyAction: ActionInsideEachCheckedOutBranch = async ({
 	console.log({ isLatestBranch });
 
 	if (!isLatestBranch) {
-		await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
+		/**
+		 * we're not using libgit's `Git.Reset.reset` here, because even after updating
+		 * to the latest version of nodegit (& they to libgit),
+		 * it still chokes when a user has specified an option `merge.conflictStyle` as `zdiff3`
+		 * (a newly added one in git, but it's been added like 4 months ago)
+		 */
+		// await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
+		execSyncInRepo(`${gitCmd} reset --hard ${commit.sha()}`);
 
 		// if (previousTargetBranchName) {
 		// execSyncInRepo(`/usr/bin/env git rebase ${previousTargetBranchName}`);

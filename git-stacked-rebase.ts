@@ -524,7 +524,8 @@ export const gitStackedRebase = async (
 			 */
 			await repo.checkoutBranch(oldLatestBranchCmd.targets![0]);
 			const commit: Git.Commit = await Git.Commit.lookup(repo, oldLatestBranchCmd.commitSHAThatBranchPointsTo!);
-			await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
+			// await Git.Reset.reset(repo, commit, Git.Reset.TYPE.HARD, {});
+			execSyncInRepo(`${options.gitCmd} reset --hard ${commit.sha()}`);
 
 			/**
 			 * go to the new "latest branch".

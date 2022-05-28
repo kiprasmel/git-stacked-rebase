@@ -210,6 +210,7 @@ const pickBoundaryParser = ({
 
 export type ActionInsideEachCheckedOutBranchCtx = {
 	repo: Git.Repository; //
+	gitCmd: string;
 	targetBranch: string;
 	targetCommitSHA: string;
 	isLatestBranch: boolean;
@@ -393,6 +394,7 @@ export const branchSequencer: BranchSequencer = async ({
 
 				await actionInsideEachCheckedOutBranch({
 					repo, //
+					gitCmd,
 					targetBranch: x,
 					targetCommitSHA,
 					isLatestBranch,
