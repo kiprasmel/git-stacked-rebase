@@ -18,24 +18,22 @@ type CommonArgs = {
  * TODO general "HumanOp" for `appendLineAfterNthCommit` & similar utils
  */
 export function humanOpAppendLineAfterNthCommit(newLine: string, { filePath, commitSHA }: CommonArgs): void {
-	const file = fs.readFileSync(filePath, { encoding: "utf-8" });
-	const lines = file.split("\n");
-	const lineIdx: number = lines.findIndex((line) => line.startsWith(`pick ${commitSHA}`));
+	const lines = readLines(filePath);
+	const lineIdx: number = findLineByCommit(lines, commitSHA);
 
 	console.log("commitSHA: %s, lineIdx: %s, newLine: %s", commitSHA, lineIdx, newLine);
 
 	lines.splice(lineIdx, 0, newLine);
 
-	fs.writeFileSync(filePath, lines.join("\n"));
+	writeLines(filePath, lines);
 }
 
 export function humanOpChangeCommandOfNthCommitInto(
 	newCommand: RegularRebaseCommand,
 	{ commitSHA, filePath }: CommonArgs
 ): void {
-	const file = fs.readFileSync(filePath, { encoding: "utf-8" });
-	const lines = file.split("\n");
-	const lineIdx: number = lines.findIndex((line) => line.startsWith(`pick ${commitSHA}`));
+	const lines = readLines(filePath);
+	const lineIdx: number = findLineByCommit(lines, commitSHA);
 
 	console.log("commitSHA: %s, lineIdx: %s, newCommand: %s", commitSHA, lineIdx, newCommand);
 
@@ -43,5 +41,38 @@ export function humanOpChangeCommandOfNthCommitInto(
 	parts[0] = newCommand;
 	lines[lineIdx] = parts.join(" ");
 
+	writeLines(filePath, lines);
+}
+
+export function humanOpRemoveLineOfCommit({ filePath, commitSHA }: CommonArgs): void {
+	const lines: string[] = readLines(filePath);
+	const idx: number = findLineByCommit(lines, commitSHA);
+
+	/**
+	 * remove (implicit "drop")
+	 *
+	 * TODO respect some git config setting where implicit drops
+	 * are allowed or not (i think was info/warning/error)
+	 */
+	lines.splice(idx, 1);
+
+	writeLines(filePath, lines);
+}
+
+export function readLines(filePath: string): string[] {
+	const file = fs.readFileSync(filePath, { encoding: "utf-8" });
+	const lines = file.split("\n");
+	return lines;
+}
+
+export function writeLines(filePath: string, lines: string[]): void {
 	fs.writeFileSync(filePath, lines.join("\n"));
+}
+
+export function findLineByCommit(lines: string[], commitSHA: string): number {
+	/**
+	 * TODO more advanced finding to allow for any command,
+	 * not just "picK"
+	 */
+	return lines.findIndex((line) => line.startsWith(`pick ${commitSHA}`));
 }
