@@ -132,7 +132,7 @@ export const regularRebaseCommands = {
 	// b: standardCommand,
 	drop: createCommand("drop", {
 		makesGitRebaseExitToPause: false,
-		willDisappearFromCommandsListInNextGitRebaseTodoFile: false, // TODO
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: true, //
 	}),
 	// d: standardCommand,
 	label: createCommand("label", {
