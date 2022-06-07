@@ -289,6 +289,17 @@ export const gitStackedRebase = async (
 
 		const checkIsRegularRebaseStillInProgress = (): boolean => fs.existsSync(pathToRegularRebaseDirInsideDotGit);
 
+		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
+			repo, //
+			nameOfInitialBranch,
+			Git.Branch.BRANCH.ALL
+		);
+		if (!initialBranch) {
+			throw new Error("initialBranch lookup failed");
+		}
+
+		const currentBranch: Git.Reference = await repo.getCurrentBranch();
+
 		if (fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply))) {
 			_markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 		}
@@ -300,6 +311,8 @@ export const gitStackedRebase = async (
 				pathToStackedRebaseDirInsideDotGit, //
 				rootLevelCommandName: "--apply",
 				gitCmd: options.gitCmd,
+				initialBranch,
+				currentBranch,
 			});
 		}
 
@@ -327,6 +340,8 @@ export const gitStackedRebase = async (
 				gitCmd: options.gitCmd,
 				autoApplyIfNeeded: configValues.autoApplyIfNeeded,
 				config,
+				initialBranch,
+				currentBranch,
 			});
 
 			return;
@@ -340,6 +355,8 @@ export const gitStackedRebase = async (
 			gitCmd: options.gitCmd,
 			autoApplyIfNeeded: configValues.autoApplyIfNeeded,
 			config,
+			initialBranch,
+			currentBranch,
 		});
 
 		if (neededToApply && !userAllowedToApplyAndWeApplied) {
@@ -357,6 +374,8 @@ export const gitStackedRebase = async (
 				pathToStackedRebaseDirInsideDotGit,
 				rootLevelCommandName: "--push --force",
 				gitCmd: options.gitCmd,
+				initialBranch,
+				currentBranch,
 			});
 		}
 
@@ -371,6 +390,8 @@ export const gitStackedRebase = async (
 					actionInsideEachCheckedOutBranch: ({ execSyncInRepo: execS }) => (execS(toExec), void 0),
 					pathToStackedRebaseDirInsideDotGit,
 					pathToStackedRebaseTodoFile,
+					initialBranch,
+					currentBranch,
 				});
 			} else {
 				/**
@@ -382,15 +403,6 @@ export const gitStackedRebase = async (
 			}
 		}
 
-		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
-
-		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
-			repo, //
-			nameOfInitialBranch,
-			Git.Branch.BRANCH.ALL
-		);
-		const currentBranch: Git.Reference = await repo.getCurrentBranch();
-
 		const wasRegularRebaseInProgress: boolean = checkIsRegularRebaseStillInProgress();
 		// const
 
@@ -399,6 +411,14 @@ export const gitStackedRebase = async (
 		if (wasRegularRebaseInProgress) {
 			throw new Termination("regular rebase already in progress");
 		}
+
+		/**
+		 * only create the dir now, when it's needed.
+		 * otherwise, other commands can incorrectly infer
+		 * that our own stacked rebase is in progress,
+		 * when it's not, up until now.
+		 */
+		fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
 
 		await createInitialEditTodoOfGitStackedRebase(
 			repo, //
@@ -631,9 +651,30 @@ REWRITTEN_LIST_FILE_PATH="$REBASE_MERGE_DIR/${filenames.rewrittenList}"
 STACKED_REBASE_DIR="$(pwd)/.git/stacked-rebase"
 REWRITTEN_LIST_BACKUP_FILE_PATH="$STACKED_REBASE_DIR/${filenames.rewrittenList}"
 
+mkdir -p "$STACKED_REBASE_DIR"
+
 #echo "REBASE_MERGE_DIR $REBASE_MERGE_DIR; STACKED_REBASE_DIR $STACKED_REBASE_DIR;"
 
-cp "$REWRITTEN_LIST_FILE_PATH" "$REWRITTEN_LIST_BACKUP_FILE_PATH"
+#cp "$REWRITTEN_LIST_FILE_PATH" "$REWRITTEN_LIST_BACKUP_FILE_PATH"
+
+
+#cat >> "$REWRITTEN_LIST_BACKUP_FILE_PATH" <<EOF
+#$1
+#$(cat /dev/stdin)
+#---
+#EOF
+
+#cat >> "$REWRITTEN_LIST_BACKUP_FILE_PATH" <<EOF
+#$(git rev-parse HEAD)
+#$(cat /dev/stdin)
+#
+#EOF
+
+cat >> "$REWRITTEN_LIST_BACKUP_FILE_PATH" <<EOF
+$1
+$(cat /dev/stdin)
+
+EOF
 
 		`;
 
@@ -879,6 +920,8 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 					gitCmd: options.gitCmd,
 					autoApplyIfNeeded: configValues.autoApplyIfNeeded,
 					config,
+					initialBranch,
+					currentBranch,
 				});
 			}
 		}
@@ -1065,7 +1108,7 @@ type CommitAndBranchBoundary = {
 	branchEnd: Git.Reference | null;
 };
 
-async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
+export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 	repo: Git.Repository, //
 	/** beginningBranch */
 	bb: Git.Reference,
@@ -1381,16 +1424,6 @@ git-stacked-rebase <branch> [-a|--apply]
     1. will apply the changes from the latest branch
        to all partial branches (currently, using 'git reset --hard'),
 	2. but wil not push the partial branches to a remote until --push --force is used.
-
-
-git-stacked-rebase [<branch>] (-c|--continue)
-
-	(!) should be used instead of git-rebase's --continue
-
-	...because, additionally to invoking git rebase --continue,
-	this option automatically (prompts you to) --apply (if the rebase
-	has finished), thus ensuring that the partial branches
-	do not go out of sync with the newly rewritten history.
 
 
 git-stacked-rebase <branch> [--push|-p --force|-f]

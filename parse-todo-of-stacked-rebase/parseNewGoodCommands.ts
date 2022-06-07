@@ -1,13 +1,13 @@
 /* eslint-disable indent */
 
-import fs from "fs";
-import path from "path";
 import assert from "assert";
 
 import Git from "nodegit";
 import { array } from "nice-comment";
 
 import { filenames } from "../filenames";
+// eslint-disable-next-line import/no-cycle
+import { readRewrittenListNotAppliedOrAppliedOrError } from "../apply";
 
 import { parseTodoOfStackedRebase } from "./parseTodoOfStackedRebase";
 import { GoodCommand, stackedRebaseCommands } from "./validator";
@@ -20,18 +20,14 @@ export function parseNewGoodCommands(
 
 	logGoodCmds(oldGoodCommands);
 
-	const pathOfRewrittenList: string = path.join(repo.path(), "stacked-rebase", filenames.rewrittenList);
-	const rewrittenList: string = fs.readFileSync(pathOfRewrittenList, { encoding: "utf-8" });
-	const rewrittenListLines: string[] = rewrittenList.split("\n").filter((line) => !!line);
-
-	console.log({ rewrittenListLines });
+	const { combinedRewrittenListLines } = readRewrittenListNotAppliedOrAppliedOrError(repo.path());
 
 	const newCommits: { newSHA: string; oldSHAs: string[] }[] = [];
 
 	type OldCommit = { oldSHA: string; newSHA: string; changed: boolean };
 	const oldCommits: OldCommit[] = [];
 
-	rewrittenListLines.map((line) => {
+	combinedRewrittenListLines.map((line) => {
 		const fromToSHA = line.split(" ");
 		assert(
 			fromToSHA.length === 2,
