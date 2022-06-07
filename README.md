@@ -23,11 +23,18 @@ from those partial branches, you can create pull requests. with this workflow, y
 
 `git-stacked-rebase` is not specific to any host like github or gitlab. it's "specific" to `git` itself.
 
-it's not only a CLI either - it's first and foremost a javascript library, and the CLI is just a tool that builds on top of the library.
+it's not only a CLI either - it's written as a javascript library, with the CLI directly on top.
+though, we're keeping our options open for a potential rewrite in C (read: we're designing it in a way
+to make a rewrite in C possible w/o breaking changes to end users,
+_if_ someone knowledgeable in git's core and C would want to take on this).
 
-in the future, we could create host-specific adapters. they could be used to automate some simple tasks, such as creating a pull request, or changing the base branch of a pull request, etc.
+in general, the design goal has always been for the experience to feel as similar to git as possible.
+and this is why i feel that it could eventually become part of core git.
+(it wasn't a "goal" per se, it just felt like the right approach.)
 
-there are bigger plans as well, such as creating a browser extension to improve the experience of exploring stacked PRs.
+nonetheless, there are other interesting things for us to explore, e.g.:
+- creating host-specific adapters - they could be used to automate some simple tasks, such as creating a pull request, or changing the base branch of a pull request, etc.
+- creating a browser extension to improve the experience of exploring stacked PRs.
 
 ## Progress
 

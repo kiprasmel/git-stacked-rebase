@@ -20,6 +20,7 @@ import { apply, applyIfNeedsToApply, markThatNeedsToApply as _markThatNeedsToApp
 import { forcePush } from "./forcePush";
 import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequencer";
 import { autosquash } from "./autosquash";
+import { InternalOnlyOptions, editor__internal, EitherEditor, getGitConfig__internal } from "./internal";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -44,12 +45,11 @@ import {
 
 export type OptionsForGitStackedRebase = {
 	gitDir: string;
-	getGitConfig: (ctx: { GitConfig: typeof Git.Config; repo: Git.Repository }) => Promise<Git.Config> | Git.Config;
 
 	/**
 	 * editor name, or a function that opens the file inside some editor.
 	 */
-	editor: string | ((ctx: { filePath: string }) => void | Promise<void>);
+	editor: string;
 
 	/**
 	 * for executing raw git commands
@@ -65,7 +65,7 @@ export type OptionsForGitStackedRebase = {
 
 	branchSequencer: boolean;
 	branchSequencerExec: string | false;
-};
+} & InternalOnlyOptions;
 
 export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
 
@@ -75,7 +75,6 @@ export const defaultGitCmd = "/usr/bin/env git" as const;
 export const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	gitDir: ".", //
 	// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-	getGitConfig: ({ GitConfig }) => GitConfig.openDefault(),
 	editor: process.env.EDITOR ?? defaultEditor,
 	gitCmd: process.env.GIT_CMD ?? defaultGitCmd,
 	viewTodoOnly: false,
@@ -134,7 +133,10 @@ export const gitStackedRebase = async (
 		}
 
 		const repo = await Git.Repository.open(options.gitDir);
-		const config: Git.Config = await options.getGitConfig({ GitConfig: Git.Config, repo });
+		const config: Git.Config =
+			getGitConfig__internal in options
+				? await options[getGitConfig__internal]!({ GitConfig: Git.Config, repo })
+				: await Git.Config.openDefault();
 
 		const configValues = {
 			gpgSign: !!(await config.getBool(configKeys.gpgSign).catch(() => 0)),
@@ -357,11 +359,18 @@ export const gitStackedRebase = async (
 
 		if (!wasRegularRebaseInProgress || options.viewTodoOnly) {
 			try {
-				if (options.editor instanceof Function) {
-					await options.editor({ filePath: pathToStackedRebaseTodoFile });
+				const editor: EitherEditor =
+					editor__internal in options
+						? options[editor__internal]!
+						: "editor" in options
+						? options.editor
+						: assertNever(options);
+
+				if (editor instanceof Function) {
+					await editor({ filePath: pathToStackedRebaseTodoFile });
 				} else {
 					process.stdout.write("\nhint: Waiting for your editor to close the file... ");
-					execSyncInRepo(`${options.editor} ${pathToStackedRebaseTodoFile}`);
+					execSyncInRepo(`${editor} ${pathToStackedRebaseTodoFile}`);
 				}
 			} catch (_e) {
 				/**

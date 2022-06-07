@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/camelcase */
+
 import fs from "fs";
 import path from "path";
 import assert from "assert";
@@ -9,6 +11,7 @@ import { configKeys } from "../configKeys";
 import { humanOpAppendLineAfterNthCommit } from "../humanOp";
 
 import { createExecSyncInRepo } from "../util/execSyncInRepo";
+import { editor__internal, getGitConfig__internal } from "../internal";
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 
@@ -53,8 +56,8 @@ export async function setupRepoWithStackedBranches({
 	console.log("launching 0th rebase to create partial branches");
 	await gitStackedRebase(initialBranch.shorthand(), {
 		gitDir: dir,
-		getGitConfig: () => config,
-		editor: ({ filePath }) => {
+		[getGitConfig__internal]: () => config,
+		[editor__internal]: ({ filePath }) => {
 			console.log("filePath %s", filePath);
 
 			for (const [newPartial, nthCommit] of newPartialBranches) {
