@@ -41,6 +41,7 @@ export type OptionsForGitStackedRebase = {
 
 	viewTodoOnly: boolean;
 	apply: boolean;
+	continue: boolean;
 	push: boolean;
 	forcePush: boolean;
 
@@ -61,6 +62,7 @@ export const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	gitCmd: process.env.GIT_CMD ?? defaultGitCmd,
 	viewTodoOnly: false,
 	apply: false,
+	continue: false,
 	push: false,
 	forcePush: false,
 	branchSequencer: false,
@@ -73,6 +75,7 @@ function areOptionsIncompetible(
 ): boolean {
 	if (options.viewTodoOnly) {
 		if (options.apply) reasons.push("--apply cannot be used together with --view-todo");
+		if (options.continue) reasons.push("--continue cannot be used together with --view-todo");
 		if (options.push) reasons.push("--push cannot be used together with --view-todo");
 		if (options.forcePush) reasons.push("--push --force cannot be used together with --view-todo");
 		if (options.branchSequencer) reasons.push("--branch-sequencer cannot be used together with --view-todo");
@@ -284,6 +287,8 @@ export const gitStackedRebase = async (
 		const pathToStackedRebaseDirInsideDotGit: string = parsed.pathToStackedRebaseDirInsideDotGit;
 		const pathToStackedRebaseTodoFile: string = parsed.pathToStackedRebaseTodoFile;
 
+		const checkIsRegularRebaseStillInProgress = (): boolean => fs.existsSync(pathToRegularRebaseDirInsideDotGit);
+
 		if (fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply))) {
 			_markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 		}
@@ -296,6 +301,35 @@ export const gitStackedRebase = async (
 				rootLevelCommandName: "--apply",
 				gitCmd: options.gitCmd,
 			});
+		}
+
+		if (options.continue) {
+			execSyncInRepo(`${options.gitCmd} rebase --continue`);
+
+			if (checkIsRegularRebaseStillInProgress()) {
+				/**
+				 * still not done - further `--continue`s will be needed.
+				 */
+				return;
+			}
+
+			console.log("after --continue, rebase done. trying to --apply");
+
+			/**
+			 * rebase has finished. we can try to --apply now
+			 * so that the partial branches do not get out of sync.
+			 */
+			await applyIfNeedsToApply({
+				repo,
+				pathToStackedRebaseTodoFile,
+				pathToStackedRebaseDirInsideDotGit, //
+				rootLevelCommandName: "--apply (automatically after --continue)",
+				gitCmd: options.gitCmd,
+				autoApplyIfNeeded: configValues.autoApplyIfNeeded,
+				config,
+			});
+
+			return;
 		}
 
 		const { neededToApply, userAllowedToApplyAndWeApplied, markThatNeedsToApply } = await applyIfNeedsToApply({
@@ -357,7 +391,7 @@ export const gitStackedRebase = async (
 		);
 		const currentBranch: Git.Reference = await repo.getCurrentBranch();
 
-		const wasRegularRebaseInProgress: boolean = fs.existsSync(pathToRegularRebaseDirInsideDotGit);
+		const wasRegularRebaseInProgress: boolean = checkIsRegularRebaseStillInProgress();
 		// const
 
 		console.log({ wasRegularRebaseInProgress });
@@ -1349,6 +1383,16 @@ git-stacked-rebase <branch> [-a|--apply]
 	2. but wil not push the partial branches to a remote until --push --force is used.
 
 
+git-stacked-rebase [<branch>] (-c|--continue)
+
+	(!) should be used instead of git-rebase's --continue
+
+	...because, additionally to invoking git rebase --continue,
+	this option automatically (prompts you to) --apply (if the rebase
+	has finished), thus ensuring that the partial branches
+	do not go out of sync with the newly rewritten history.
+
+
 git-stacked-rebase <branch> [--push|-p --force|-f]
 
     1. will checkout each branch and will push --force,
@@ -1431,6 +1475,31 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 		throw new Termination(helpMsg);
 	}
 
+	if (["--continue", "-c"].includes(nameOfInitialBranch) && !process.argv.length) {
+		console.log("--continue without initialBranch");
+
+		/**
+		 * TODO allow `null` / make optional
+		 *
+		 * both will need some intellisense to only allow
+		 * in specific cases
+		 *
+		 * (unless we'll keep track of the
+		 * current initial branch we're working with?)
+		 *
+		 */
+		const initialBranch = "";
+
+		/**
+		 * TODO call more appropraitely / extract default options
+		 * so that it's less error-prone here
+		 */
+		return gitStackedRebase(initialBranch, {
+			gitDir,
+			continue: true,
+		});
+	}
+
 	/**
 	 * TODO: improve arg parsing, lmao
 	 */
@@ -1454,10 +1523,11 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 	const isViewTodoOnly: boolean =
 		!!second && ["--view-todo", "-v", "--view-only", "--view-todo-only"].includes(second);
 	const isApply: boolean = !!second && ["--apply", "-a"].includes(second);
+	const isContinue: boolean = !!second && ["--continue", "-c"].includes(second);
 	const isPush: boolean = !!second && ["--push", "-p"].includes(second);
 	const isBranchSequencer: boolean = !!second && ["--branch-sequencer", "--bs", "-s"].includes(second);
 
-	if (isViewTodoOnly || isApply || isPush || isBranchSequencer) {
+	if (isViewTodoOnly || isContinue || isApply || isPush || isBranchSequencer) {
 		eatNextArg();
 	}
 
@@ -1507,6 +1577,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 		gitDir,
 		viewTodoOnly: isViewTodoOnly,
 		apply: isApply,
+		continue: isContinue,
 		push: isPush,
 		forcePush: isForcePush,
 		branchSequencer: isBranchSequencer,
