@@ -3,6 +3,7 @@
  */
 export const filenames = {
 	rewrittenList: "rewritten-list",
+	willNeedToApply: "will-need-to-apply",
 	needsToApply: "needs-to-apply",
 	applied: "applied",
 	//
