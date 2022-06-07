@@ -19,6 +19,7 @@ import { configKeys } from "./configKeys";
 import { apply, applyIfNeedsToApply, markThatNeedsToApply as _markThatNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequencer";
+import { autosquash } from "./autosquash";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -138,6 +139,7 @@ export const gitStackedRebase = async (
 		const configValues = {
 			gpgSign: !!(await config.getBool(configKeys.gpgSign).catch(() => 0)),
 			autoApplyIfNeeded: !!(await config.getBool(configKeys.autoApplyIfNeeded).catch(() => 0)),
+			autoSquash: !!(await config.getBool(configKeys.autoSquash).catch(() => 0)),
 		} as const;
 
 		console.log({ configValues });
@@ -338,7 +340,8 @@ export const gitStackedRebase = async (
 			initialBranch,
 			currentBranch,
 			// __default__pathToStackedRebaseTodoFile
-			pathToStackedRebaseTodoFile
+			pathToStackedRebaseTodoFile,
+			configValues.autoSquash
 			// () =>
 			// 	getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 			// 		gitCmd: options.gitCmd,
@@ -853,6 +856,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 	initialBranch: Git.Reference,
 	currentBranch: Git.Reference,
 	pathToRebaseTodoFile: string,
+	autoSquash: boolean,
 	getCommitsWithBranchBoundaries: () => Promise<CommitAndBranchBoundary[]> = () =>
 		getWantedCommitsWithBranchBoundariesOurCustomImpl(
 			repo, //
@@ -867,7 +871,7 @@ async function createInitialEditTodoOfGitStackedRebase(
 	// 	return;
 	// }
 
-	const commitsWithBranchBoundaries: CommitAndBranchBoundary[] = await getCommitsWithBranchBoundaries();
+	let commitsWithBranchBoundaries: CommitAndBranchBoundary[] = await getCommitsWithBranchBoundaries();
 
 	// /**
 	//  * TODO: FIXME HACK for nodegit rebase
@@ -883,6 +887,10 @@ async function createInitialEditTodoOfGitStackedRebase(
 	// fs.writeFileSync(ff, `${commitsWithBranchBoundaries[last].commit.sha()}`);
 
 	noop(commitsWithBranchBoundaries);
+
+	if (autoSquash) {
+		commitsWithBranchBoundaries = await autosquash(repo, commitsWithBranchBoundaries);
+	}
 
 	const rebaseTodo = commitsWithBranchBoundaries
 		.map(({ commit, commitCommand, branchEnd }, i) => {
@@ -994,7 +1002,7 @@ function callAll(keyToFunctionMap: KeyToFunctionMap) {
 	);
 }
 
-type CommitAndBranchBoundary = {
+export type CommitAndBranchBoundary = {
 	commit: Git.Commit;
 	commitCommand: RegularRebaseEitherCommandOrAlias;
 	branchEnd: Git.Reference[] | null;
