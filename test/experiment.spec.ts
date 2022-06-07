@@ -1,11 +1,14 @@
 #!/usr/bin/env ts-node-dev
 
+/* eslint-disable @typescript-eslint/camelcase */
+
 import fs from "fs";
 
 import { setupRepoWithStackedBranches } from "./setupRepo";
 
 import { gitStackedRebase, defaultGitCmd } from "../git-stacked-rebase";
 import { humanOpChangeCommandOfNthCommitInto } from "../humanOp";
+import { editor__internal, getGitConfig__internal } from "../internal";
 
 export async function testCase() {
 	const {
@@ -27,8 +30,8 @@ export async function testCase() {
 
 	await gitStackedRebase(initialBranch.shorthand(), {
 		gitDir: dir,
-		getGitConfig: () => config,
-		editor: async ({ filePath }) => {
+		[getGitConfig__internal]: () => config,
+		[editor__internal]: async ({ filePath }) => {
 			const SHA = commitOidsInLatestStacked[nthCommit2ndRebase].tostrS();
 
 			humanOpChangeCommandOfNthCommitInto("edit", { filePath, commitSHA: SHA });
@@ -68,7 +71,7 @@ export async function testCase() {
 
 	await gitStackedRebase(initialBranch.shorthand(), {
 		gitDir: dir,
-		getGitConfig: () => config,
+		[getGitConfig__internal]: () => config,
 		apply: true,
 	});
 }

@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/camelcase */
 
-import { gitStackedRebase } from "../git-stacked-rebase";
+import { gitStackedRebase, SomeOptionsForGitStackedRebase } from "../git-stacked-rebase";
 import {
 	humanOpAppendLineAfterNthCommit, //
 	humanOpRemoveLineOfCommit,
 	humanOpChangeCommandOfNthCommitInto,
 } from "../humanOp";
+import { editor__internal, getGitConfig__internal } from "../internal";
 
 import { setupRepoWithStackedBranches } from "../test/setupRepo";
 
@@ -18,14 +19,14 @@ export async function parseNewGoodCommandsSpec() {
 		const { initialBranch, commitOidsInLatestStacked, dir, config } = await setupRepoWithStackedBranches();
 
 		const branch = initialBranch.shorthand();
-		const common = {
+		const common: SomeOptionsForGitStackedRebase = {
 			gitDir: dir,
-			getGitConfig: () => config,
+			[getGitConfig__internal]: () => config,
 		} as const;
 
 		await gitStackedRebase(branch, {
 			...common,
-			editor: ({ filePath }) => {
+			[editor__internal]: ({ filePath }) => {
 				const commitSHA: string = commitOidsInLatestStacked[7].tostrS();
 				humanOpAppendLineAfterNthCommit("break", {
 					filePath,
@@ -44,14 +45,14 @@ export async function parseNewGoodCommandsSpec() {
 		const { initialBranch, commitOidsInLatestStacked, dir, config } = await setupRepoWithStackedBranches();
 		const branch = initialBranch.shorthand();
 
-		const common = {
+		const common: SomeOptionsForGitStackedRebase = {
 			gitDir: dir,
-			getGitConfig: () => config,
+			[getGitConfig__internal]: () => config,
 		} as const;
 
 		await gitStackedRebase(branch, {
 			...common,
-			editor: ({ filePath }) => {
+			[editor__internal]: ({ filePath }) => {
 				const commitSHA: string = commitOidsInLatestStacked[7].tostrS();
 				humanOpRemoveLineOfCommit({ filePath, commitSHA });
 			},
@@ -67,14 +68,14 @@ export async function parseNewGoodCommandsSpec() {
 		const { initialBranch, commitOidsInLatestStacked, dir, config } = await setupRepoWithStackedBranches();
 		const branch = initialBranch.shorthand();
 
-		const common = {
+		const common: SomeOptionsForGitStackedRebase = {
 			gitDir: dir,
-			getGitConfig: () => config,
-		} as const;
+			[getGitConfig__internal]: () => config,
+		};
 
 		await gitStackedRebase(branch, {
 			...common,
-			editor: ({ filePath }) => {
+			[editor__internal]: ({ filePath }) => {
 				const commitSHA: string = commitOidsInLatestStacked[7].tostrS();
 				humanOpChangeCommandOfNthCommitInto("drop", {
 					filePath,
