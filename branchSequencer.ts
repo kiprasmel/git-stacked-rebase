@@ -3,8 +3,6 @@ import assert from "assert";
 
 import Git from "nodegit";
 
-import { filenames } from "./filenames";
-
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { Termination } from "./util/error";
 
@@ -54,7 +52,6 @@ export type BranchSequencerArgs = BranchSequencerArgsBase & {
 	actionInsideEachCheckedOutBranch: ActionInsideEachCheckedOutBranch;
 	delayMsBetweenCheckouts?: number;
 	callbackAfterDone?: CallbackAfterDone;
-	rewrittenListFile?: typeof filenames.rewrittenList | typeof filenames.rewrittenListApplied;
 };
 
 export type BranchSequencerBase = (args: BranchSequencerArgsBase) => Promise<void>;
@@ -70,18 +67,13 @@ export const branchSequencer: BranchSequencer = async ({
 	// callbackBeforeBegin,
 	actionInsideEachCheckedOutBranch,
 	callbackAfterDone = (): void => {},
-	rewrittenListFile = filenames.rewrittenList,
 	gitCmd,
 }) => {
 	if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) {
 		throw new Termination(`\n\nno stacked-rebase in progress? (nothing to ${rootLevelCommandName})\n\n`);
 	}
 
-	const stackedRebaseCommandsNew: GoodCommand[] = parseNewGoodCommands(
-		repo,
-		pathToStackedRebaseTodoFile,
-		rewrittenListFile
-	);
+	const stackedRebaseCommandsNew: GoodCommand[] = parseNewGoodCommands(repo, pathToStackedRebaseTodoFile);
 
 	// const remotes: Git.Remote[] = await repo.getRemotes();
 	// const remote: Git.Remote | undefined = remotes.find((r) =>
