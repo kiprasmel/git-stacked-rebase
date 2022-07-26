@@ -4,22 +4,21 @@
 
 import fs from "fs";
 
-import { setupRepoWithStackedBranches } from "./setupRepo";
+import { setupRepo } from "./setupRepo";
 
 import { defaultGitCmd } from "../options";
 import { gitStackedRebase } from "../git-stacked-rebase";
 import { humanOpChangeCommandOfNthCommitInto } from "../humanOp";
-import { editor__internal, getGitConfig__internal } from "../internal";
+import { editor__internal } from "../internal";
 
-export async function testCase() {
+export async function testCase(): Promise<void> {
 	const {
 		initialBranch, //
-		dir,
-		config,
-		commitOidsInLatestStacked,
+		common,
+		commitsInLatest,
 		read,
 		execSyncInRepo,
-	} = await setupRepoWithStackedBranches();
+	} = await setupRepo();
 
 	/**
 	 *
@@ -29,13 +28,13 @@ export async function testCase() {
 
 	const nthCommit2ndRebase = 5;
 
-	await gitStackedRebase(initialBranch.shorthand(), {
-		gitDir: dir,
-		[getGitConfig__internal]: () => config,
+	await gitStackedRebase(initialBranch, {
+		...common,
 		[editor__internal]: async ({ filePath }) => {
-			const SHA = commitOidsInLatestStacked[nthCommit2ndRebase].tostrS();
-
-			humanOpChangeCommandOfNthCommitInto("edit", { filePath, commitSHA: SHA });
+			humanOpChangeCommandOfNthCommitInto("edit", {
+				filePath, //
+				commitSHA: commitsInLatest[nthCommit2ndRebase],
+			});
 		},
 	});
 	/**
@@ -70,9 +69,8 @@ export async function testCase() {
 	console.log("attempting early 3rd rebase to --apply");
 	read();
 
-	await gitStackedRebase(initialBranch.shorthand(), {
-		gitDir: dir,
-		[getGitConfig__internal]: () => config,
+	await gitStackedRebase(initialBranch, {
+		...common,
 		apply: true,
 	});
 }

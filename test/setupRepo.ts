@@ -1,26 +1,27 @@
 /* eslint-disable @typescript-eslint/camelcase */
 
 import fs from "fs";
-import path from "path";
 import assert from "assert";
 
 import Git from "nodegit";
 
 import { gitStackedRebase } from "../git-stacked-rebase";
-import { defaultGitCmd } from "../options";
+import { defaultGitCmd, SomeOptionsForGitStackedRebase } from "../options";
 import { configKeys } from "../config";
 import { humanOpAppendLineAfterNthCommit } from "../humanOp";
 
 import { createExecSyncInRepo } from "../util/execSyncInRepo";
 import { editor__internal, getGitConfig__internal } from "../internal";
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+import { createTmpdir } from "./util/tmpdir";
 
 type Opts = {
 	blockWithRead?: boolean;
 	commitCount?: number;
-} & SetupRepoOpts;
-export async function setupRepoWithStackedBranches({
+} & Omit<SetupRepoOpts, "bare">;
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export async function setupRepo({
 	blockWithRead = false, //
 	commitCount = 12,
 	...rest
@@ -31,12 +32,23 @@ export async function setupRepoWithStackedBranches({
 		sig,
 		dir,
 		execSyncInRepo,
-	} = await setupRepo(rest);
+		common,
+	} = await setupRepoBase({ ...rest, bare: 0 });
+
+	const inicialCommitId = "Initial commit (from setupRepo)";
+	const initialCommit: Git.Oid = await fs.promises
+		.writeFile(inicialCommitId, inicialCommitId) //
+		.then(() => repo.createCommitOnHead([inicialCommitId], sig, sig, inicialCommitId));
+
+	console.log("initial commit %s", initialCommit.tostrS());
 
 	const commitOidsInInitial: Git.Oid[] = [];
-	const initialBranch: Git.Reference = await appendCommitsTo(commitOidsInInitial, 3, repo, sig);
+	const initialBranchRef: Git.Reference = await appendCommitsTo(commitOidsInInitial, 3, repo, sig);
 
-	const latestStackedBranch: Git.Reference = await Git.Branch.create(
+	const initialBranch: string = initialBranchRef.shorthand();
+	const commitsInInitial: string[] = commitOidsInInitial.map((oid) => oid.tostrS());
+
+	const latestStackedBranchRef: Git.Reference = await Git.Branch.create(
 		repo,
 		"stack-latest",
 		await repo.getHeadCommit(),
@@ -44,7 +56,7 @@ export async function setupRepoWithStackedBranches({
 	);
 
 	// await repo.checkoutBranch(latestStackedBranch);
-	execSyncInRepo(`${defaultGitCmd} checkout -b ${latestStackedBranch.name()}`);
+	execSyncInRepo(`${defaultGitCmd} checkout -b ${latestStackedBranchRef.name()}`);
 
 	const read = (): void => (blockWithRead ? void execSyncInRepo("read") : void 0);
 
@@ -53,6 +65,8 @@ export async function setupRepoWithStackedBranches({
 	const commitOidsInLatestStacked: Git.Oid[] = [];
 	await appendCommitsTo(commitOidsInLatestStacked, commitCount, repo, sig);
 
+	const commitsInLatest: string[] = commitOidsInLatestStacked.map((oid) => oid.tostrS());
+
 	const newPartialBranches = [
 		["partial-1", 4],
 		["partial-2", 6],
@@ -60,9 +74,8 @@ export async function setupRepoWithStackedBranches({
 	] as const;
 
 	console.log("launching 0th rebase to create partial branches");
-	await gitStackedRebase(initialBranch.shorthand(), {
-		gitDir: dir,
-		[getGitConfig__internal]: () => config,
+	await gitStackedRebase(initialBranch, {
+		...common,
 		[editor__internal]: ({ filePath }) => {
 			console.log("filePath %s", filePath);
 
@@ -94,36 +107,43 @@ export async function setupRepoWithStackedBranches({
 		config,
 		sig,
 		dir,
+		common,
 
-		commitOidsInInitial,
+		initialBranchRef,
 		initialBranch,
-		latestStackedBranch,
+		commitOidsInInitial,
+		commitsInInitial,
+
+		latestStackedBranchRef,
+		commitOidsInLatestStacked,
+		commitsInLatest,
+
+		newPartialBranches,
+
 		execSyncInRepo,
 		read,
-		commitOidsInLatestStacked,
-		newPartialBranches,
 	} as const;
 }
 
-type SetupRepoOpts = {
-	tmpdir?: boolean;
+export type InitRepoCtx = {
+	Git: typeof Git;
+	dir: string;
+	bare: number;
 };
-export async function setupRepo({
-	tmpdir = true, //
-}: SetupRepoOpts = {}) {
-	const dir: string = createTmpdir(tmpdir);
 
-	const foldersToDeletePath: string = path.join(__dirname, "folders-to-delete");
-	if (!fs.existsSync(foldersToDeletePath)) {
-		fs.writeFileSync(foldersToDeletePath, "");
-	}
-	const deletables = fs.readFileSync(foldersToDeletePath, { encoding: "utf-8" }).split("\n");
-	for (const d of deletables) {
-		if (fs.existsSync(d)) {
-			fs.rmdirSync(d, { recursive: true });
-		}
-	}
-	fs.appendFileSync(foldersToDeletePath, dir + "\n", { encoding: "utf-8" });
+export type SetupRepoOpts = {
+	tmpdir?: boolean;
+	bare?: number;
+	initRepo?: (ctx: InitRepoCtx) => Promise<Git.Repository>;
+};
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export async function setupRepoBase({
+	tmpdir = true, //
+	bare = 0,
+	initRepo = (ctx) => ctx.Git.Repository.init(ctx.dir, ctx.bare),
+}: SetupRepoOpts = {}) {
+	const dir: string = createTmpdir(tmpdir, !!bare);
 
 	/**
 	 * TODO make concurrent-safe (lol)
@@ -131,8 +151,7 @@ export async function setupRepo({
 	process.chdir(dir);
 	console.log("chdir to tmpdir %s", dir);
 
-	const isBare = 0;
-	const repo: Git.Repository = await Git.Repository.init(dir, isBare);
+	const repo: Git.Repository = await initRepo({ Git, dir, bare });
 
 	const config: Git.Config = await repo.config();
 
@@ -155,39 +174,29 @@ export async function setupRepo({
 	const sig: Git.Signature = await Git.Signature.default(repo);
 	console.log("sig %s", sig);
 
-	const inicialCommitId = "Initial commit (from setupRepo)";
-	const initialCommit: Git.Oid = await fs.promises
-		.writeFile(inicialCommitId, inicialCommitId) //
-		.then(() => repo.createCommitOnHead([inicialCommitId], sig, sig, inicialCommitId));
-
-	console.log("initial commit %s", initialCommit.tostrS());
-
 	const execSyncInRepo = createExecSyncInRepo(repo);
+
+	/**
+	 * common options to GitStackedRebase,
+	 * esp. for running tests
+	 * (consumes the provided config, etc)
+	 */
+	const common: SomeOptionsForGitStackedRebase = {
+		gitDir: dir,
+		[getGitConfig__internal]: () => config,
+	} as const;
 
 	return {
 		dir,
 		repo,
 		config,
 		sig,
-		initialCommit,
 		execSyncInRepo,
+		common,
 	} as const;
 }
 
-function createTmpdir(random: boolean = true): string {
-	if (random) {
-		return fs.mkdtempSync(path.join(__dirname, ".tmp-"), { encoding: "utf-8" });
-	}
-
-	const dir = path.join(__dirname, ".tmp");
-	if (fs.existsSync(dir)) {
-		fs.rmdirSync(dir, { recursive: true });
-	}
-	fs.mkdirSync(dir);
-	return dir;
-}
-
-async function appendCommitsTo(
+export async function appendCommitsTo(
 	alreadyExistingCommits: Git.Oid[],
 	n: number,
 	repo: Git.Repository, //
