@@ -6,7 +6,8 @@ import fs from "fs";
 
 import { setupRepoWithStackedBranches } from "./setupRepo";
 
-import { gitStackedRebase, defaultGitCmd } from "../git-stacked-rebase";
+import { defaultGitCmd } from "../options";
+import { gitStackedRebase } from "../git-stacked-rebase";
 import { humanOpChangeCommandOfNthCommitInto } from "../humanOp";
 import { editor__internal, getGitConfig__internal } from "../internal";
 

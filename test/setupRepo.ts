@@ -6,8 +6,9 @@ import assert from "assert";
 
 import Git from "nodegit";
 
-import { defaultGitCmd, gitStackedRebase } from "../git-stacked-rebase";
-import { configKeys } from "../configKeys";
+import { gitStackedRebase } from "../git-stacked-rebase";
+import { defaultGitCmd } from "../options";
+import { configKeys } from "../config";
 import { humanOpAppendLineAfterNthCommit } from "../humanOp";
 
 import { createExecSyncInRepo } from "../util/execSyncInRepo";

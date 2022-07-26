@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/camelcase */
 
-import { gitStackedRebase, SomeOptionsForGitStackedRebase } from "../git-stacked-rebase";
+import { gitStackedRebase } from "../git-stacked-rebase";
+import { SomeOptionsForGitStackedRebase } from "../options";
 import {
 	humanOpAppendLineAfterNthCommit, //
 	humanOpRemoveLineOfCommit,

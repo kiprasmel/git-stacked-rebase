@@ -15,12 +15,18 @@ import { bullets } from "nice-comment";
 import { setupPostRewriteHookFor } from "./git-reconcile-rewritten-list/postRewriteHook";
 
 import { filenames } from "./filenames";
-import { configKeys } from "./configKeys";
+import { configKeys, loadGitConfig } from "./config";
+import {
+	getDefaultOptions, //
+	ParsedOptionsForGitStackedRebase,
+	parseOptions,
+	SomeOptionsForGitStackedRebase,
+} from "./options";
 import { apply, applyIfNeedsToApply, markThatNeedsToApply as _markThatNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequencer";
 import { autosquash } from "./autosquash";
-import { InternalOnlyOptions, editor__internal, EitherEditor, getGitConfig__internal } from "./internal";
+import { editor__internal, EitherEditor } from "./internal";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -41,112 +47,17 @@ import {
 	StackedRebaseCommandAlias,
 } from "./parse-todo-of-stacked-rebase/validator";
 
-// console.log = () => {};
+export * from "./options";
 
-export type OptionsForGitStackedRebase = {
-	gitDir: string;
-
-	/**
-	 * editor name, or a function that opens the file inside some editor.
-	 */
-	editor: string;
-
-	/**
-	 * for executing raw git commands
-	 * that aren't natively supported by `nodegit` (libgit2)
-	 */
-	gitCmd: string;
-
-	viewTodoOnly: boolean;
-	apply: boolean;
-	continue: boolean;
-	push: boolean;
-	forcePush: boolean;
-
-	branchSequencer: boolean;
-	branchSequencerExec: string | false;
-} & InternalOnlyOptions;
-
-export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
-
-export const defaultEditor = "vi" as const;
-export const defaultGitCmd = "/usr/bin/env git" as const;
-
-export const getDefaultOptions = (): OptionsForGitStackedRebase => ({
-	gitDir: ".", //
-	// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-	editor: process.env.EDITOR ?? defaultEditor,
-	gitCmd: process.env.GIT_CMD ?? defaultGitCmd,
-	viewTodoOnly: false,
-	apply: false,
-	continue: false,
-	push: false,
-	forcePush: false,
-	branchSequencer: false,
-	branchSequencerExec: false,
-});
-
-function areOptionsIncompetible(
-	options: OptionsForGitStackedRebase, //
-	reasons: string[] = []
-): boolean {
-	if (options.viewTodoOnly) {
-		if (options.apply) reasons.push("--apply cannot be used together with --view-todo");
-		if (options.continue) reasons.push("--continue cannot be used together with --view-todo");
-		if (options.push) reasons.push("--push cannot be used together with --view-todo");
-		if (options.forcePush) reasons.push("--push --force cannot be used together with --view-todo");
-		if (options.branchSequencer) reasons.push("--branch-sequencer cannot be used together with --view-todo");
-		if (options.branchSequencerExec)
-			reasons.push("--branch-sequencer --exec cannot be used together with --view-todo");
-	}
-
-	/**
-	 * TODO HANDLE ALL CASES
-	 */
-
-	return reasons.length > 0;
-}
-
-export const gitStackedRebase = async (
+export async function gitStackedRebase(
 	nameOfInitialBranch: string,
 	specifiedOptions: SomeOptionsForGitStackedRebase = {}
-): Promise<void> => {
+): Promise<void> {
 	try {
-		const options: OptionsForGitStackedRebase = {
-			...getDefaultOptions(), //
-			...removeUndefinedProperties(specifiedOptions),
-		};
-		console.log({ options });
+		const repo: Git.Repository = await Git.Repository.open(specifiedOptions.gitDir || getDefaultOptions().gitDir);
+		const config: Git.Config = await loadGitConfig(repo, specifiedOptions);
 
-		const reasonsWhatWhyIncompatible: string[] = [];
-
-		if (areOptionsIncompetible(options, reasonsWhatWhyIncompatible)) {
-			throw new Termination(
-				"\n" +
-					bullets(
-						"error - incompatible options:", //
-						reasonsWhatWhyIncompatible,
-						"  "
-					) +
-					"\n\n"
-			);
-		}
-
-		const repo = await Git.Repository.open(options.gitDir);
-		const config: Git.Config =
-			getGitConfig__internal in options
-				? await options[getGitConfig__internal]!({ GitConfig: Git.Config, repo })
-				: await Git.Config.openDefault();
-
-		const configValues = {
-			gpgSign: !!(await config.getBool(configKeys.gpgSign).catch(() => 0)),
-			autoApplyIfNeeded: !!(await config.getBool(configKeys.autoApplyIfNeeded).catch(() => 0)),
-			autoSquash: !!(await config.getBool(configKeys.autoSquash).catch(() => 0)),
-		} as const;
-
-		console.log({ configValues });
-
-		// if (process.env.QUIT) return;
+		const options: ParsedOptionsForGitStackedRebase = await parseOptions(specifiedOptions, config);
 
 		const execSyncInRepo = createExecSyncInRepo(repo);
 
@@ -250,7 +161,7 @@ export const gitStackedRebase = async (
 				pathToStackedRebaseDirInsideDotGit, //
 				rootLevelCommandName: "--apply (automatically after --continue)",
 				gitCmd: options.gitCmd,
-				autoApplyIfNeeded: configValues.autoApplyIfNeeded,
+				autoApplyIfNeeded: options.autoApplyIfNeeded,
 				config,
 				initialBranch,
 				currentBranch,
@@ -265,7 +176,7 @@ export const gitStackedRebase = async (
 			pathToStackedRebaseDirInsideDotGit, //
 			rootLevelCommandName: "--apply",
 			gitCmd: options.gitCmd,
-			autoApplyIfNeeded: configValues.autoApplyIfNeeded,
+			autoApplyIfNeeded: options.autoApplyIfNeeded,
 			config,
 			initialBranch,
 			currentBranch,
@@ -343,7 +254,7 @@ export const gitStackedRebase = async (
 			currentBranch,
 			// __default__pathToStackedRebaseTodoFile
 			pathToStackedRebaseTodoFile,
-			configValues.autoSquash
+			options.autoSquash
 			// () =>
 			// 	getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 			// 		gitCmd: options.gitCmd,
@@ -672,7 +583,7 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 				latestCommitOfOursThatInitialBranchAlreadyHas.tostrS(),
 				"--onto",
 				initialBranch.name(),
-				configValues.gpgSign ? "--gpg-sign" : "",
+				options.gpgSign ? "--gpg-sign" : "",
 			].join(" "),
 			{
 				env: {
@@ -775,7 +686,7 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 		 * optional is good, since we ask anyway
 		 * before proceeding w/ other commands way above.
 		 */
-		if (configValues.autoApplyIfNeeded) {
+		if (options.autoApplyIfNeeded) {
 			/**
 			 * since we're invoking `git rebase --continue` directly (above),
 			 * we do not have the control over it.
@@ -823,7 +734,7 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 					pathToStackedRebaseDirInsideDotGit, //
 					rootLevelCommandName: "--apply",
 					gitCmd: options.gitCmd,
-					autoApplyIfNeeded: configValues.autoApplyIfNeeded,
+					autoApplyIfNeeded: options.autoApplyIfNeeded,
 					config,
 					initialBranch,
 					currentBranch,
@@ -844,24 +755,10 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 	} catch (e) {
 		throw e; // TODO FIXME - no try/catch at all?
 	}
-};
+}
 
 function referenceToOid(ref: Git.Reference): Promise<Git.Oid> {
 	return ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
-}
-
-export function removeUndefinedProperties<T, K extends keyof Partial<T>>(
-	object: Partial<T> //
-): Partial<T> {
-	return (
-		Object.keys(object).forEach(
-			(k) =>
-				k in object && //
-				object[k as K] === undefined &&
-				delete object[k as K]
-		),
-		object
-	);
 }
 
 async function createInitialEditTodoOfGitStackedRebase(
@@ -1447,6 +1344,17 @@ git-stacked-rebase <branch> [-v|--view-todo|--view-only]
     3. after viewing/editing, will remove the .tmp directory.
 
 
+
+non-positional args:
+
+  --autosquash, --no-autosquash
+
+      handles "fixup!", "squash!" -prefixed commits
+      just like git-rebase's --autosquash does.
+
+      can be enabled by default with the rebase.autosquash option.
+
+
 git-stacked-rebase [...] --git-dir <path/to/git/dir/> [...]
 
     makes git-stacked-rebase begin operating inside the specified directory.
@@ -1458,6 +1366,7 @@ git-stacked-rebase [...] -h|--help    [...]
 
 git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 `.replace(/\t/g, " ".repeat(4));
+	process.argv.splice(0, 2);
 
 	if (process.argv.some((arg) => ["-h", "--help"].includes(arg))) {
 		process.stdout.write(helpMsg);
@@ -1469,7 +1378,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 		return;
 	}
 
-	process.argv.splice(0, 2);
+	const isAutoSquash: boolean | undefined = eatOverwrittableArg("autosquash", process.argv);
 
 	const peakNextArg = (): string | undefined => process.argv[0];
 	const eatNextArg = (): string | undefined => process.argv.shift();
@@ -1613,6 +1522,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 
 	const options: SomeOptionsForGitStackedRebase = {
 		gitDir,
+		autoSquash: isAutoSquash,
 		viewTodoOnly: isViewTodoOnly,
 		apply: isApply,
 		continue: isContinue,
@@ -1624,6 +1534,31 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 
 	// await
 	return gitStackedRebase(nameOfInitialBranch, options); //
+}
+
+/**
+ * mutates `argv` - removes the
+ * --{dashlessArgName}
+ * --no-{dashlessArgName}
+ * args.
+ *
+ * @returns {boolean|undefined} which arg prevailed (yes or no).
+ * last arg is the deciding one.
+ * if 0 args matched, returns undefined
+ *
+ */
+export function eatOverwrittableArg(dashlessArgName: string, argv: string[]): boolean | undefined {
+	const yesArgName = `--${dashlessArgName}`;
+	const noArgName = `--no-${dashlessArgName}`;
+	const yesNoArgs = [yesArgName, noArgName];
+
+	const matchedArgs = argv.filter((arg) => yesNoArgs.includes(arg));
+
+	if (!matchedArgs.length) {
+		return undefined;
+	}
+
+	return matchedArgs[matchedArgs.length - 1] === yesArgName;
 }
 
 if (!module.parent) {

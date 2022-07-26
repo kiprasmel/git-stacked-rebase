@@ -8,7 +8,7 @@ import { createQuestion } from "./util/createQuestion";
 import { isDirEmptySync } from "./util/fs";
 
 import { filenames } from "./filenames";
-import { configKeys } from "./configKeys";
+import { configKeys } from "./config";
 // eslint-disable-next-line import/no-cycle
 import {
 	BranchSequencerBase, //
