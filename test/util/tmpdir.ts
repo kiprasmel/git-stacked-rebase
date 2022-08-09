@@ -1,10 +1,23 @@
 import fs from "fs";
 import path from "path";
 
-export function createTmpdir(random: boolean = true, bare: boolean = false): string {
+export type CreateTmpdirOpts = {
+	random?: boolean;
+	bare?: number;
+	infoPrefix?: string;
+};
+
+export function createTmpdir({
+	random = true, //
+	bare = 0,
+	infoPrefix = "",
+}: CreateTmpdirOpts = {}): string {
 	let dir: string;
 
-	const prefix: string = !bare ? ".tmp-" : ".tmp-bare-";
+	const prefix: string =
+		".tmp-" + //
+		(bare ? "bare-" : "") +
+		(infoPrefix.trim() ? infoPrefix + "-" : "");
 
 	if (random) {
 		dir = fs.mkdtempSync(path.join(__dirname, prefix), { encoding: "utf-8" });

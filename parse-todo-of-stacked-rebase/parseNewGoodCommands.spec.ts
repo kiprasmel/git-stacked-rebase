@@ -8,7 +8,7 @@ import {
 } from "../humanOp";
 import { editor__internal } from "../internal";
 
-import { setupRepo } from "../test/setupRepo";
+import { setupRepo } from "../test/util/setupRepo";
 
 export async function parseNewGoodCommandsSpec(): Promise<void> {
 	await succeeds_to_apply_after_break_or_exec();

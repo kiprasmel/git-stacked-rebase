@@ -4,7 +4,7 @@
 
 import fs from "fs";
 
-import { setupRepo } from "./setupRepo";
+import { setupRepo } from "./util/setupRepo";
 
 import { defaultGitCmd } from "../options";
 import { gitStackedRebase } from "../git-stacked-rebase";

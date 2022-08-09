@@ -47,6 +47,16 @@
 			"env": {
 				"DEBUG": "gsr:*"
 			}
+		},
+		{
+			"name": "ts-node active file",
+			"type": "node",
+			"request": "launch",
+			"args": ["${relativeFile}"],
+			"runtimeArgs": ["-r", "ts-node/register"],
+			"cwd": "${workspaceRoot}",
+			"protocol": "inspector",
+			"internalConsoleOptions": "openOnSessionStart"
 		}
 	]
 }
