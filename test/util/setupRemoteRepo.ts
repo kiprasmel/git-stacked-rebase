@@ -12,57 +12,48 @@ export async function setupRemoteRepo() {
 		baseRepoInLocalBob,
 	} = await setupRemoteRepoBase();
 
+	const RemoteBareServer = await Promise.resolve(baseRepoInRemote);
+
+	const RemoteAlice = await Promise.resolve(baseRepoInLocalAlice).then((owner) =>
+		/**
+		 * setup stacked branches
+		 */
+		setupRepo({
+			initRepoBase: () => baseRepoInLocalAlice,
+		}).then((repoMeta) => ({
+			...owner,
+			repoMeta,
+		}))
+	);
+
+	const LocalBob = await Promise.resolve(baseRepoInLocalBob)
+		.then((owner) => (Git.Remote.addFetch(owner.repo, "origin", "+refs/remotes/origin/*:refs/heads/*"), owner))
+		.then((owner) => ({
+			...owner,
+			/**
+			 * TODO NATIVE?
+			 */
+			async fetch(remote = "origin"): Promise<void> {
+				return await owner.repo.fetch(remote);
+			},
+		}));
+
+	console.log({ RemoteBareServer, RemoteAlice, LocalBob });
+
+	RemoteAlice.push();
+	await LocalBob.fetch();
+
 	/**
-	 * setup stacked branches
+	 * need to checkout the initial branch first,
+	 * so that repo is in valid state,
+	 * instead of at 0-commit master.
 	 */
-	const localRepoAlice = await setupRepo({
-		initRepoBase: async () => baseRepoInLocalAlice,
-	});
-
-	// TODO
-	const originAlice: Git.Remote = await localRepoAlice.repo.getRemote("origin");
-	console.log({ originAlice });
-
-	// TODO proper type - returns promise
-	const rsp = originAlice.getRefspec(0);
-	console.log({ rsp: rsp.string() });
-
-	const refspecs = localRepoAlice.branches.map((b) => "+" + b.name() + ":refs/remotes/origin/" + b.shorthand());
-	console.log({ refspecs });
-
-	// await originAlice.upload("+refs/heads/*:refs/remotes/origin/*");
-	// await originAlice.push(["+refs/heads/*:refs/remotes/origin/*"]);
-	await originAlice.push(refspecs);
-
-	const originBob: Git.Remote = await baseRepoInLocalBob.repo.getRemote("origin");
-	const refSpecsInBobPush = await originBob.getPushRefspecs();
-	const refSpecsInBobFetch = await originBob.getFetchRefspecs();
-	console.log({ refSpecsInBobFetch, refSpecsInBobPush });
-
-	const branchesInLocalBobBefore: Git.Reference[] = await Git.Reference.list(baseRepoInLocalBob.repo);
-	console.log({ branchesInLocalBobBefore: branchesInLocalBobBefore.map((ref) => ref.name()) });
-
-	await Git.Remote.addFetch(baseRepoInLocalBob.repo, "origin", "+refs/remotes/origin/*:refs/heads/*");
-	// await Git.Remote.addFetch(baseRepoInLocalBob.repo, "origin", "refs/heads/*:+refs/remotes/origin/*");
-	await baseRepoInLocalBob.repo.fetch("origin");
-
-	const branchesInLocalBobAfter: Git.Reference[] = await Git.Reference.list(baseRepoInLocalBob.repo);
-	// const it = await (Git.Branch as any).list(baseRepoInLocalBob.repo, Git.Branch.BRANCH.ALL);
-	console.log({
-		branchesInLocalBobAfter,
-		// branchesInLocalBobAfter: branchesInLocalBobAfter.map((ref) =>
-		// 	!ref.isBranch() ? "<not-a-branch>" : ref.isRemote() ? "<remote>" : ref.name()
-		// ),
-	});
-
-	// refSpecsInBobPush = await originBob.getPushRefspecs();
-	// refSpecsInBobFetch = await originBob.getFetchRefspecs();
-	// console.log({ refSpecsInBobFetch, refSpecsInBobPush });
+	LocalBob.execSyncInRepo(`git checkout ${RemoteAlice.repoMeta.initialBranch}`);
 
 	return {
-		baseRepoInRemote,
-		localRepoAlice,
-		baseRepoInLocalBob,
+		RemoteBareServer,
+		RemoteAlice,
+		LocalBob,
 	};
 }
 

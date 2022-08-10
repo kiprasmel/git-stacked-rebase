@@ -11,8 +11,10 @@ import { defaultGitCmd, SomeOptionsForGitStackedRebase } from "../../options";
 import { configKeys } from "../../config";
 import { humanOpAppendLineAfterNthCommit } from "../../humanOp";
 import { editor__internal, getGitConfig__internal } from "../../internal";
+import { getBranches, nativeGetBranchNames, nativePush } from "../../native-git/branch";
 
 import { createExecSyncInRepo } from "../../util/execSyncInRepo";
+import { UnpromiseFn } from "../../util/Unpromise";
 
 import { createTmpdir, CreateTmpdirOpts } from "./tmpdir";
 
@@ -23,7 +25,7 @@ type Opts = {
 	/**
 	 *
 	 */
-	initRepoBase?: typeof setupRepoBase;
+	initRepoBase?: typeof setupRepoBase | UnpromiseFn<typeof setupRepoBase>;
 } & Omit<SetupRepoOpts, "bare">;
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -100,14 +102,14 @@ export async function setupRepo({
 
 	// console.log("looking up branches to make sure they were created successfully");
 	read();
-	const branches: Git.Reference[] = [];
+	const partialBranches: Git.Reference[] = [];
 	for (const [newPartial] of newPartialBranches) {
 		/**
 		 * will throw if branch does not exist
 		 * TODO "properly" expect to not throw
 		 */
 		const branch = await Git.Branch.lookup(repo, newPartial, Git.Branch.BRANCH.LOCAL);
-		branches.push(branch);
+		partialBranches.push(branch);
 	}
 
 	return {
@@ -126,7 +128,7 @@ export async function setupRepo({
 		commitOidsInLatestStacked,
 		commitsInLatest,
 
-		branches,
+		partialBranches,
 		newPartialBranches,
 
 		execSyncInRepo,
@@ -190,6 +192,8 @@ export async function setupRepoBase({
 		[getGitConfig__internal]: () => config,
 	} as const;
 
+	const getBranchNames = nativeGetBranchNames(repo.workdir());
+
 	return {
 		dir,
 		repo,
@@ -197,6 +201,10 @@ export async function setupRepoBase({
 		sig,
 		execSyncInRepo,
 		common,
+		//
+		getBranchNames,
+		getBranches: getBranches(repo),
+		push: nativePush(repo.workdir()),
 	} as const;
 }
 

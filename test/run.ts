@@ -2,8 +2,9 @@
 
 import { testCase } from "./experiment.spec";
 import reducePathTC from "../git-reconcile-rewritten-list/reducePath.spec";
-
 import { parseNewGoodCommandsSpec } from "../parse-todo-of-stacked-rebase/parseNewGoodCommands.spec";
+import autoCheckoutRemotePartialBranchesTC from "./auto-checkout-remote-partial-branches.spec";
+
 import { sequentialResolve } from "../util/sequentialResolve";
 import { cleanupTmpRepos } from "./util/tmpdir";
 
@@ -14,6 +15,7 @@ function main() {
 		testCase, //
 		async () => reducePathTC(),
 		parseNewGoodCommandsSpec,
+		autoCheckoutRemotePartialBranchesTC,
 	])
 		.then(cleanupTmpRepos)
 		.then(() => process.stdout.write("\nsuccess\n\n"))
