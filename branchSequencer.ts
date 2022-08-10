@@ -288,47 +288,7 @@ export const branchSequencer: BranchSequencer = async ({
 		 *
 		 * thus, we checkout the branch locally if it's not.
 		 */
-		// if (!Git.Branch.lookup(repo, targetBranch, Git.Branch.BRANCH.LOCAL)) {
-		// 	execSyncInRepo();
-		// }
 		if (boundary.branchEndFullName.some((x) => x.startsWith("refs/remotes/"))) {
-			/**
-			 * TODO - probably should handle this "checkout remote branch locally" logic
-			 * in a better place than here,
-			 *
-			 * especially since this is quite fragile,
-			 * e.g. if multiple remotes exist & have the same branch..
-			 *
-			 * here's a hint that git gives in this situation (& exits w/ 1 so good that errors)
-			 *
-			 * ```
-			 * hint: If you meant to check out a remote tracking branch on, e.g. 'origin',
-			 * hint: you can do so by fully qualifying the name with the --track option:
-			 * hint:
-			 * hint:     git checkout --track origin/<name>
-			 * hint:
-			 * hint: If you'd like to always have checkouts of an ambiguous <name> prefer
-			 * hint: one remote, e.g. the 'origin' remote, consider setting
-			 * hint: checkout.defaultRemote=origin in your config.
-			 * fatal: 'fork' matched multiple (2) remote tracking branches
-			 * ```
-			 *
-			 * seems like we should be checking all the branches somewhere early,
-			 * and either checking them out locally,
-			 * or if not possible because multiple remotes, then asking them
-			 * which remote to use (or individual, idk).
-			 *
-			 * tho, this might not always be necessary, so maybe not good
-			 * to ask for something that might not be needed?
-			 * or maybe it is always necessary, then yeah, should handle early.
-			 *
-			 * probably a good spot would be in the `branchSequencer`,
-			 * just not in an individual "checkout",
-			 * but rather - before any checkouts take place --
-			 * by doing the pre-checking logic if branches exists
-			 * before doing the checkouts.
-			 *
-			 */
 			boundary.branchEndFullName = boundary.branchEndFullName.map((x) => x.replace(/refs\/remotes\/[^/]+\//, ""));
 		}
 

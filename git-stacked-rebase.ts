@@ -802,6 +802,8 @@ async function createInitialEditTodoOfGitStackedRebase(
 		commitsWithBranchBoundaries = await autosquash(repo, commitsWithBranchBoundaries);
 	}
 
+	const branchesWhoNeedLocalCheckout: BranchWhoNeedsLocalCheckout[] = [];
+
 	const rebaseTodo = commitsWithBranchBoundaries
 		.map(({ commit, commitCommand, branchEnd }, i) => {
 			if (i === 0) {
@@ -830,7 +832,18 @@ async function createInitialEditTodoOfGitStackedRebase(
 			if (branchEnd?.length) {
 				return [
 					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
-					...branchEnd.map((x) => `branch-end ${x.name()}`), //
+					...branchEnd.map((branch) => {
+						const nameWithoutRefsRemotesOriginPrefix: string = branch.name().replace(removeRemoteRegex, "");
+
+						if (branch.isRemote() || branch.name().startsWith("refs/remotes/")) {
+							branchesWhoNeedLocalCheckout.push({
+								branch, //
+								nameWithoutRefsRemotesOriginPrefix,
+							});
+						}
+
+						return `branch-end ${nameWithoutRefsRemotesOriginPrefix}`;
+					}), //
 				];
 			}
 
@@ -843,7 +856,59 @@ async function createInitialEditTodoOfGitStackedRebase(
 
 	fs.writeFileSync(pathToRebaseTodoFile, rebaseTodo.join("\n"));
 
+	checkoutRemotePartialBranchesLocally(
+		repo, //
+		currentBranch,
+		branchesWhoNeedLocalCheckout
+	);
+
 	return;
+}
+
+type BranchWhoNeedsLocalCheckout = {
+	branch: Git.Reference;
+	nameWithoutRefsRemotesOriginPrefix: string; //
+};
+
+function checkoutRemotePartialBranchesLocally(
+	repo: Git.Repository, //
+	currentBranch: Git.Reference,
+	branchesWhoNeedLocalCheckout: BranchWhoNeedsLocalCheckout[]
+): void {
+	if (!branchesWhoNeedLocalCheckout.length) {
+		return;
+	}
+
+	console.log({ branchesWhoNeedLocalCheckout });
+
+	const execSyncInRepo = createExecSyncInRepo(repo);
+
+	/**
+	 * TODO handle if multiple remotes exist & have the same branch
+	 * in such a case, ask the user which remote to use
+	 * (by default for all branches, and/or allow customizing for each one? tho rare)
+	 *
+	 * here's a hint that git gives in this situation (& exits w/ 1 so good that errors)
+	 *
+	 * ```
+	 * hint: If you meant to check out a remote tracking branch on, e.g. 'origin',
+	 * hint: you can do so by fully qualifying the name with the --track option:
+	 * hint:
+	 * hint:     git checkout --track origin/<name>
+	 * hint:
+	 * hint: If you'd like to always have checkouts of an ambiguous <name> prefer
+	 * hint: one remote, e.g. the 'origin' remote, consider setting
+	 * hint: checkout.defaultRemote=origin in your config.
+	 * fatal: 'fork' matched multiple (2) remote tracking branches
+	 * ```
+	 *
+	 */
+	for (const { nameWithoutRefsRemotesOriginPrefix } of branchesWhoNeedLocalCheckout) {
+		execSyncInRepo(`git checkout ${nameWithoutRefsRemotesOriginPrefix}`);
+	}
+
+	/** go back */
+	execSyncInRepo(`git checkout ${currentBranch.shorthand()}`);
 }
 
 export async function getCommitHistory(
