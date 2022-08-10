@@ -2,6 +2,7 @@
 
 /* eslint-disable indent */
 /* eslint-disable @typescript-eslint/camelcase */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 import Git from "nodegit";
 import fs from "fs";
@@ -504,17 +505,36 @@ export async function gitStackedRebase(
 			 */
 		}
 
+		const branchesWhoNeedLocalCheckout: BranchWhoNeedsLocalCheckout[] = [];
+
 		for (const cmd of goodCommands) {
 			if (cmd.rebaseKind === "regular") {
 				regularRebaseTodoLines.push(cmd.fullLine);
 			} else if (cmd.rebaseKind === "stacked") {
 				if (cmd.commandName === "branch-end-new") {
 					await createBranchForCommand(cmd as any); // TODO TS
+				} else if (cmd.commandName === "branch-end-new-from-remote") {
+					const nameWithoutRefsRemotesOriginPrefix: string = cmd.targets![0];
+					const remote: string = cmd.targets![1];
+					const fullNameOfBranchWithRemote: string =
+						"refs/remotes/" + remote + "/" + nameWithoutRefsRemotesOriginPrefix;
+
+					branchesWhoNeedLocalCheckout.push({
+						nameWithoutRefsRemotesOriginPrefix,
+						remote,
+						fullNameOfBranchWithRemote,
+					});
 				}
 			} else {
 				assertNever(cmd);
 			}
 		}
+
+		checkoutRemotePartialBranchesLocally(
+			repo, //
+			currentBranch,
+			branchesWhoNeedLocalCheckout
+		);
 
 		setupPostRewriteHookFor("git-stacked-rebase", {
 			dotGitDirPathForInstallingTheHook: dotGitDirPath,
@@ -802,8 +822,6 @@ async function createInitialEditTodoOfGitStackedRebase(
 		commitsWithBranchBoundaries = await autosquash(repo, commitsWithBranchBoundaries);
 	}
 
-	const branchesWhoNeedLocalCheckout: BranchWhoNeedsLocalCheckout[] = [];
-
 	const rebaseTodo = commitsWithBranchBoundaries
 		.map(({ commit, commitCommand, branchEnd }, i) => {
 			if (i === 0) {
@@ -833,16 +851,48 @@ async function createInitialEditTodoOfGitStackedRebase(
 				return [
 					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
 					...branchEnd.map((branch) => {
-						const nameWithoutRefsRemotesOriginPrefix: string = branch.name().replace(removeRemoteRegex, "");
-
+						/**
+						 * TODO handle if multiple remotes exist & have the same branch
+						 * in such a case, ask the user which remote to use
+						 * (by default for all branches, and/or allow customizing for each one? tho rare)
+						 *
+						 * here's a hint that git gives in this situation (& exits w/ 1 so good that errors)
+						 *
+						 * ```
+						 * hint: If you meant to check out a remote tracking branch on, e.g. 'origin',
+						 * hint: you can do so by fully qualifying the name with the --track option:
+						 * hint:
+						 * hint:     git checkout --track origin/<name>
+						 * hint:
+						 * hint: If you'd like to always have checkouts of an ambiguous <name> prefer
+						 * hint: one remote, e.g. the 'origin' remote, consider setting
+						 * hint: checkout.defaultRemote=origin in your config.
+						 * fatal: 'fork' matched multiple (2) remote tracking branches
+						 * ```
+						 *
+						 *
+						 * OR, do not do anything, because the user can edit the remote
+						 * in the git-rebase-todo file when the editor opens.
+						 *
+						 * so maybe instead have some option for choosing the default remote,
+						 * but otherwise everything's fine already.
+						 *
+						 * probably can respect the `checkout.defaultRemote` config var
+						 * (see man git-checkout)
+						 *
+						 *
+						 */
 						if (branch.isRemote() || branch.name().startsWith("refs/remotes/")) {
-							branchesWhoNeedLocalCheckout.push({
-								branch, //
-								nameWithoutRefsRemotesOriginPrefix,
-							});
-						}
+							const nameWithoutRefsRemotesOriginPrefix: string = branch
+								.name()
+								.replace(removeRemoteRegex, "");
 
-						return `branch-end ${nameWithoutRefsRemotesOriginPrefix}`;
+							const remote: string = branch.name().match(removeRemoteRegex)![1];
+
+							return `branch-end-new-from-remote ${nameWithoutRefsRemotesOriginPrefix} ${remote}`;
+						} else {
+							return `branch-end ${branch.name()}`;
+						}
 					}), //
 				];
 			}
@@ -856,18 +906,13 @@ async function createInitialEditTodoOfGitStackedRebase(
 
 	fs.writeFileSync(pathToRebaseTodoFile, rebaseTodo.join("\n"));
 
-	checkoutRemotePartialBranchesLocally(
-		repo, //
-		currentBranch,
-		branchesWhoNeedLocalCheckout
-	);
-
 	return;
 }
 
 type BranchWhoNeedsLocalCheckout = {
-	branch: Git.Reference;
 	nameWithoutRefsRemotesOriginPrefix: string; //
+	remote: string;
+	fullNameOfBranchWithRemote: string;
 };
 
 function checkoutRemotePartialBranchesLocally(
@@ -883,28 +928,9 @@ function checkoutRemotePartialBranchesLocally(
 
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
-	/**
-	 * TODO handle if multiple remotes exist & have the same branch
-	 * in such a case, ask the user which remote to use
-	 * (by default for all branches, and/or allow customizing for each one? tho rare)
-	 *
-	 * here's a hint that git gives in this situation (& exits w/ 1 so good that errors)
-	 *
-	 * ```
-	 * hint: If you meant to check out a remote tracking branch on, e.g. 'origin',
-	 * hint: you can do so by fully qualifying the name with the --track option:
-	 * hint:
-	 * hint:     git checkout --track origin/<name>
-	 * hint:
-	 * hint: If you'd like to always have checkouts of an ambiguous <name> prefer
-	 * hint: one remote, e.g. the 'origin' remote, consider setting
-	 * hint: checkout.defaultRemote=origin in your config.
-	 * fatal: 'fork' matched multiple (2) remote tracking branches
-	 * ```
-	 *
-	 */
-	for (const { nameWithoutRefsRemotesOriginPrefix } of branchesWhoNeedLocalCheckout) {
-		execSyncInRepo(`git checkout ${nameWithoutRefsRemotesOriginPrefix}`);
+	for (const b of branchesWhoNeedLocalCheckout) {
+		const cmd = `git checkout -b ${b.nameWithoutRefsRemotesOriginPrefix} --track ${b.fullNameOfBranchWithRemote}`;
+		execSyncInRepo(cmd);
 	}
 
 	/** go back */
@@ -1242,7 +1268,7 @@ exit 1
 }
 
 const removeLocalRegex = /^refs\/heads\//;
-const removeRemoteRegex = /^refs\/remotes\/[^/]*\//;
+const removeRemoteRegex = /^refs\/remotes\/([^/]*)\//;
 noop(removeRemoteRegex);
 
 async function extendCommitsWithBranchEnds(

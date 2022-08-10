@@ -217,6 +217,22 @@ const branchValidator: Validator = ({ rest, reasonsIfBad: reasonsWhyInvalid }) =
 	return !(reasonsWhyInvalid.length - origLen);
 };
 
+const branchFromRemoteValidator: Validator = ({ rest, reasonsIfBad }) => {
+	const origLen = reasonsIfBad.length;
+
+	const spl = rest.split(" ");
+
+	if (spl.length !== 2) {
+		const reason = `expected a branch name _and_ a remote (2 spaceless args), got ${spl.length} args instead (${spl})`;
+		reasonsIfBad.push(reason);
+	}
+
+	const branch = spl[0];
+	branchValidator({ rest: branch, reasonsIfBad });
+
+	return !(reasonsIfBad.length - origLen);
+};
+
 /**
  * we'll never (?) have the `makesGitRebaseExitToPause` as `true` here
  * because these commands do not end up in the regular git rebase's todo file.
@@ -237,6 +253,19 @@ export const stackedRebaseCommands = {
 		maxUseCount: Infinity,
 		isRestValid: branchValidator,
 		parseTargets: ({ rest }) => [rest],
+	}),
+	"branch-end-new-from-remote": createCommand("branch-end-new-from-remote", {
+		makesGitRebaseExitToPause: false,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
+
+		maxUseCount: Infinity,
+		isRestValid: branchFromRemoteValidator,
+		parseTargets: ({ split }) => {
+			assert.deepStrictEqual(split.length, 3);
+
+			/** new branch name, remote */
+			return [split[1], split[2]];
+		},
 	}),
 	"branch-end-initial": createCommand("branch-end-initial", {
 		makesGitRebaseExitToPause: false,
