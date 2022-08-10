@@ -20,9 +20,9 @@ export async function setupRemoteRepo() {
 		 */
 		setupRepo({
 			initRepoBase: () => baseRepoInLocalAlice,
-		}).then((repoMeta) => ({
+		}).then((partials) => ({
+			...partials,
 			...owner,
-			repoMeta,
 		}))
 	);
 
@@ -48,7 +48,7 @@ export async function setupRemoteRepo() {
 	 * so that repo is in valid state,
 	 * instead of at 0-commit master.
 	 */
-	LocalBob.execSyncInRepo(`git checkout ${RemoteAlice.repoMeta.initialBranch}`);
+	LocalBob.execSyncInRepo(`git checkout ${RemoteAlice.initialBranch}`);
 
 	return {
 		RemoteBareServer,

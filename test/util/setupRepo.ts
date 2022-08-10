@@ -37,41 +37,45 @@ export async function setupRepo({
 }: Opts = {}) {
 	const ctx: SetupRepoOpts = { ...rest, bare: 0 };
 
-	const {
-		repo, //
-		config,
-		sig,
-		dir,
-		execSyncInRepo,
-		common,
-	} = await (initRepoBase?.(ctx) ?? setupRepoBase(ctx));
+	const base = await (initRepoBase?.(ctx) ?? setupRepoBase(ctx));
 
 	const initialCommitId = "Initial-commit-from-setupRepo";
-	const initialCommitFilePath = path.join(dir, initialCommitId);
+	const initialCommitFilePath = path.join(base.dir, initialCommitId);
 	const relFilepaths = [initialCommitId];
 
 	fs.writeFileSync(initialCommitFilePath, initialCommitId);
-	const initialCommit: Git.Oid = await repo.createCommitOnHead(relFilepaths, sig, sig, initialCommitId);
+	const initialCommit: Git.Oid = await base.repo.createCommitOnHead(
+		relFilepaths, //
+		base.sig,
+		base.sig,
+		initialCommitId
+	);
 
 	console.log("initial commit %s", initialCommit.tostrS());
 
 	const commitOidsInInitial: Git.Oid[] = [];
-	const initialBranchRef: Git.Reference = await appendCommitsTo(commitOidsInInitial, 3, repo, sig, dir);
+	const initialBranchRef: Git.Reference = await appendCommitsTo(
+		commitOidsInInitial, //
+		3,
+		base.repo,
+		base.sig,
+		base.dir
+	);
 
 	const initialBranch: string = initialBranchRef.shorthand();
 	const commitsInInitial: string[] = commitOidsInInitial.map((oid) => oid.tostrS());
 
 	const latestStackedBranchName = "stack-latest";
-	const headCommit: Git.Commit = await repo.getHeadCommit();
+	const headCommit: Git.Commit = await base.repo.getHeadCommit();
 	const createBranchCmd = `${defaultGitCmd} checkout -b ${latestStackedBranchName} ${headCommit}`;
-	execSyncInRepo(createBranchCmd);
+	base.execSyncInRepo(createBranchCmd);
 
-	const read = (): void => (blockWithRead ? void execSyncInRepo("read") : void 0);
+	const read = (): void => (blockWithRead ? void base.execSyncInRepo("read") : void 0);
 
 	read();
 
 	const commitOidsInLatestStacked: Git.Oid[] = [];
-	await appendCommitsTo(commitOidsInLatestStacked, commitCount, repo, sig, dir);
+	await appendCommitsTo(commitOidsInLatestStacked, commitCount, base.repo, base.sig, base.dir);
 
 	const commitsInLatest: string[] = commitOidsInLatestStacked.map((oid) => oid.tostrS());
 
@@ -83,7 +87,7 @@ export async function setupRepo({
 
 	console.log("launching 0th rebase to create partial branches");
 	await gitStackedRebase(initialBranch, {
-		...common,
+		...base.common,
 		[editor__internal]: ({ filePath }) => {
 			console.log("filePath %s", filePath);
 
@@ -108,16 +112,13 @@ export async function setupRepo({
 		 * will throw if branch does not exist
 		 * TODO "properly" expect to not throw
 		 */
-		const branch = await Git.Branch.lookup(repo, newPartial, Git.Branch.BRANCH.LOCAL);
+		const branch = await Git.Branch.lookup(base.repo, newPartial, Git.Branch.BRANCH.LOCAL);
 		partialBranches.push(branch);
 	}
 
 	return {
-		repo,
-		config,
-		sig,
-		dir,
-		common,
+		...base,
+		read, // TODO move to base
 
 		initialBranchRef,
 		initialBranch,
@@ -130,9 +131,6 @@ export async function setupRepo({
 
 		partialBranches,
 		newPartialBranches,
-
-		execSyncInRepo,
-		read,
 	} as const;
 }
 

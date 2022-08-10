@@ -21,9 +21,9 @@ async function auto_checks_out_remote_partial_branches() {
 	/**
 	 * switch to latest branch to perform stacked rebase
 	 */
-	LocalBob.execSyncInRepo(`git checkout ${RemoteAlice.repoMeta.latestStackedBranchName}`);
+	LocalBob.execSyncInRepo(`git checkout ${RemoteAlice.latestStackedBranchName}`);
 
-	const remotePartialBranchesInAlice: string[] = RemoteAlice.repoMeta.partialBranches.map((b) => b.shorthand());
+	const remotePartialBranchesInAlice: string[] = RemoteAlice.partialBranches.map((b) => b.shorthand());
 	const localPartialBranchesInBobBefore: string[] = findPartialBranchesThatArePresentLocally();
 
 	function findPartialBranchesThatArePresentLocally(
@@ -38,7 +38,7 @@ async function auto_checks_out_remote_partial_branches() {
 		"expected partial branches to __not be__ checked out locally, to be able to test later that they will be."
 	);
 
-	await gitStackedRebase(RemoteAlice.repoMeta.initialBranch, {
+	await gitStackedRebase(RemoteAlice.initialBranch, {
 		[editor__internal]: () => void 0 /** no edit */,
 		gitDir: LocalBob.repo.workdir(),
 	});
