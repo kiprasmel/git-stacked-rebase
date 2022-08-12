@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# meant for CONSUMERS,
-# NOT UPDATERS!
+# meant for users of GSR;
+# for updating nightly - use ./goodnight.sh
 
 git checkout nightly
 git pull --rebase
