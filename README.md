@@ -44,9 +44,10 @@ follow [http://kiprasmel.github.io/notes/git-stacked-rebase.html](http://kiprasm
 
 dependencies:
 
-- [node.js](https://nodejs.org/en/)
 - git
-- something else i probably forgot
+- a unix-like environment
+- [node.js](https://nodejs.org/en/)
+	- yarn (`npm i -g yarn`)
 
 <!-- REMOVED because i'm dogfooding like never before. use nightly instead. -->
 <!--
@@ -54,7 +55,6 @@ dependencies:
 npm i -g git-stacked-rebase
 
 # optional:
-git config --global alias.stacked-rebase git-stacked-rebase
 git config --global alias.rr             git-stacked-rebase
 ```
 -->
@@ -65,7 +65,7 @@ git clone https://github.com/kiprasmel/git-stacked-rebase
 
 cd git-stacked-rebase
 
-./nightly-setup-and-update
+./nightly-setup-and-update.sh
 ```
 
 [![nightly](https://img.shields.io/github/workflow/status/kiprasmel/git-stacked-rebase/tests/nightly?label=nightly)](https://github.com/kiprasmel/git-stacked-rebase/actions/workflows/test.yml)
