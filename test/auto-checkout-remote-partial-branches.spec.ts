@@ -11,13 +11,10 @@ import { nativeGetBranchNames } from "../native-git/branch";
 import { modifyLines } from "../humanOp";
 
 import { setupRemoteRepo } from "./util/setupRemoteRepo";
-import { noop } from "../util/noop";
 
 export default async function run() {
 	await auto_checks_out_remote_partial_branches();
-	//noop(auto_checks_out_remote_partial_branches)
-	noop(give_chosen_name_to_local_branch)
-	//await give_chosen_name_to_local_branch();
+	await give_chosen_name_to_local_branch();
 }
 
 async function auto_checks_out_remote_partial_branches() {
@@ -71,13 +68,20 @@ async function give_chosen_name_to_local_branch() {
 	 */
 	LocalBob.execSyncInRepo(`git checkout ${RemoteAlice.latestStackedBranchName}`);
 
-	const remotePartialBranchesInAlice: string[] = RemoteAlice.partialBranches.map((b) => b.shorthand());
-	const localPartialBranchesInBobBefore: string[] = findPartialBranchesThatArePresentLocally();
+	const renamedLocalBranch = "partial-renamed-local-branch-hehe" as const;
 
-	function findPartialBranchesThatArePresentLocally(
-		localBranches: string[] = nativeGetBranchNames(LocalBob.repo.workdir())("local")
-	) {
-		return remotePartialBranchesInAlice.filter((partial) => localBranches.includes(partial));
+	const isPartial = (b: string): boolean => b.includes("partial")
+
+	assert(isPartial(renamedLocalBranch))
+
+	// TODO TS
+	// @ts-ignore
+	const remotePartialBranchesInAlice: string[] = findPartialBranches(RemoteAlice);
+	const localPartialBranchesInBobBefore: string[] = findPartialBranches(LocalBob)
+
+	// TODO CLEANUP PREV TEST TOO
+	function findPartialBranches(owner: typeof RemoteAlice | typeof LocalBob, workdir = owner.repo.workdir()): string[] {
+		return nativeGetBranchNames(workdir)("local").filter(isPartial)
 	}
 
 	assert.deepStrictEqual(
@@ -85,8 +89,6 @@ async function give_chosen_name_to_local_branch() {
 		0,
 		"expected partial branches to __not be__ checked out locally, to be able to test later that they will be."
 	);
-	
-	const renamedLocalBranch = "renamed-local-branch-hehe" as const;
 
 	await gitStackedRebase(RemoteAlice.initialBranch, {
 		gitDir: LocalBob.repo.workdir(),
@@ -112,7 +114,7 @@ async function give_chosen_name_to_local_branch() {
 		},
 	});
 
-	const localPartialBranchesInBobAfter: string[] = findPartialBranchesThatArePresentLocally();
+	const localPartialBranchesInBobAfter: string[] = findPartialBranches(LocalBob)
 
 	console.log({
 		remotePartialBranchesInAlice,

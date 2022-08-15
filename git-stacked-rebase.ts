@@ -932,7 +932,7 @@ export function parseBranchWhichNeedsLocalCheckout(targets: NonNullable<Targets>
 }
 
 function getFullNameOfBranchWithRemote(b: Pick<BranchWhoNeedsLocalCheckout, "fullNameOfBranchWithRemote"> | Pick<BranchWhoNeedsLocalCheckout, "wantedLocalBranchName" | "remoteName">): string {
-	return "refs/remotes/" + (
+	return (
 		"fullNameOfBranchWithRemote" in b
 			? b.fullNameOfBranchWithRemote
 			: b.remoteName + "/" + b.wantedLocalBranchName
