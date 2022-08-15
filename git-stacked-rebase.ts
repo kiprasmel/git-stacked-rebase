@@ -38,6 +38,7 @@ import { assertNever } from "./util/assertNever";
 import { Single, Tuple } from "./util/tuple";
 import { isDirEmptySync } from "./util/fs";
 import {
+    getParseTargetsCtxFromLine,
 	GoodCommand,
 	GoodCommandRegular,
 	GoodCommandStacked, //
@@ -46,6 +47,8 @@ import {
 	RegularRebaseEitherCommandOrAlias,
 	StackedRebaseCommand,
 	StackedRebaseCommandAlias,
+    stackedRebaseCommands,
+    Targets,
 } from "./parse-todo-of-stacked-rebase/validator";
 
 export * from "./options";
@@ -514,16 +517,8 @@ export async function gitStackedRebase(
 				if (cmd.commandName === "branch-end-new") {
 					await createBranchForCommand(cmd as any); // TODO TS
 				} else if (cmd.commandName === "branch-end-new-from-remote") {
-					const nameWithoutRefsRemotesOriginPrefix: string = cmd.targets![0];
-					const remote: string = cmd.targets![1];
-					const fullNameOfBranchWithRemote: string =
-						"refs/remotes/" + remote + "/" + nameWithoutRefsRemotesOriginPrefix;
-
-					branchesWhoNeedLocalCheckout.push({
-						nameWithoutRefsRemotesOriginPrefix,
-						remote,
-						fullNameOfBranchWithRemote,
-					});
+					const b = parseBranchWhichNeedsLocalCheckout(cmd.targets!); // TODO TS NARROWER TYPES
+					branchesWhoNeedLocalCheckout.push(b);
 				}
 			} else {
 				assertNever(cmd);
@@ -883,13 +878,17 @@ async function createInitialEditTodoOfGitStackedRebase(
 						 *
 						 */
 						if (branch.isRemote() || branch.name().startsWith("refs/remotes/")) {
-							const nameWithoutRefsRemotesOriginPrefix: string = branch
+							const wantedLocalBranchName: string = branch
 								.name()
 								.replace(removeRemoteRegex, "");
 
-							const remote: string = branch.name().match(removeRemoteRegex)![1];
+							const remoteName: string = branch.name().match(removeRemoteRegex)![1];
 
-							return `branch-end-new-from-remote ${nameWithoutRefsRemotesOriginPrefix} ${remote}`;
+							return encodeCmdToLine({
+								wantedLocalBranchName,
+								remoteName,
+								fullNameOfBranchWithRemote: getFullNameOfBranchWithRemote({ wantedLocalBranchName, remoteName })
+							})
 						} else {
 							return `branch-end ${branch.name()}`;
 						}
@@ -909,11 +908,48 @@ async function createInitialEditTodoOfGitStackedRebase(
 	return;
 }
 
-type BranchWhoNeedsLocalCheckout = {
-	nameWithoutRefsRemotesOriginPrefix: string; //
-	remote: string;
+export type BranchWhoNeedsLocalCheckout = {
+	wantedLocalBranchName: string; //
+	remoteName: string;
 	fullNameOfBranchWithRemote: string;
 };
+
+/**
+ * expects targets from the format of "branch-end-new-from-remote"
+ * TODO TS NARROWER TYPES (specific targets for each type of cmd)
+ */
+export function parseBranchWhichNeedsLocalCheckout(targets: NonNullable<Targets>): BranchWhoNeedsLocalCheckout {
+	const wantedLocalBranchName: string = targets[0];
+	const remoteAndRemoteBranchName: string = targets[1];
+	const remoteName: string = remoteAndRemoteBranchName.split("/")[0];
+	const fullNameOfBranchWithRemote: string = getFullNameOfBranchWithRemote({ fullNameOfBranchWithRemote: remoteAndRemoteBranchName });
+
+	return {
+		wantedLocalBranchName,
+		remoteName,
+		fullNameOfBranchWithRemote,
+	}
+}
+
+function getFullNameOfBranchWithRemote(b: Pick<BranchWhoNeedsLocalCheckout, "fullNameOfBranchWithRemote"> | Pick<BranchWhoNeedsLocalCheckout, "wantedLocalBranchName" | "remoteName">): string {
+	return "refs/remotes/" + (
+		"fullNameOfBranchWithRemote" in b
+			? b.fullNameOfBranchWithRemote
+			: b.remoteName + "/" + b.wantedLocalBranchName
+	);
+}
+
+// TODO RENAME
+export function encodeCmdToLine(b: BranchWhoNeedsLocalCheckout) {
+	return `branch-end-new-from-remote ${b.wantedLocalBranchName} ${b.fullNameOfBranchWithRemote}`;
+}
+
+// TODO RENAME
+export function decodeLineToCmd(line: string): BranchWhoNeedsLocalCheckout {
+	// TODO TS NARROWER TYPES
+	const targets: NonNullable<Targets> = stackedRebaseCommands["branch-end-new-from-remote"].parseTargets(getParseTargetsCtxFromLine(line))!
+	return parseBranchWhichNeedsLocalCheckout(targets);
+}
 
 function checkoutRemotePartialBranchesLocally(
 	repo: Git.Repository, //
@@ -929,7 +965,7 @@ function checkoutRemotePartialBranchesLocally(
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
 	for (const b of branchesWhoNeedLocalCheckout) {
-		const cmd = `git checkout -b ${b.nameWithoutRefsRemotesOriginPrefix} --track ${b.fullNameOfBranchWithRemote}`;
+		const cmd = `git checkout -b ${b.wantedLocalBranchName} --track ${b.fullNameOfBranchWithRemote}`;
 		execSyncInRepo(cmd);
 	}
 

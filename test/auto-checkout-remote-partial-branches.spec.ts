@@ -5,14 +5,19 @@
 
 import assert from "assert";
 
-import { gitStackedRebase } from "../git-stacked-rebase";
+import { BranchWhoNeedsLocalCheckout, decodeLineToCmd, encodeCmdToLine, gitStackedRebase } from "../git-stacked-rebase";
 import { editor__internal } from "../internal";
 import { nativeGetBranchNames } from "../native-git/branch";
+import { modifyLines } from "../humanOp";
 
 import { setupRemoteRepo } from "./util/setupRemoteRepo";
+import { noop } from "../util/noop";
 
 export default async function run() {
 	await auto_checks_out_remote_partial_branches();
+	//noop(auto_checks_out_remote_partial_branches)
+	noop(give_chosen_name_to_local_branch)
+	//await give_chosen_name_to_local_branch();
 }
 
 async function auto_checks_out_remote_partial_branches() {
@@ -39,8 +44,8 @@ async function auto_checks_out_remote_partial_branches() {
 	);
 
 	await gitStackedRebase(RemoteAlice.initialBranch, {
-		[editor__internal]: () => void 0 /** no edit */,
 		gitDir: LocalBob.repo.workdir(),
+		[editor__internal]: () => void 0 /** no edit */,
 	});
 
 	const localPartialBranchesInBobAfter: string[] = findPartialBranchesThatArePresentLocally();
@@ -57,6 +62,70 @@ async function auto_checks_out_remote_partial_branches() {
 		"expected partial branches to __be__ checked out locally by git-stacked-rebase."
 	);
 }
+
+async function give_chosen_name_to_local_branch() {
+	const { RemoteAlice, LocalBob } = await setupRemoteRepo();
+
+	/**
+	 * switch to latest branch to perform stacked rebase
+	 */
+	LocalBob.execSyncInRepo(`git checkout ${RemoteAlice.latestStackedBranchName}`);
+
+	const remotePartialBranchesInAlice: string[] = RemoteAlice.partialBranches.map((b) => b.shorthand());
+	const localPartialBranchesInBobBefore: string[] = findPartialBranchesThatArePresentLocally();
+
+	function findPartialBranchesThatArePresentLocally(
+		localBranches: string[] = nativeGetBranchNames(LocalBob.repo.workdir())("local")
+	) {
+		return remotePartialBranchesInAlice.filter((partial) => localBranches.includes(partial));
+	}
+
+	assert.deepStrictEqual(
+		localPartialBranchesInBobBefore.length,
+		0,
+		"expected partial branches to __not be__ checked out locally, to be able to test later that they will be."
+	);
+	
+	const renamedLocalBranch = "renamed-local-branch-hehe" as const;
+
+	await gitStackedRebase(RemoteAlice.initialBranch, {
+		gitDir: LocalBob.repo.workdir(),
+		[editor__internal]: ({filePath}) => {
+			const branchNameOf2ndBranch: string = RemoteAlice.newPartialBranches[1][0];
+			modifyLines(filePath, (lines) => {
+				const lineIdx: number = lines.findIndex(l => l.includes(branchNameOf2ndBranch))!
+				const line: string = lines[lineIdx];
+				const cmd: BranchWhoNeedsLocalCheckout = decodeLineToCmd(line)
+				console.log({
+					lineIdx,
+					line,
+					cmd
+				})
+				const newCmd: BranchWhoNeedsLocalCheckout = {
+					...cmd,
+					wantedLocalBranchName: renamedLocalBranch,
+				}
+				const newLine: string = encodeCmdToLine(newCmd)
+				const newLines: string[] = lines.map((oldLine, i) => i === lineIdx ? newLine : oldLine)
+				return newLines;
+			})
+		},
+	});
+
+	const localPartialBranchesInBobAfter: string[] = findPartialBranchesThatArePresentLocally();
+
+	console.log({
+		remotePartialBranchesInAlice,
+		localPartialBranchesInBobBefore,
+		localPartialBranchesInBobAfter,
+	});
+
+	assert.deepStrictEqual(
+		localPartialBranchesInBobAfter.length,
+		remotePartialBranchesInAlice.length,
+		"expected partial branches to __be__ checked out locally by git-stacked-rebase."
+	);
+};
 
 if (!module.parent) {
 	run();

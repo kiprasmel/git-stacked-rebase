@@ -59,6 +59,12 @@ export function humanOpRemoveLineOfCommit({ filePath, commitSHA }: CommonArgs): 
 	writeLines(filePath, lines);
 }
 
+export function modifyLines(filePath: string, modifier = (lines: string[]) => lines): void {
+	const lines: string[] = readLines(filePath);
+	const modifiedLines: string[] = modifier(lines);
+	writeLines(filePath, modifiedLines);
+};
+
 export function readLines(filePath: string): string[] {
 	const file = fs.readFileSync(filePath, { encoding: "utf-8" });
 	const lines = file.split("\n");

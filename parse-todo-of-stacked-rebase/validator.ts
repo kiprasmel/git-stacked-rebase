@@ -10,11 +10,14 @@ import { Termination } from "../util/error";
  */
 type Validator = (ctx: { rest: string; reasonsIfBad: string[] }) => boolean;
 
-type ParseTargets = (ctx: {
+export type Targets = string[] | null;
+
+type ParseTargetsCtx = {
 	line: string; //
 	split: string[];
 	rest: string;
-}) => string[] | null;
+}
+type ParseTargets = (ctx: ParseTargetsCtx) => Targets
 
 type Command = {
 	/**
@@ -428,7 +431,7 @@ export function validate(
 		nthCommand++;
 
 		const [commandOrAliasName, ..._rest] = fullLine.split(" ");
-		const rest = _rest.join(" ");
+		const rest = getRest(fullLine);
 
 		if (!commandOrAliasExists(commandOrAliasName)) {
 			badCommands.push({
@@ -482,13 +485,11 @@ export function validate(
 
 		const command: Command = allEitherRebaseCommands[commandName];
 
+		/**
+		 * TODO TS NARROWER TYPES: combine the 2 below:
+		 */
 		command.isRestValid({ rest, reasonsIfBad });
-
-		const targets: string[] | null = command.parseTargets({
-			line: fullLine, //
-			split: fullLine.split(" ").filter((word) => !!word),
-			rest,
-		});
+		const targets: Targets = command.parseTargets(getParseTargetsCtxFromLine(fullLine));
 
 		if (reasonsIfBad.length) {
 			badCommands.push({
@@ -548,3 +549,16 @@ export function validate(
 
 	return goodCommands;
 }
+
+export function getParseTargetsCtxFromLine(fullLine: string): ParseTargetsCtx {
+	return {
+		line: fullLine, //
+		split: fullLine.split(" ").filter((word) => !!word),
+		rest: getRest(fullLine),
+	}
+}
+
+export function getRest(fullLine: string): ParseTargetsCtx["rest"] {
+	return fullLine.split(" ").slice(1).join(" ")
+}
+
