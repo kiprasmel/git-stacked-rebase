@@ -70,49 +70,8 @@ export async function gitStackedRebase(
 		const pathToRegularRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "rebase-merge");
 		const pathToRegularRebaseTodoFile = path.join(pathToRegularRebaseDirInsideDotGit, filenames.gitRebaseTodo);
 
-		const createPathForStackedRebase = (withName: string): string => path.join(dotGitDirPath, withName); // "stacked-rebase"
-
-		const __default__pathToStackedRebaseDirInsideDotGit: string = createPathForStackedRebase("stacked-rebase");
-		const __default__pathToStackedRebaseTodoFile = path.join(
-			__default__pathToStackedRebaseDirInsideDotGit,
-			filenames.gitRebaseTodo
-		);
-
-		let parsed: {
-			pathToStackedRebaseDirInsideDotGit: string;
-			pathToStackedRebaseTodoFile: string;
-		};
-
-		if (options.viewTodoOnly) {
-			/**
-			 * would've been in stacked-rebase/
-			 * now will be   in stacked-rebase/tmp/
-			 */
-			const insideDir: string = createPathForStackedRebase("stacked-rebase.tmp");
-
-			parsed = {
-				pathToStackedRebaseDirInsideDotGit: insideDir,
-				pathToStackedRebaseTodoFile: path.join(insideDir, filenames.gitRebaseTodo),
-			};
-		} else {
-			parsed = {
-				pathToStackedRebaseDirInsideDotGit: __default__pathToStackedRebaseDirInsideDotGit,
-				pathToStackedRebaseTodoFile: __default__pathToStackedRebaseTodoFile,
-			};
-		}
-
-		/**
-		 * TODO v1: FIXME update usage of this to use the `__default__` instead (in most places except --view-todo)
-		 * EDIT: oh but this is what's actually proctecting from e.g. --apply together w/ --view-todo...
-		 *
-		 * TODO v2.1: instead, extract the `--view-todo` logic & exit early
-		 * TODO v2.2: though, also consider we'll want `--dry-run` in the future & the current approach might be better.
-		 *
-		 * TODO v3: okay nevermind re: v1, and yes v2.2 -- now that we're completely isolating into a separate dir
-		 * if it's --view-todo,
-		 */
-		const pathToStackedRebaseDirInsideDotGit: string = parsed.pathToStackedRebaseDirInsideDotGit;
-		const pathToStackedRebaseTodoFile: string = parsed.pathToStackedRebaseTodoFile;
+		const pathToStackedRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "stacked-rebase");
+		const pathToStackedRebaseTodoFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.gitRebaseTodo);
 
 		const checkIsRegularRebaseStillInProgress = (): boolean => fs.existsSync(pathToRegularRebaseDirInsideDotGit);
 
@@ -272,7 +231,7 @@ export async function gitStackedRebase(
 			// 	})
 		);
 
-		if (!wasRegularRebaseInProgress || options.viewTodoOnly) {
+		if (!wasRegularRebaseInProgress) {
 			try {
 				const editor: EitherEditor =
 					editor__internal in options
@@ -298,16 +257,6 @@ export async function gitStackedRebase(
 
 				throw new Termination(`error: There was a problem with the editor '${options.editor}'.\n`);
 			}
-		}
-
-		if (options.viewTodoOnly) {
-			fs.rmdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
-
-			const dirname = path.basename(pathToStackedRebaseDirInsideDotGit);
-
-			process.stdout.write(`removed ${dirname}/\n`);
-
-			return;
 		}
 
 		const regularRebaseTodoLines: string[] = [];
@@ -1462,15 +1411,6 @@ git-stacked-rebase <branch> [--push|-p --force|-f]
 	2.1 unless autoApply is enabled.
 
 
-git-stacked-rebase <branch> [-v|--view-todo|--view-only]
-
-    1. will make git-stacked-rebase work inside a separate, .tmp directory,
-        to allow viewing/editing (w/o affecting the actual todo
-        nor any subsequent runs that might happen later),
-    2. will NOT execute the rebase,
-    3. after viewing/editing, will remove the .tmp directory.
-
-
 
 non-positional args:
 
@@ -1579,29 +1519,12 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 	 */
 	const second = peakNextArg();
 
-	/**
-	 * `isViewTodoOnly` is safe because the decision of using the .tmp directory or not
-	 * is decided purely by this option,
-	 * and **it's impossible to have more options** that would
-	 * have side effects for the git repository
-	 * (because git-stacked-rebase would be working in the same .tmp directory).
-	 *
-	 * i.e. if --view-todo is specified, then another option,
-	 * such as --edit-todo, or --apply, cannot be specified,
-	 * because all of these options are positional
-	 * & are the 3rd argument.
-	 * additionally, gitStackedRebase checks for these incompatible options
-	 * in the library code as well (TODO check all incompatible options).
-	 *
-	 */
-	const isViewTodoOnly: boolean =
-		!!second && ["--view-todo", "-v", "--view-only", "--view-todo-only"].includes(second);
 	const isApply: boolean = !!second && ["--apply", "-a"].includes(second);
 	const isContinue: boolean = !!second && ["--continue", "-c"].includes(second);
 	const isPush: boolean = !!second && ["--push", "-p"].includes(second);
 	const isBranchSequencer: boolean = !!second && ["--branch-sequencer", "--bs", "-s"].includes(second);
 
-	if (isViewTodoOnly || isContinue || isApply || isPush || isBranchSequencer) {
+	if (isContinue || isApply || isPush || isBranchSequencer) {
 		eatNextArg();
 	}
 
@@ -1650,7 +1573,6 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 	const options: SomeOptionsForGitStackedRebase = {
 		gitDir,
 		autoSquash: isAutoSquash,
-		viewTodoOnly: isViewTodoOnly,
 		apply: isApply,
 		continue: isContinue,
 		push: isPush,

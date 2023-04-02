@@ -8,6 +8,7 @@ import { removeUndefinedProperties } from "./util/removeUndefinedProperties";
 
 import { InternalOnlyOptions } from "./internal";
 import { parseGitConfigValues } from "./config";
+import { noop } from "./util/noop";
 
 export type BaseOptionsForGitStackedRebase = {
 	gitDir: string;
@@ -27,7 +28,6 @@ export type BaseOptionsForGitStackedRebase = {
 	autoSquash?: boolean | undefined;
 	autoApplyIfNeeded?: boolean | undefined;
 
-	viewTodoOnly: boolean;
 	apply: boolean;
 	continue: boolean;
 	push: boolean;
@@ -104,24 +104,13 @@ export const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 	//
 	branchSequencer: false,
 	branchSequencerExec: false,
-	//
-	viewTodoOnly: false,
 });
 
 export function areOptionsIncompatible(
 	options: ParsedOptionsForGitStackedRebase, //
 	reasons: string[] = []
 ): boolean {
-	if (options.viewTodoOnly) {
-		if (options.apply) reasons.push("--apply cannot be used together with --view-todo");
-		if (options.continue) reasons.push("--continue cannot be used together with --view-todo");
-		if (options.push) reasons.push("--push cannot be used together with --view-todo");
-		if (options.forcePush) reasons.push("--push --force cannot be used together with --view-todo");
-		if (options.branchSequencer) reasons.push("--branch-sequencer cannot be used together with --view-todo");
-		if (options.branchSequencerExec)
-			reasons.push("--branch-sequencer --exec cannot be used together with --view-todo");
-	}
-
+	noop(options);
 	/**
 	 * TODO HANDLE ALL CASES
 	 */
