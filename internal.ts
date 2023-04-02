@@ -5,6 +5,10 @@ import Git from "nodegit";
 export const editor__internal = Symbol("editor__internal");
 export const getGitConfig__internal = Symbol("getGitConfig__internal");
 
+export const noEditor = {
+	[editor__internal]: () => void 0,
+};
+
 /**
  * meant to NOT be exported to the end user of the library
  */
