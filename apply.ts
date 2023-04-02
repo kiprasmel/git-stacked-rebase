@@ -4,7 +4,7 @@ import path from "path";
 import Git from "nodegit";
 import { combineRewrittenLists } from "./git-reconcile-rewritten-list/combineRewrittenLists";
 
-import { createQuestion } from "./util/createQuestion";
+import { question } from "./util/createQuestion";
 import { isDirEmptySync } from "./util/fs";
 
 import { filenames } from "./filenames";
@@ -93,45 +93,46 @@ export async function applyIfNeedsToApply({
 		return {
 			neededToApply: false,
 		};
-	} else {
-		if (!autoApplyIfNeeded) {
-			const question = createQuestion();
-
-			const answerRaw: string = await question("\nneed to --apply before continuing. proceed? [Y/n/(a)lways] ");
-			console.log({ answerRaw });
-
-			const answer: string = answerRaw.trim().toLowerCase();
-
-			const userAllowedToApply: boolean = ["y", "yes", ""].includes(answer);
-			console.log({ userAllowedToApply });
-
-			const userAllowedToApplyAlways: boolean = ["a", "always"].includes(answer);
-
-			if (!userAllowedToApply && !userAllowedToApplyAlways) {
-				return {
-					neededToApply: true,
-					userAllowedToApplyAndWeApplied: false,
-				};
-			}
-
-			if (userAllowedToApplyAlways) {
-				await config.setBool(configKeys.autoApplyIfNeeded, 1);
-			}
-		}
-
-		await apply({
-			repo,
-			pathToStackedRebaseTodoFile,
-			pathToStackedRebaseDirInsideDotGit, //
-			...rest,
-		});
 	}
+
+	const allowedToApply = autoApplyIfNeeded || (await askIfCanApply(config));
+	if (!allowedToApply) {
+		return {
+			neededToApply: true,
+			userAllowedToApplyAndWeApplied: false,
+		};
+	}
+
+	await apply({
+		repo,
+		pathToStackedRebaseTodoFile,
+		pathToStackedRebaseDirInsideDotGit, //
+		...rest,
+	});
 
 	return {
 		neededToApply: true,
 		userAllowedToApplyAndWeApplied: true, //
 	};
 }
+
+const askIfCanApply = async (config: Git.Config): Promise<boolean> => {
+	const answer = await question(
+		"need to --apply before continuing. proceed? [Y/n/(a)lways] ", //
+		(ans) => ans.trim().toLowerCase()
+	);
+
+	const userAllowedToApply: boolean = ["y", "yes", ""].includes(answer);
+	const userAllowedToApplyAlways: boolean = ["a", "always"].includes(answer);
+
+	if (userAllowedToApplyAlways) {
+		await config.setBool(configKeys.autoApplyIfNeeded, 1);
+	}
+
+	const canApply = userAllowedToApply || userAllowedToApplyAlways;
+
+	return canApply;
+};
 
 const getPaths = (
 	pathToStackedRebaseDirInsideDotGit: string //
