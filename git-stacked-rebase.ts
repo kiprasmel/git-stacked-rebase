@@ -23,7 +23,7 @@ import {
 	parseOptions,
 	SomeOptionsForGitStackedRebase,
 } from "./options";
-import { apply, applyIfNeedsToApply, markThatNeedsToApply as _markThatNeedsToApply } from "./apply";
+import { apply, applyIfNeedsToApply, markThatNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequencer";
 import { autosquash } from "./autosquash";
@@ -87,7 +87,7 @@ export async function gitStackedRebase(
 		const currentBranch: Git.Reference = await repo.getCurrentBranch();
 
 		if (fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply))) {
-			_markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
+			markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 		}
 
 		if (options.apply) {
@@ -133,7 +133,7 @@ export async function gitStackedRebase(
 			return;
 		}
 
-		const { neededToApply, userAllowedToApplyAndWeApplied, markThatNeedsToApply } = await applyIfNeedsToApply({
+		const { neededToApply, userAllowedToApplyAndWeApplied } = await applyIfNeedsToApply({
 			repo,
 			pathToStackedRebaseTodoFile,
 			pathToStackedRebaseDirInsideDotGit, //
@@ -636,7 +636,7 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 
 		fs.unlinkSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply));
 		if (rebaseChangedLocalHistory) {
-			markThatNeedsToApply();
+			markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 		} else {
 			// /**
 			//  * TODO `unmarkThatNeedsToApply` (NOT the same as `markThatApplied`!)

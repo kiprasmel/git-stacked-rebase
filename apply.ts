@@ -63,9 +63,7 @@ const defaultApplyAction: ActionInsideEachCheckedOutBranch = async ({
 export const getBackupPathOfPreviousStackedRebase = (pathToStackedRebaseDirInsideDotGit: string): string =>
 	pathToStackedRebaseDirInsideDotGit + ".previous";
 
-export type ReturnOfApplyIfNeedsToApply = {
-	markThatNeedsToApply: () => void;
-} & (
+export type ReturnOfApplyIfNeedsToApply =
 	| {
 			neededToApply: false;
 			userAllowedToApplyAndWeApplied?: never;
@@ -73,13 +71,11 @@ export type ReturnOfApplyIfNeedsToApply = {
 	| {
 			neededToApply: true;
 			userAllowedToApplyAndWeApplied: false;
-			// markThatNeedsToApply?: never; // TODO TS infer auto - force code owner to exit
 	  }
 	| {
 			neededToApply: true;
 			userAllowedToApplyAndWeApplied: true;
-	  }
-);
+	  };
 export async function applyIfNeedsToApply({
 	repo,
 	pathToStackedRebaseTodoFile,
@@ -92,16 +88,12 @@ export async function applyIfNeedsToApply({
 	config: Git.Config;
 }): Promise<ReturnOfApplyIfNeedsToApply> {
 	const needsToApply: boolean = doesNeedToApply(pathToStackedRebaseDirInsideDotGit);
-	const _markThatNeedsToApply = (): void => markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 
 	if (!needsToApply) {
 		return {
 			neededToApply: false,
-			markThatNeedsToApply: _markThatNeedsToApply,
 		};
-	}
-
-	if (needsToApply) {
+	} else {
 		if (!autoApplyIfNeeded) {
 			const question = createQuestion();
 
@@ -119,7 +111,6 @@ export async function applyIfNeedsToApply({
 				return {
 					neededToApply: true,
 					userAllowedToApplyAndWeApplied: false,
-					markThatNeedsToApply: _markThatNeedsToApply,
 				};
 			}
 
@@ -139,7 +130,6 @@ export async function applyIfNeedsToApply({
 	return {
 		neededToApply: true,
 		userAllowedToApplyAndWeApplied: true, //
-		markThatNeedsToApply: _markThatNeedsToApply,
 	};
 }
 
@@ -219,9 +209,7 @@ const doesNeedToApply = (pathToStackedRebaseDirInsideDotGit: string): boolean =>
 	return needsToApplyPart2;
 };
 
-export function readRewrittenListNotAppliedOrAppliedOrError(
-	repoPath: string
-): {
+export function readRewrittenListNotAppliedOrAppliedOrError(repoPath: string): {
 	pathOfRewrittenList: string;
 	pathOfRewrittenListApplied: string;
 	rewrittenListRaw: string;
@@ -243,9 +231,7 @@ export function readRewrittenListNotAppliedOrAppliedOrError(
 	} else if (fs.existsSync(pathOfRewrittenListApplied)) {
 		rewrittenListRaw = fs.readFileSync(pathOfRewrittenListApplied, { encoding: "utf-8" });
 	} else {
-		throw new Error(
-			`rewritten-list not found neither in ${pathOfRewrittenList}, nor in ${pathOfRewrittenListApplied}`
-		);
+		throw new Error(`rewritten-list not found neither in ${pathOfRewrittenList}, nor in ${pathOfRewrittenListApplied}`);
 	}
 
 	const { combinedRewrittenList } = combineRewrittenLists(rewrittenListRaw);
