@@ -4,7 +4,7 @@ import path from "path";
 import Git from "nodegit";
 import { combineRewrittenLists } from "./git-reconcile-rewritten-list/combineRewrittenLists";
 
-import { question } from "./util/createQuestion";
+import { AskQuestion, question, Questions } from "./util/createQuestion";
 import { isDirEmptySync } from "./util/fs";
 import { Termination } from "./util/error";
 
@@ -71,6 +71,7 @@ export async function applyIfNeedsToApply({
 	autoApplyIfNeeded,
 	isMandatoryIfMarkedAsNeeded,
 	config,
+	askQuestion = question,
 	...rest
 }: BranchSequencerArgsBase & {
 	/**
@@ -88,6 +89,7 @@ export async function applyIfNeedsToApply({
 
 	autoApplyIfNeeded: boolean; //
 	config: Git.Config;
+	askQuestion: AskQuestion;
 }): Promise<void> {
 	const needsToApply: boolean = doesNeedToApply(pathToStackedRebaseDirInsideDotGit);
 	if (!needsToApply) {
@@ -99,7 +101,7 @@ export async function applyIfNeedsToApply({
 		 * is marked as needed to apply,
 		 * and is mandatory -- try to get a confirmation that it is ok to apply.
 		 */
-		const userAllowedToApply = autoApplyIfNeeded || (await askIfCanApply(config));
+		const userAllowedToApply = autoApplyIfNeeded || (await askIfCanApply(config, askQuestion));
 
 		if (!userAllowedToApply) {
 			const msg = "\ncannot continue without mandatory --apply. Exiting.\n";
@@ -139,9 +141,9 @@ export async function applyIfNeedsToApply({
 	}
 }
 
-const askIfCanApply = async (config: Git.Config): Promise<boolean> => {
-	const answer = await question(
-		"need to --apply before continuing. proceed? [Y/n/(a)lways] ", //
+const askIfCanApply = async (config: Git.Config, askQuestion: AskQuestion = question): Promise<boolean> => {
+	const answer = await askQuestion(
+		Questions.need_to_apply_before_continuing, //
 		(ans) => ans.trim().toLowerCase()
 	);
 
