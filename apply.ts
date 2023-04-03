@@ -4,7 +4,7 @@ import path from "path";
 import Git from "nodegit";
 import { combineRewrittenLists } from "./git-reconcile-rewritten-list/combineRewrittenLists";
 
-import { question } from "./util/createQuestion";
+import { AskQuestion, question, Questions } from "./util/createQuestion";
 import { isDirEmptySync } from "./util/fs";
 
 import { filenames } from "./filenames";
@@ -82,10 +82,12 @@ export async function applyIfNeedsToApply({
 	pathToStackedRebaseDirInsideDotGit, //
 	autoApplyIfNeeded,
 	config,
+	askQuestion = question,
 	...rest
 }: BranchSequencerArgsBase & {
 	autoApplyIfNeeded: boolean; //
 	config: Git.Config;
+	askQuestion: AskQuestion;
 }): Promise<ReturnOfApplyIfNeedsToApply> {
 	const needsToApply: boolean = doesNeedToApply(pathToStackedRebaseDirInsideDotGit);
 
@@ -95,7 +97,7 @@ export async function applyIfNeedsToApply({
 		};
 	}
 
-	const allowedToApply = autoApplyIfNeeded || (await askIfCanApply(config));
+	const allowedToApply = autoApplyIfNeeded || (await askIfCanApply(config, askQuestion));
 	if (!allowedToApply) {
 		return {
 			neededToApply: true,
@@ -116,9 +118,9 @@ export async function applyIfNeedsToApply({
 	};
 }
 
-const askIfCanApply = async (config: Git.Config): Promise<boolean> => {
-	const answer = await question(
-		"need to --apply before continuing. proceed? [Y/n/(a)lways] ", //
+const askIfCanApply = async (config: Git.Config, askQuestion: AskQuestion = question): Promise<boolean> => {
+	const answer = await askQuestion(
+		Questions.need_to_apply_before_continuing, //
 		(ans) => ans.trim().toLowerCase()
 	);
 

@@ -13,5 +13,14 @@ export const createQuestion =
 			})
 		);
 
-export const question = (q: string, cb: (ans: string) => string, { prefix = "\n" } = {}): Promise<string> =>
-	createQuestion()(prefix + q).then(cb);
+export type AskQuestion = typeof question;
+
+export const question = (
+	q: string, //
+	cb: (ans: string) => string = (ans) => ans,
+	{ prefix = "\n" } = {}
+): string | Promise<string> => createQuestion()(prefix + q).then(cb);
+
+export const Questions = {
+	need_to_apply_before_continuing: "need to --apply before continuing. proceed? [Y/n/(a)lways] ", //
+} as const;
