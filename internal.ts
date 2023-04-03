@@ -7,6 +7,10 @@ import { AskQuestion } from "./util/createQuestion";
 export const editor__internal = Symbol("editor__internal");
 export const getGitConfig__internal = Symbol("getGitConfig__internal");
 
+export const noEditor = {
+	[editor__internal]: () => void 0,
+};
+
 export const askQuestion__internal = Symbol("askQuestion__internal");
 
 /**
