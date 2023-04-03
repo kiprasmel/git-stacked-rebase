@@ -2,7 +2,14 @@
 
 set -e
 
-git branch -f nightly @
+# sync 'nightly' with the current branch in remote (that has been pushed)
+#
+# we don't want the local version of the current branch,
+# because if we haven't pushed new commits into remote yet
+# (thru current branch), we don't want to push thru nightly either.
+#
+CURR_BRANCH_PUSHED="origin/$(git branch --show)"
+git branch -f nightly "$CURR_BRANCH_PUSHED"
 git push -f origin nightly
 
 # create a git hook for this repo
