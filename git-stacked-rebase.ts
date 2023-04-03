@@ -27,7 +27,7 @@ import { apply, applyIfNeedsToApply, markThatNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequencer";
 import { autosquash } from "./autosquash";
-import { editor__internal, EitherEditor } from "./internal";
+import { askQuestion__internal, editor__internal, EitherEditor } from "./internal";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -37,6 +37,7 @@ import { Termination } from "./util/error";
 import { assertNever } from "./util/assertNever";
 import { Single, Tuple } from "./util/tuple";
 import { isDirEmptySync } from "./util/fs";
+import { AskQuestion, question } from "./util/createQuestion";
 import {
     getParseTargetsCtxFromLine,
 	GoodCommand,
@@ -86,6 +87,8 @@ export async function gitStackedRebase(
 
 		const currentBranch: Git.Reference = await repo.getCurrentBranch();
 
+		const askQuestion: AskQuestion = askQuestion__internal in options ? options[askQuestion__internal]! : question;
+
 		if (fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply))) {
 			markThatNeedsToApply(pathToStackedRebaseDirInsideDotGit);
 		}
@@ -129,6 +132,7 @@ export async function gitStackedRebase(
 				config,
 				initialBranch,
 				currentBranch,
+				askQuestion,
 			});
 
 			return;
@@ -154,6 +158,7 @@ export async function gitStackedRebase(
 			config,
 			initialBranch,
 			currentBranch,
+			askQuestion,
 		});
 
 		if (options.push) {
@@ -703,6 +708,7 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 				config,
 				initialBranch,
 				currentBranch,
+				askQuestion,
 			});
 		}
 
