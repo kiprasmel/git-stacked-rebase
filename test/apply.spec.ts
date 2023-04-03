@@ -5,9 +5,10 @@ import Git from "nodegit";
 import { configKeys } from "../config";
 import { gitStackedRebase } from "../git-stacked-rebase";
 import { humanOpChangeCommandOfNthCommitInto } from "../humanOp";
-import { editor__internal, noEditor } from "../internal";
+import { askQuestion__internal, editor__internal, noEditor } from "../internal";
 
 import { setupRepo } from "./util/setupRepo";
+import { question, Questions } from "../util/createQuestion";
 
 export async function applyTC() {
 	await integration__git_stacked_rebase_exits_if_apply_was_needed_but_user_disallowed();
@@ -50,9 +51,13 @@ async function integration__git_stacked_rebase_exits_if_apply_was_needed_but_use
 		gitStackedRebase(initialBranch, {
 			...common,
 			...noEditor,
-			/**
-			 * TODO: allow handling question prompts, and respond with `n` to disallow.
-			 */
+			[askQuestion__internal]: (q, ...rest) => {
+				if (q === Questions.need_to_apply_before_continuing) {
+					return "n";
+				}
+
+				return question(q, ...rest);
+			},
 		})
 	);
 
