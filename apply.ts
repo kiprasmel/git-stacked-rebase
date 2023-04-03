@@ -6,6 +6,7 @@ import { combineRewrittenLists } from "./git-reconcile-rewritten-list/combineRew
 
 import { AskQuestion, question, Questions } from "./util/createQuestion";
 import { isDirEmptySync } from "./util/fs";
+import { Termination } from "./util/error";
 
 import { filenames } from "./filenames";
 import { configKeys } from "./config";
@@ -63,59 +64,81 @@ const defaultApplyAction: ActionInsideEachCheckedOutBranch = async ({
 export const getBackupPathOfPreviousStackedRebase = (pathToStackedRebaseDirInsideDotGit: string): string =>
 	pathToStackedRebaseDirInsideDotGit + ".previous";
 
-export type ReturnOfApplyIfNeedsToApply =
-	| {
-			neededToApply: false;
-			userAllowedToApplyAndWeApplied?: never;
-	  }
-	| {
-			neededToApply: true;
-			userAllowedToApplyAndWeApplied: false;
-	  }
-	| {
-			neededToApply: true;
-			userAllowedToApplyAndWeApplied: true;
-	  };
 export async function applyIfNeedsToApply({
 	repo,
 	pathToStackedRebaseTodoFile,
 	pathToStackedRebaseDirInsideDotGit, //
 	autoApplyIfNeeded,
+	isMandatoryIfMarkedAsNeeded,
 	config,
 	askQuestion = question,
 	...rest
 }: BranchSequencerArgsBase & {
+	/**
+	 * i.e., sometimes a) we need the `--apply` to go thru,
+	 * and sometimes b) it's "resumable" on the next run,
+	 * i.e. we'd prefer to apply right now,
+	 * but it's fine if user does not apply now,
+	 * because `--apply` is resumable[1],
+	 * and on the next run of stacked rebase, user will be forced to apply anyway.
+	 *
+	 * [1] resumable, unless user runs into some edge case where it no longer is.
+	 * TODO: work out when this happens & handle better.
+	 */
+	isMandatoryIfMarkedAsNeeded: boolean;
+
 	autoApplyIfNeeded: boolean; //
 	config: Git.Config;
 	askQuestion: AskQuestion;
-}): Promise<ReturnOfApplyIfNeedsToApply> {
+}): Promise<void> {
 	const needsToApply: boolean = doesNeedToApply(pathToStackedRebaseDirInsideDotGit);
-
 	if (!needsToApply) {
-		return {
-			neededToApply: false,
-		};
+		return;
 	}
 
-	const allowedToApply = autoApplyIfNeeded || (await askIfCanApply(config, askQuestion));
-	if (!allowedToApply) {
-		return {
-			neededToApply: true,
-			userAllowedToApplyAndWeApplied: false,
-		};
+	if (isMandatoryIfMarkedAsNeeded) {
+		/**
+		 * is marked as needed to apply,
+		 * and is mandatory -- try to get a confirmation that it is ok to apply.
+		 */
+		const userAllowedToApply = autoApplyIfNeeded || (await askIfCanApply(config, askQuestion));
+
+		if (!userAllowedToApply) {
+			const msg = "\ncannot continue without mandatory --apply. Exiting.\n";
+			throw new Termination(msg);
+		} else {
+			await apply({
+				repo,
+				pathToStackedRebaseTodoFile,
+				pathToStackedRebaseDirInsideDotGit, //
+				...rest,
+			});
+
+			return;
+		}
+	} else {
+		/**
+		 * is marked as needed to apply,
+		 * but performing the apply is NOT mandatory.
+		 *
+		 * thus, do NOT ask user if should apply -- only infer from config.
+		 */
+
+		if (autoApplyIfNeeded) {
+			await apply({
+				repo,
+				pathToStackedRebaseTodoFile,
+				pathToStackedRebaseDirInsideDotGit, //
+				...rest,
+			});
+
+			return;
+		} else {
+			/**
+			 * not mandatory, thus do nothing.
+			 */
+		}
 	}
-
-	await apply({
-		repo,
-		pathToStackedRebaseTodoFile,
-		pathToStackedRebaseDirInsideDotGit, //
-		...rest,
-	});
-
-	return {
-		neededToApply: true,
-		userAllowedToApplyAndWeApplied: true, //
-	};
 }
 
 const askIfCanApply = async (config: Git.Config, askQuestion: AskQuestion = question): Promise<boolean> => {
