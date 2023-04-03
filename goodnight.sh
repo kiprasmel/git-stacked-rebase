@@ -2,7 +2,9 @@
 
 set -e
 
-git branch -f nightly @
+# sync 'nightly' with the current branch.
+CURR_BRANCH="$(git branch --show)"
+git branch -f nightly "$CURR_BRANCH"
 git push -f origin nightly
 
 # create a git hook for this repo
