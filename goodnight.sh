@@ -10,7 +10,14 @@ set -e
 #
 CURR_BRANCH_PUSHED="origin/$(git branch --show)"
 git branch -f nightly "$CURR_BRANCH_PUSHED"
-git push -f origin nightly
+
+LOCAL_NIGHTLY="$(git rev-parse nightly)"
+REMOTE_NIGHTLY="$(git rev-parse origin/nightly)"
+if [ "$LOCAL_NIGHTLY" = "$REMOTE_NIGHTLY" ]; then
+	printf "Already up-to-date, skipping push.\n"
+else
+	git push -f origin nightly
+fi
 
 # create a git hook for this repo
 # that will auto-run this goodnight.sh script
