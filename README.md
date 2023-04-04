@@ -17,7 +17,7 @@ there must be a better way. and that's exactly how git-stacked-rebase came to be
 
 a branch is just a reference to some commit (literally, it's a single-line file that contains a 40-character commit SHA -- check your `.git/refs/` folder). why not just work on your latest feature branch, rebase comfortably, and then have your tool automatically update the partial branches to make them point to the correct new commits?
 
-from those partial branches, you can create pull requests. with this workflow, you get to comfortably iterate in a single branch; your teammates get the benefits of reviewing smaller PRs (when they're ready). win win. that's _literally_ all.
+from those partial branches, you can create pull requests. with this workflow, you get to comfortably iterate in a single branch; your teammates get the benefits of reviewing smaller PRs (when they're ready). win win. that's it.
 
 ---
 
@@ -77,5 +77,43 @@ cd git-stacked-rebase
 ## Usage
 
 ```sh
-git-stacked-rebase --help
+$ git-stacked-rebase --help
+
+git-stacked-rebase <branch>
+
+    0. usually <branch> should be a remote one, e.g. 'origin/master'.
+    1. will perform the interactive stacked rebase from HEAD to <branch>,
+    2. but will not apply the changes to partial branches until --apply is used.
+
+
+git-stacked-rebase <branch> [-a|--apply]
+
+    1. will apply the changes to partial branches,
+    2. but will not push any partial branches to a remote until --push is used.
+
+
+git-stacked-rebase <branch> [-p|--push -f|--force]
+
+    1. will push partial branches with --force (and extra safety).
+
+
+
+non-positional args:
+
+  --autosquash, --no-autosquash
+
+      handles "fixup!", "squash!" -prefixed commits
+      just like --autosquash for a regular rebase does.
+
+      can be enabled by default with the 'rebase.autosquash' option.
+
+
+  --git-dir <path/to/git/dir/>
+
+    makes git-stacked-rebase begin operating inside the specified directory.
+
+
+  -V|--version
+  -h|--help
+
 ```
