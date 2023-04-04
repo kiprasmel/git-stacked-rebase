@@ -16,7 +16,7 @@ import { bullets } from "nice-comment";
 import { setupPostRewriteHookFor } from "./git-reconcile-rewritten-list/postRewriteHook";
 
 import { filenames } from "./filenames";
-import { configKeys, loadGitConfig } from "./config";
+import { loadGitConfig } from "./config";
 import {
 	getDefaultOptions, //
 	ParsedOptionsForGitStackedRebase,
@@ -1376,45 +1376,24 @@ async function getCommitOfBranch(repo: Git.Repository, branchReference: Git.Refe
 
 //
 
-/**
- * the CLI
- */
-export async function git_stacked_rebase(): Promise<void> {
-	const pkgFromSrc = path.join(__dirname, "package.json");
-	const pkgFromDist = path.join(__dirname, "../", "package.json");
-	let pkg;
-
-	// eslint-disable-next-line import/no-dynamic-require
-	if (fs.existsSync(pkgFromSrc)) pkg = require(pkgFromSrc);
-	// eslint-disable-next-line import/no-dynamic-require
-	else if (fs.existsSync(pkgFromDist)) pkg = require(pkgFromDist);
-	else pkg = {};
-
-	const gitStackedRebaseVersion = pkg.version;
-
-	const gitStackedRebaseVersionStr: string = !gitStackedRebaseVersion ? "" : "v" + gitStackedRebaseVersion;
-
-	const helpMsg = `\
+export const helpMsg = `\
 
 git-stacked-rebase <branch>
 
-    1. will edit/create the todo & will execute the interactive rebase (in the latest branch),
+    0. usually <branch> should be a remote one, e.g. 'origin/master'.
+    1. will perform the interactive stacked rebase from HEAD to <branch>,
     2. but will not apply the changes to partial branches until --apply is used.
-	2.1 unless autoApply is enabled via \`git config [--global] ${configKeys.autoApplyIfNeeded} true'.
 
 
 git-stacked-rebase <branch> [-a|--apply]
 
-    1. will apply the changes from the latest branch
-       to all partial branches (currently, using 'git reset --hard'),
-	2. but wil not push the partial branches to a remote until --push --force is used.
+    1. will apply the changes to partial branches,
+    2. but will not push any partial branches to a remote until --push is used.
 
 
-git-stacked-rebase <branch> [--push|-p --force|-f]
+git-stacked-rebase <branch> [-p|--push -f|--force]
 
-    1. will checkout each branch and will push --force,
-    2. but will NOT have any effect if --apply was not used yet.
-	2.1 unless autoApply is enabled.
+    1. will push partial branches with --force (and extra safety).
 
 
 
@@ -1423,22 +1402,27 @@ non-positional args:
   --autosquash, --no-autosquash
 
       handles "fixup!", "squash!" -prefixed commits
-      just like git-rebase's --autosquash does.
+      just like --autosquash for a regular rebase does.
 
-      can be enabled by default with the rebase.autosquash option.
+      can be enabled by default with the 'rebase.autosquash' option.
 
 
-git-stacked-rebase [...] --git-dir <path/to/git/dir/> [...]
+  --git-dir <path/to/git/dir/>
 
     makes git-stacked-rebase begin operating inside the specified directory.
 
 
-git-stacked-rebase [...] -V|--version [...]
-git-stacked-rebase [...] -h|--help    [...]
+  -V|--version
+  -h|--help
 
 
-git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
+git-stacked-rebase __VERSION_REPLACEMENT_STR__ __BUILD_DATE_REPLACEMENT_STR__
 `.replace(/\t/g, " ".repeat(4));
+
+/**
+ * the CLI
+ */
+export async function git_stacked_rebase(): Promise<void> {
 	process.argv.splice(0, 2);
 
 	if (process.argv.some((arg) => ["-h", "--help"].includes(arg))) {
@@ -1447,7 +1431,7 @@ git-stacked-rebase ${gitStackedRebaseVersionStr} __BUILD_DATE_REPLACEMENT_STR__
 	}
 
 	if (process.argv.some((arg) => ["-V", "--version"].includes(arg))) {
-		process.stdout.write(`\ngit-stacked-rebase ${gitStackedRebaseVersionStr}\n\n`);
+		process.stdout.write(`git-stacked-rebase __VERSION_REPLACEMENT_STR__\n`);
 		return;
 	}
 

@@ -1,4 +1,7 @@
+#!/usr/bin/env node
+
 const fs = require("fs");
+const { execSync } = require("child_process");
 const { execSyncP } = require("pipestdio");
 
 const executablePath = "./dist/git-stacked-rebase.js";
@@ -14,12 +17,14 @@ function modifyLines(path) {
 
 	const afterUpdateShebang = updateShebang(lines);
 	const afterInjectRelativeBuildDatePrinter = injectRelativeBuildDatePrinter(lines);
+	const afterInjectVersionStr = injectVersionStr(lines);
 
 	const newFile = lines.join("\n");
 	fs.writeFileSync(path, newFile);
 
 	afterUpdateShebang();
 	afterInjectRelativeBuildDatePrinter();
+	afterInjectVersionStr();
 }
 
 function updateShebang(lines) {
@@ -38,6 +43,7 @@ function updateShebang(lines) {
 function injectRelativeBuildDatePrinter(lines) {
 	const BUILD_DATE_REPLACEMENT_STR = "__BUILD_DATE_REPLACEMENT_STR__";
 	const targetLineIdx = lines.findIndex((line) => line.includes(BUILD_DATE_REPLACEMENT_STR));
+
 	const buildDate = new Date().getTime();
 	const printRelativeDate =
 		"(" + //
@@ -51,4 +57,25 @@ function injectRelativeBuildDatePrinter(lines) {
 	lines[targetLineIdx] = lines[targetLineIdx].replace(BUILD_DATE_REPLACEMENT_STR, printRelativeDate);
 
 	return () => execSyncP(`cat ${executablePath} | grep " mins ago"`);
+}
+
+function injectVersionStr(lines) {
+	const NEEDLE = "__VERSION_REPLACEMENT_STR__";
+	const targetLines = lines.map((line, idx) => [line, idx]).filter(([line]) => line.includes(NEEDLE));
+
+	if (!targetLines.length) {
+		throw new Error("0 target lines found.");
+	}
+
+	const commitSha = execSync("git rev-parse @").toString().trim();
+	const hasUntrackedChanges = execSync("git status -s", { encoding: "utf-8" }).toString().length > 0;
+
+	const REPLACEMENT = commitSha + (hasUntrackedChanges ? "-dirty" : "");
+
+	for (const [_line, idx] of targetLines) {
+		lines[idx] = lines[idx].replace(NEEDLE, REPLACEMENT);
+	}
+
+	// return () => execSyncP(`cat ${executablePath} | grep -v ${NEEDLE}`);
+	return () => void 0;
 }
