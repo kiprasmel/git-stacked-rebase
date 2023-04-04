@@ -47,7 +47,9 @@ dependencies:
 - git
 - a unix-like environment
 - [node.js](https://nodejs.org/en/)
-	- yarn (`npm i -g yarn`)
+	- tested versions: 12 thru 18, except v18 on linux. [see details](https://github.com/kiprasmel/git-stacked-rebase/blob/refactor1/.github/workflows/test.yml).
+		- note that after installing node, you can install version managers, e.g. `npm i -g n`, to easily change node's version.
+- yarn (`npm i -g yarn`)
 
 <!-- REMOVED because i'm dogfooding like never before. use nightly instead. -->
 <!--
@@ -59,6 +61,8 @@ git config --global alias.rr             git-stacked-rebase
 ```
 -->
 
+once satisfied, run:
+
 ```sh
 git clone https://github.com/kiprasmel/git-stacked-rebase
 # or:  git clone git@github.com:kiprasmel/git-stacked-rebase.git
@@ -68,7 +72,7 @@ cd git-stacked-rebase
 ./nightly-setup-and-update.sh
 ```
 
-[![nightly](https://img.shields.io/github/workflow/status/kiprasmel/git-stacked-rebase/tests/nightly?label=nightly)](https://github.com/kiprasmel/git-stacked-rebase/actions/workflows/test.yml)
+[![nightly](https://img.shields.io/github/actions/workflow/status/kiprasmel/git-stacked-rebase/test.yml?label=nightly)](https://github.com/kiprasmel/git-stacked-rebase/actions/workflows/test.yml)
 
 ## Usage
 
