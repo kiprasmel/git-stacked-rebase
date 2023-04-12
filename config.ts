@@ -2,7 +2,7 @@
 
 import Git from "nodegit";
 
-import { SomeOptionsForGitStackedRebase } from "./options";
+import { SpecifiableGitStackedRebaseOptions } from "./options";
 import { getGitConfig__internal } from "./internal";
 
 export const configKeyPrefix = "stackedrebase" as const;
@@ -15,7 +15,7 @@ export const configKeys = {
 
 export async function loadGitConfig(
 	repo: Git.Repository,
-	specifiedOptions: SomeOptionsForGitStackedRebase
+	specifiedOptions: SpecifiableGitStackedRebaseOptions
 ): Promise<Git.Config> {
 	return getGitConfig__internal in specifiedOptions
 		? await specifiedOptions[getGitConfig__internal]!({ GitConfig: Git.Config, repo })
@@ -23,17 +23,44 @@ export async function loadGitConfig(
 }
 
 export type ConfigValues = {
-	gpgSign: boolean;
-	autoApplyIfNeeded: boolean;
-	autoSquash: boolean;
+	gpgSign: boolean | undefined;
+	autoApplyIfNeeded: boolean | undefined;
+	autoSquash: boolean | undefined;
 };
 
-export async function parseGitConfigValues(config: Git.Config): Promise<ConfigValues> {
+export async function resolveGitConfigValues(config: Git.Config): Promise<ConfigValues> {
+	const [
+		gpgSign, //
+		autoApplyIfNeeded,
+		autoSquash,
+	] = await Promise.all([
+		resolveConfigBooleanValue(config.getBool(configKeys.gpgSign)),
+		resolveConfigBooleanValue(config.getBool(configKeys.autoApplyIfNeeded)),
+		resolveConfigBooleanValue(config.getBool(configKeys.autoSquash)),
+	]);
+
 	const configValues: ConfigValues = {
-		gpgSign: !!(await config.getBool(configKeys.gpgSign).catch(() => 0)),
-		autoApplyIfNeeded: !!(await config.getBool(configKeys.autoApplyIfNeeded).catch(() => 0)),
-		autoSquash: !!(await config.getBool(configKeys.autoSquash).catch(() => 0)),
+		gpgSign,
+		autoApplyIfNeeded,
+		autoSquash,
 	};
 
 	return configValues;
 }
+
+/**
+ * there's a difference between a value set to false (intentionally disabled),
+ * vs not set at all:
+ * can then look thru lower level options providers, and take their value.
+ *
+ * ```
+ * export const handleConfigBooleanValue = (x: Promise<number>) => x.then(Boolean).catch(() => undefined);
+ * ```
+ *
+ * but actually, it doesn't matter here, because when we're trying to resolve (here),
+ * our goal is to provide a final value that will be used by the program,
+ * thus no `undefined`.
+ *
+ */
+//
+export const resolveConfigBooleanValue = (x: Promise<number>) => x.then(Boolean).catch(() => false);

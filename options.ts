@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/camelcase */
 
+import fs from "fs";
+import path from "path";
+
 import Git from "nodegit";
 import { bullets } from "nice-comment";
 
@@ -7,10 +10,17 @@ import { Termination } from "./util/error";
 import { removeUndefinedProperties } from "./util/removeUndefinedProperties";
 
 import { InternalOnlyOptions } from "./internal";
-import { parseGitConfigValues } from "./config";
+import { resolveGitConfigValues } from "./config";
+import { filenames } from "./filenames";
 import { noop } from "./util/noop";
 
-export type BaseOptionsForGitStackedRebase = {
+/**
+ * first, the required options:
+ * without them, GSR cannot function properly.
+ */
+export type _BaseOptionsForGitStackedRebase_Required = {
+	initialBranch: string;
+
 	gitDir: string;
 
 	/**
@@ -23,10 +33,12 @@ export type BaseOptionsForGitStackedRebase = {
 	 * that aren't natively supported by `nodegit` (libgit2)
 	 */
 	gitCmd: string;
+};
 
-	gpgSign?: boolean | undefined;
-	autoSquash?: boolean | undefined;
-	autoApplyIfNeeded?: boolean | undefined;
+export type _BaseOptionsForGitStackedRebase_Optional = Partial<{
+	gpgSign: boolean;
+	autoSquash: boolean;
+	autoApplyIfNeeded: boolean;
 
 	apply: boolean;
 	continue: boolean;
@@ -35,43 +47,52 @@ export type BaseOptionsForGitStackedRebase = {
 
 	branchSequencer: boolean;
 	branchSequencerExec: string | false;
-};
+}>;
 
-/**
- * the defaults (some optional)
- */
-export type OptionsForGitStackedRebase = BaseOptionsForGitStackedRebase & InternalOnlyOptions;
+export type ResolvedGitStackedRebaseOptions = Required<_BaseOptionsForGitStackedRebase_Optional> &
+	_BaseOptionsForGitStackedRebase_Required &
+	InternalOnlyOptions;
 
 /**
  * the specifiable ones in the library call (all optional)
  */
-export type SomeOptionsForGitStackedRebase = Partial<OptionsForGitStackedRebase>;
-
-/**
- * the parsed ones (0 optional)
- */
-export type ParsedOptionsForGitStackedRebase = Required<BaseOptionsForGitStackedRebase> & InternalOnlyOptions;
+export type SpecifiableGitStackedRebaseOptions = Partial<ResolvedGitStackedRebaseOptions>;
 
 export const defaultEditor = "vi" as const;
 export const defaultGitCmd = "/usr/bin/env git" as const;
 
-export async function parseOptions(
-	specifiedOptions: SomeOptionsForGitStackedRebase, //
-	config: Git.Config
-): Promise<ParsedOptionsForGitStackedRebase> {
-	const parsedOptions: ParsedOptionsForGitStackedRebase = {
+export type ResolveOptionsCtx = {
+	config: Git.Config;
+	dotGitDirPath: string;
+};
+
+export async function resolveOptions(
+	specifiedOptions: SpecifiableGitStackedRebaseOptions, //
+	{
+		config, //
+		dotGitDirPath,
+	}: ResolveOptionsCtx
+): Promise<ResolvedGitStackedRebaseOptions> {
+	const resolvedOptions: ResolvedGitStackedRebaseOptions = {
 		/**
-		 * order matters
+		 * order matters for what takes priority.
 		 */
-		...getDefaultOptions(),
-		...(await parseGitConfigValues(config)),
+		...getDefaultResolvedOptions(),
+		...(await resolveGitConfigValues(config)),
 		...removeUndefinedProperties(specifiedOptions),
+
+		/**
+		 * the `initialBranch` arg is taken from `specifiedOptions`, instead of `resolvedOptions`,
+		 * because we do want to throw the error if the user didn't specify & does not have cached.
+		 */
+		initialBranch: resolveInitialBranchNameFromProvidedOrCache({
+			initialBranch: specifiedOptions.initialBranch, //
+			dotGitDirPath,
+		}),
 	};
 
-	console.log({ parsedOptions });
-
 	const reasonsWhatWhyIncompatible: string[] = [];
-	if (areOptionsIncompatible(parsedOptions, reasonsWhatWhyIncompatible)) {
+	if (areOptionsIncompatible(resolvedOptions, reasonsWhatWhyIncompatible)) {
 		const msg =
 			"\n" +
 			bullets(
@@ -83,17 +104,19 @@ export async function parseOptions(
 		throw new Termination(msg);
 	}
 
-	return parsedOptions;
+	return resolvedOptions;
 }
 
-export const getDefaultOptions = (): OptionsForGitStackedRebase => ({
+export const getDefaultResolvedOptions = (): ResolvedGitStackedRebaseOptions => ({
+	initialBranch: "origin/master",
+	//
 	gitDir: ".", //
 	gitCmd: process.env.GIT_CMD ?? defaultGitCmd,
 	editor: process.env.EDITOR ?? defaultEditor,
 	//
-	gpgSign: undefined,
-	autoSquash: undefined,
-	autoApplyIfNeeded: undefined,
+	gpgSign: false,
+	autoSquash: false,
+	autoApplyIfNeeded: false,
 	//
 	apply: false,
 	//
@@ -107,7 +130,7 @@ export const getDefaultOptions = (): OptionsForGitStackedRebase => ({
 });
 
 export function areOptionsIncompatible(
-	options: ParsedOptionsForGitStackedRebase, //
+	options: ResolvedGitStackedRebaseOptions, //
 	reasons: string[] = []
 ): boolean {
 	noop(options);
@@ -116,4 +139,50 @@ export function areOptionsIncompatible(
 	 */
 
 	return reasons.length > 0;
+}
+
+export type ResolveInitialBranchNameFromProvidedOrCacheCtx = {
+	initialBranch?: SpecifiableGitStackedRebaseOptions["initialBranch"];
+	dotGitDirPath: string;
+};
+
+export function resolveInitialBranchNameFromProvidedOrCache({
+	initialBranch, //
+	dotGitDirPath,
+}: ResolveInitialBranchNameFromProvidedOrCacheCtx): string {
+	const pathToStackedRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "stacked-rebase");
+	const initialBranchCachePath: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.initialBranch);
+
+	fs.mkdirSync(pathToStackedRebaseDirInsideDotGit, { recursive: true });
+
+	const hasCached = () => fs.existsSync(initialBranchCachePath);
+	const setCache = (initialBranch: string) => fs.writeFileSync(initialBranchCachePath, initialBranch);
+	const getCache = (): string => fs.readFileSync(initialBranchCachePath).toString();
+
+	if (initialBranch) {
+		setCache(initialBranch);
+		return initialBranch;
+	}
+
+	if (hasCached()) {
+		return getCache();
+	} else {
+		/**
+		 * TODO: try from config if default initial branch is specified,
+		 * if yes - check if is here, if yes - ask user if start from there.
+		 * if no - throw
+		 */
+		const msg = `\ndefault argument of the initial branch is required.\n\n`;
+		throw new Termination(msg);
+	}
+}
+
+export async function parseInitialBranch(repo: Git.Repository, nameOfInitialBranch: string): Promise<Git.Reference> {
+	const initialBranch: Git.Reference | void = await Git.Branch.lookup(repo, nameOfInitialBranch, Git.Branch.BRANCH.ALL);
+
+	if (!initialBranch) {
+		throw new Termination("initialBranch lookup failed");
+	}
+
+	return initialBranch;
 }

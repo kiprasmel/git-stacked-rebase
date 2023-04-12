@@ -16,9 +16,9 @@ export async function parseNewGoodCommandsSpec(): Promise<void> {
 	await succeeds_to_apply_after_explicit_drop();
 
 	async function succeeds_to_apply_after_break_or_exec(): Promise<void> {
-		const { initialBranch, common, commitsInLatest } = await setupRepo();
+		const { common, commitsInLatest } = await setupRepo();
 
-		await gitStackedRebase(initialBranch, {
+		await gitStackedRebase({
 			...common,
 			[editor__internal]: ({ filePath }) => {
 				humanOpAppendLineAfterNthCommit("break", {
@@ -28,16 +28,16 @@ export async function parseNewGoodCommandsSpec(): Promise<void> {
 			},
 		});
 
-		await gitStackedRebase(initialBranch, {
+		await gitStackedRebase({
 			...common,
 			apply: true,
 		});
 	}
 
 	async function succeeds_to_apply_after_implicit_drop(): Promise<void> {
-		const { initialBranch, common, commitsInLatest } = await setupRepo();
+		const { common, commitsInLatest } = await setupRepo();
 
-		await gitStackedRebase(initialBranch, {
+		await gitStackedRebase({
 			...common,
 			[editor__internal]: ({ filePath }) => {
 				humanOpRemoveLineOfCommit({
@@ -47,16 +47,16 @@ export async function parseNewGoodCommandsSpec(): Promise<void> {
 			},
 		});
 
-		await gitStackedRebase(initialBranch, {
+		await gitStackedRebase({
 			...common,
 			apply: true,
 		});
 	}
 
 	async function succeeds_to_apply_after_explicit_drop(): Promise<void> {
-		const { initialBranch, common, commitsInLatest } = await setupRepo();
+		const { common, commitsInLatest } = await setupRepo();
 
-		await gitStackedRebase(initialBranch, {
+		await gitStackedRebase({
 			...common,
 			[editor__internal]: ({ filePath }) => {
 				humanOpChangeCommandOfNthCommitInto("drop", {
@@ -66,7 +66,7 @@ export async function parseNewGoodCommandsSpec(): Promise<void> {
 			},
 		});
 
-		await gitStackedRebase(initialBranch, {
+		await gitStackedRebase({
 			...common,
 			apply: true,
 		});

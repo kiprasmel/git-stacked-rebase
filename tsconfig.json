@@ -36,7 +36,11 @@
 	},
 	"exclude": [
 		"node_modules", //
-		"dist"
+		"dist",
+		/**
+		 * ignore test, because of annoying and incorrect error: TS4058
+		 */
+		"test"
 	],
 	"include": [
 		//

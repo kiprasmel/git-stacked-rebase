@@ -40,7 +40,8 @@ async function auto_checks_out_remote_partial_branches() {
 		"expected partial branches to __not be__ checked out locally, to be able to test later that they will be."
 	);
 
-	await gitStackedRebase(RemoteAlice.initialBranch, {
+	await gitStackedRebase({
+		initialBranch: RemoteAlice.initialBranch,
 		gitDir: LocalBob.repo.workdir(),
 		[editor__internal]: () => void 0 /** no edit */,
 	});
@@ -90,7 +91,8 @@ async function give_chosen_name_to_local_branch() {
 		"expected partial branches to __not be__ checked out locally, to be able to test later that they will be."
 	);
 
-	await gitStackedRebase(RemoteAlice.initialBranch, {
+	await gitStackedRebase({
+		initialBranch: RemoteAlice.initialBranch,
 		gitDir: LocalBob.repo.workdir(),
 		[editor__internal]: ({filePath}) => {
 			const branchNameOf2ndBranch: string = RemoteAlice.newPartialBranches[1][0];

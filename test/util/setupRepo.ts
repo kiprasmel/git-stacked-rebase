@@ -7,7 +7,7 @@ import assert from "assert";
 import Git from "nodegit";
 
 import { gitStackedRebase } from "../../git-stacked-rebase";
-import { defaultGitCmd, SomeOptionsForGitStackedRebase } from "../../options";
+import { defaultGitCmd } from "../../options";
 import { configKeys } from "../../config";
 import { humanOpAppendLineAfterNthCommit } from "../../humanOp";
 import { editor__internal, getGitConfig__internal } from "../../internal";
@@ -37,24 +37,32 @@ export async function setupRepo({
 }: Opts = {}) {
 	const ctx: SetupRepoOpts = { ...rest, bare: 0 };
 
-	const base = await (initRepoBase?.(ctx) ?? setupRepoBase(ctx));
+	const { common: _common, ...base } = await (initRepoBase?.(ctx) ?? setupRepoBase(ctx));
 
-	const initialCommitId = "Initial-commit-from-setupRepo";
-	const initialCommitFilePath = path.join(base.dir, initialCommitId);
-	const relFilepaths = [initialCommitId];
+	/**
+	 * create a single initial commit,
+	 * so that other git ops work as expected.
+	 */
+	await createInitialCommit();
 
-	fs.writeFileSync(initialCommitFilePath, initialCommitId);
-	const initialCommit: Git.Oid = await base.repo.createCommitOnHead(
-		relFilepaths, //
-		base.sig,
-		base.sig,
-		initialCommitId
-	);
+	async function createInitialCommit() {
+		const initialCommitId = "Initial-commit-from-setupRepo";
+		const initialCommitFilePath = path.join(base.dir, initialCommitId);
+		const relFilepaths = [initialCommitId];
 
-	console.log("initial commit %s", initialCommit.tostrS());
+		fs.writeFileSync(initialCommitFilePath, initialCommitId);
+		const initialCommit: Git.Oid = await base.repo.createCommitOnHead(
+			relFilepaths, //
+			base.sig,
+			base.sig,
+			initialCommitId
+		);
+
+		console.log("initial commit %s", initialCommit.tostrS());
+	}
 
 	const commitOidsInInitial: Git.Oid[] = [];
-	const initialBranchRef: Git.Reference = await appendCommitsTo(
+	await appendCommitsTo(
 		commitOidsInInitial, //
 		3,
 		base.repo,
@@ -62,7 +70,15 @@ export async function setupRepo({
 		base.dir
 	);
 
+	const initialBranchRef: Git.Reference = await base.repo.getCurrentBranch();
+
 	const initialBranch: string = initialBranchRef.shorthand();
+
+	const common = {
+		..._common,
+		initialBranch,
+	} as const;
+
 	const commitsInInitial: string[] = commitOidsInInitial.map((oid) => oid.tostrS());
 
 	const latestStackedBranchName = "stack-latest";
@@ -86,8 +102,8 @@ export async function setupRepo({
 	] as const;
 
 	console.log("launching 0th rebase to create partial branches");
-	await gitStackedRebase(initialBranch, {
-		...base.common,
+	await gitStackedRebase({
+		...common,
 		[editor__internal]: ({ filePath }) => {
 			console.log("filePath %s", filePath);
 
@@ -118,6 +134,7 @@ export async function setupRepo({
 
 	return {
 		...base,
+		common,
 		read, // TODO move to base
 
 		initialBranchRef,
@@ -185,10 +202,10 @@ export async function setupRepoBase({
 	 * esp. for running tests
 	 * (consumes the provided config, etc)
 	 */
-	const common: SomeOptionsForGitStackedRebase = {
+	const common = {
 		gitDir: dir,
 		[getGitConfig__internal]: () => config,
-	} as const;
+	} as const; // satisfies SomeOptionsForGitStackedRebase; // TODO
 
 	const getBranchNames = nativeGetBranchNames(repo.workdir());
 

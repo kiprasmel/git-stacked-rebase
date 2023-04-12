@@ -5,6 +5,9 @@ import reducePathTC from "../git-reconcile-rewritten-list/reducePath.spec";
 import { parseNewGoodCommandsSpec } from "../parse-todo-of-stacked-rebase/parseNewGoodCommands.spec";
 import autoCheckoutRemotePartialBranchesTC from "./auto-checkout-remote-partial-branches.spec";
 import { applyTC } from "./apply.spec";
+import { argparse_TC } from "../argparse/argparse.spec";
+import { parseArgvResolveOptions_TC } from "./parse-argv-resolve-options.spec";
+import { nonFirstRebaseHasInitialBranchCached_TC } from "./non-first-rebase-has-initial-branch-cached.spec";
 
 import { sequentialResolve } from "../util/sequentialResolve";
 import { cleanupTmpRepos } from "./util/tmpdir";
@@ -26,6 +29,9 @@ function main() {
 		parseNewGoodCommandsSpec,
 		autoCheckoutRemotePartialBranchesTC,
 		applyTC,
+		async () => argparse_TC(),
+		parseArgvResolveOptions_TC,
+		nonFirstRebaseHasInitialBranchCached_TC,
 	])
 		.then(cleanupTmpRepos)
 		.then(() => {
