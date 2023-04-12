@@ -14,14 +14,16 @@ import { bullets } from "nice-comment";
  * separate package (soon)
  */
 import { setupPostRewriteHookFor } from "./git-reconcile-rewritten-list/postRewriteHook";
+import { Argv, createArgParse, Maybe, maybe, last, MaybeArg } from "./argparse/argparse";
 
 import { filenames } from "./filenames";
 import { loadGitConfig } from "./config";
 import {
-	getDefaultOptions, //
-	ParsedOptionsForGitStackedRebase,
-	parseOptions,
-	SomeOptionsForGitStackedRebase,
+	getDefaultResolvedOptions, //
+	ResolvedGitStackedRebaseOptions,
+	parseInitialBranch,
+	resolveOptions,
+	SpecifiableGitStackedRebaseOptions,
 } from "./options";
 import { apply, applyIfNeedsToApply, markThatNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
@@ -55,38 +57,28 @@ import {
 export * from "./options";
 
 export async function gitStackedRebase(
-	nameOfInitialBranch: string,
-	specifiedOptions: SomeOptionsForGitStackedRebase = {}
+	specifiedOptions: SpecifiableGitStackedRebaseOptions = {}
 ): Promise<void> {
 	try {
-		const repo: Git.Repository = await Git.Repository.open(specifiedOptions.gitDir || getDefaultOptions().gitDir);
+		const repo: Git.Repository = await Git.Repository.open(specifiedOptions.gitDir || getDefaultResolvedOptions().gitDir);
 		const config: Git.Config = await loadGitConfig(repo, specifiedOptions);
-
-		const options: ParsedOptionsForGitStackedRebase = await parseOptions(specifiedOptions, config);
-
-		const execSyncInRepo = createExecSyncInRepo(repo);
-
 		const dotGitDirPath: string = repo.path();
 
-		const pathToRegularRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "rebase-merge");
+		const options: ResolvedGitStackedRebaseOptions = await resolveOptions(specifiedOptions, { config, dotGitDirPath });
+
+		console.log({ options });
+
+		const pathToRegularRebaseDirInsideDotGit = path.join(dotGitDirPath, "rebase-merge");
+		const pathToStackedRebaseDirInsideDotGit = path.join(dotGitDirPath, "stacked-rebase");
+
 		const pathToRegularRebaseTodoFile = path.join(pathToRegularRebaseDirInsideDotGit, filenames.gitRebaseTodo);
+		const pathToStackedRebaseTodoFile = path.join(pathToStackedRebaseDirInsideDotGit, filenames.gitRebaseTodo);
 
-		const pathToStackedRebaseDirInsideDotGit: string = path.join(dotGitDirPath, "stacked-rebase");
-		const pathToStackedRebaseTodoFile: string = path.join(pathToStackedRebaseDirInsideDotGit, filenames.gitRebaseTodo);
-
-		const checkIsRegularRebaseStillInProgress = (): boolean => fs.existsSync(pathToRegularRebaseDirInsideDotGit);
-
-		const initialBranch: Git.Reference | void = await Git.Branch.lookup(
-			repo, //
-			nameOfInitialBranch,
-			Git.Branch.BRANCH.ALL
-		);
-		if (!initialBranch) {
-			throw new Error("initialBranch lookup failed");
-		}
-
+		const initialBranch: Git.Reference = await parseInitialBranch(repo, options.initialBranch);
 		const currentBranch: Git.Reference = await repo.getCurrentBranch();
 
+		const execSyncInRepo = createExecSyncInRepo(repo);
+		const checkIsRegularRebaseStillInProgress = (): boolean => fs.existsSync(pathToRegularRebaseDirInsideDotGit);
 		const askQuestion: AskQuestion = askQuestion__internal in options ? options[askQuestion__internal]! : question;
 
 		if (fs.existsSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply))) {
@@ -1385,15 +1377,15 @@ git-stacked-rebase <branch>
     2. but will not apply the changes to partial branches until --apply is used.
 
 
-git-stacked-rebase <branch> [-a|--apply]
+git-stacked-rebase [-a|--apply]
 
-    1. will apply the changes to partial branches,
-    2. but will not push any partial branches to a remote until --push is used.
+    3. will apply the changes to partial branches,
+    4. but will not push any partial branches to a remote until --push is used.
 
 
-git-stacked-rebase <branch> [-p|--push -f|--force]
+git-stacked-rebase [-p|--push -f|--force]
 
-    1. will push partial branches with --force (and extra safety).
+    5. will push partial branches with --force (and extra safety).
 
 
 
@@ -1422,107 +1414,92 @@ git-stacked-rebase __VERSION_REPLACEMENT_STR__ __BUILD_DATE_REPLACEMENT_STR__
 /**
  * the CLI
  */
-export async function git_stacked_rebase(): Promise<void> {
-	process.argv.splice(0, 2);
+export async function git_stacked_rebase(argv: Argv = process.argv.slice(2)): Promise<void> {
+	try {
+		const options: SpecifiableGitStackedRebaseOptions = parseArgv(argv);
+		await gitStackedRebase(options);
+		process.exit(0);
+	} catch (e) {
+		const isKnownError = e instanceof Termination;
+		if (isKnownError) {
+			if (e.exitCode === 0) {
+				process.stdout.write(e.message);
+			} else {
+				process.stderr.write(e.message);
+			}
 
-	if (process.argv.some((arg) => ["-h", "--help"].includes(arg))) {
-		process.stdout.write(helpMsg);
-		return;
+			process.exit(e.exitCode);
+		} else {
+			process.stderr.write(e);
+			process.exit(1);
+		}
+	}
+}
+
+export const parseArgs = (argvStr: string): SpecifiableGitStackedRebaseOptions => parseArgv(!argvStr?.trim() ? [] : argvStr.split(" "));
+
+export function parseArgv(argv: Argv): SpecifiableGitStackedRebaseOptions {
+	const argp = createArgParse(argv);
+
+	if (argp.eatNonPositionals(["-h", "--help"]).length) {
+		throw new Termination(helpMsg, 0);
 	}
 
-	if (process.argv.some((arg) => ["-V", "--version"].includes(arg))) {
-		process.stdout.write(`git-stacked-rebase __VERSION_REPLACEMENT_STR__\n`);
-		return;
+	if (argp.eatNonPositionals(["-V", "--version"]).length) {
+		const msg = `git-stacked-rebase __VERSION_REPLACEMENT_STR__\n`;
+		throw new Termination(msg, 0);
 	}
 
-	const isAutoSquash: boolean | undefined = eatOverwrittableArg("autosquash", process.argv);
-
-	const peakNextArg = (): string | undefined => process.argv[0];
-	const eatNextArg = (): string | undefined => process.argv.shift();
-
-	const eatValueOfNonPositionalArg = (
-		argNameAndAliases: string[],
-		// argName: string | undefined = undefined,
-		indexOfArgVal: number | undefined = undefined,
-		argVal: string | undefined = undefined
-	): typeof argVal => (
-		(process.argv = process.argv
-			.map((arg, i, args) =>
-				i === indexOfArgVal
-					? false
-					: argNameAndAliases.includes(arg)
-					? // ? (((argName = arg), (indexOfArgVal = i + 1), (argVal = args[i + 1])), false)
-					  ((indexOfArgVal = i + 1), (argVal = args[i + 1]), false)
-					: arg
-			)
-			.filter((arg) => arg !== false) as string[]),
-		argVal
+	const isAutoSquash: Maybe<boolean> = maybe(
+		argp.eatNonPositionals(["--autosquash", "--no-autosquash"]),
+		(xs) => last(xs).argName === "--autosquash",
+		_ => undefined
 	);
-
-	/**
-	 * need to read & get rid of non-positional args & their values first.
-	 */
 
 	/**
 	 * TODO use value directly from git's `git --git-dir` if possible?
 	 * (to get the default, probably)
 	 */
-	const gitDir: string | undefined = eatValueOfNonPositionalArg(["--git-dir", "--gd"]);
+	const gitDir: MaybeArg = maybe(
+		argp.eatNonPositionalsWithValues(["--git-dir", "--gd"]),
+		(xs) => last(xs).argVal,
+		_ => undefined
+	);
 
-	/**
-	 * and now off to positional args.
-	 */
-	console.log({ "process.argv after non-positional": process.argv });
+	const checkIsApply = (arg: MaybeArg): boolean => !!arg && ["--apply", "-a"].includes(arg);
+	const checkIsContinue = (arg: MaybeArg): boolean => !!arg && ["--continue", "-c"].includes(arg);
+	const checkIsPush = (arg: MaybeArg): boolean => !!arg && ["--push", "-p"].includes(arg);
+	const checkIsBranchSequencer = (arg: MaybeArg): boolean =>
+		!!arg && ["--branch-sequencer", "--bs", "-s"].includes(arg);
 
-	const nameOfInitialBranch: string | undefined = eatNextArg();
-	if (!nameOfInitialBranch) {
-		throw new Termination(helpMsg);
+	const checkIsSecondArg = (arg: MaybeArg): boolean =>
+		checkIsApply(arg) || checkIsContinue(arg) || checkIsPush(arg) || checkIsBranchSequencer(arg);
+
+	let nameOfInitialBranch: MaybeArg = argp.eatNextArg();
+	let second: MaybeArg;
+
+	if (checkIsSecondArg(nameOfInitialBranch)) {
+		second = nameOfInitialBranch;
+		nameOfInitialBranch = undefined;
+	} else {
+		second = argp.eatNextArg();
+
+		if (second && !checkIsSecondArg(second)) {
+			const msg = `\nunknown second arg "${second}".\n\n`;
+			throw new Termination(msg);
+		}
 	}
 
-	if (["--continue", "-c"].includes(nameOfInitialBranch) && !process.argv.length) {
-		console.log("--continue without initialBranch");
-
-		/**
-		 * TODO allow `null` / make optional
-		 *
-		 * both will need some intellisense to only allow
-		 * in specific cases
-		 *
-		 * (unless we'll keep track of the
-		 * current initial branch we're working with?)
-		 *
-		 */
-		const initialBranch = "";
-
-		/**
-		 * TODO call more appropraitely / extract default options
-		 * so that it's less error-prone here
-		 */
-		return gitStackedRebase(initialBranch, {
-			gitDir,
-			continue: true,
-		});
-	}
-
-	/**
-	 * TODO: improve arg parsing, lmao
-	 */
-	const second = peakNextArg();
-
-	const isApply: boolean = !!second && ["--apply", "-a"].includes(second);
-	const isContinue: boolean = !!second && ["--continue", "-c"].includes(second);
-	const isPush: boolean = !!second && ["--push", "-p"].includes(second);
-	const isBranchSequencer: boolean = !!second && ["--branch-sequencer", "--bs", "-s"].includes(second);
-
-	if (isContinue || isApply || isPush || isBranchSequencer) {
-		eatNextArg();
-	}
+	const isApply: boolean = checkIsApply(second);
+	const isContinue: boolean = checkIsContinue(second);
+	const isPush: boolean = checkIsPush(second);
+	const isBranchSequencer: boolean = checkIsBranchSequencer(second);
 
 	let isForcePush: boolean = false;
 	let branchSequencerExec: string | false = false;
 
-	if (peakNextArg() && (isPush || isBranchSequencer)) {
-		const third = eatNextArg() || "";
+	if (argp.hasMoreArgs() && (isPush || isBranchSequencer)) {
+		const third = argp.eatNextArg() || "";
 
 		if (isPush) {
 			isForcePush = ["--force", "-f"].includes(third);
@@ -1536,31 +1513,27 @@ export async function git_stacked_rebase(): Promise<void> {
 			 *
 			 */
 			const execNames = ["--exec", "-x"];
-			if (execNames.includes(third) && peakNextArg()) {
-				const fourth = eatNextArg();
+			if (execNames.includes(third) && argp.hasMoreArgs()) {
+				const fourth = argp.eatNextArg();
 				branchSequencerExec = fourth ? fourth : false;
 			} else {
-				throw new Termination(
-					`\n--branch-sequencer can only (for now) be followed by ${execNames.join("|")}\n\n`
-				);
+				const msg = `\n--branch-sequencer can only (for now) be followed by "${execNames.join("|")}".\n\n`;
+				throw new Termination(msg);
 			}
 		}
 
 		if (!isForcePush && !branchSequencerExec) {
-			throw new Termination(`\nunrecognized 3th option (got "${third}")\n\n`);
+			throw new Termination(`\nunknown 3rd arg "${third}".\n\n`);
 		}
 	}
 
-	if (process.argv.length) {
-		throw new Termination(
-			"" + //
-				"\n" +
-				bullets("\nerror - leftover arguments: ", process.argv, "  ") +
-				"\n\n"
-		);
+	if (argv.length) {
+		const msg = "\n" + bullets("\nerror - leftover arguments: ", argv, "  ") + "\n\n";
+		throw new Termination(msg);
 	}
 
-	const options: SomeOptionsForGitStackedRebase = {
+	const options: SpecifiableGitStackedRebaseOptions = {
+		initialBranch: nameOfInitialBranch,
 		gitDir,
 		autoSquash: isAutoSquash,
 		apply: isApply,
@@ -1571,46 +1544,9 @@ export async function git_stacked_rebase(): Promise<void> {
 		branchSequencerExec,
 	};
 
-	// await
-	return gitStackedRebase(nameOfInitialBranch, options); //
-}
-
-/**
- * mutates `argv` - removes the
- * --{dashlessArgName}
- * --no-{dashlessArgName}
- * args.
- *
- * @returns {boolean|undefined} which arg prevailed (yes or no).
- * last arg is the deciding one.
- * if 0 args matched, returns undefined
- *
- */
-export function eatOverwrittableArg(dashlessArgName: string, argv: string[]): boolean | undefined {
-	const yesArgName = `--${dashlessArgName}`;
-	const noArgName = `--no-${dashlessArgName}`;
-	const yesNoArgs = [yesArgName, noArgName];
-
-	const matchedArgs = argv.filter((arg) => yesNoArgs.includes(arg));
-
-	if (!matchedArgs.length) {
-		return undefined;
-	}
-
-	return matchedArgs[matchedArgs.length - 1] === yesArgName;
+	return options;
 }
 
 if (!module.parent) {
-	git_stacked_rebase() //
-		.then(() => process.exit(0))
-		.catch((e) => {
-			if (e instanceof Termination) {
-				process.stderr.write(e.message);
-				process.exit(1);
-			} else {
-				console.error(e);
-				process.exit(1);
-				// throw e;
-			}
-		});
+	git_stacked_rebase();
 }

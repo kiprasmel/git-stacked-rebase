@@ -20,7 +20,7 @@ export async function applyTC() {
  * create a scenario where an apply is needed, and disallow it - GSR should exit.
  */
 async function integration__git_stacked_rebase_exits_if_apply_was_needed_but_user_disallowed() {
-	const { initialBranch, common, commitsInLatest, config, repo } = await setupRepo();
+	const { common, commitsInLatest, config, repo } = await setupRepo();
 
 	/**
 	 * ensure autoApplyIfNeeded is disabled
@@ -30,7 +30,7 @@ async function integration__git_stacked_rebase_exits_if_apply_was_needed_but_use
 	/**
 	 * force modify history, so that an apply will be needed
 	 */
-	await gitStackedRebase(initialBranch, {
+	await gitStackedRebase({
 		...common,
 		[editor__internal]: ({ filePath }) => {
 			humanOpChangeCommandOfNthCommitInto("drop", {
@@ -57,7 +57,7 @@ async function integration__git_stacked_rebase_exits_if_apply_was_needed_but_use
 		 * and autoApplyIfNeeded is disabled,
 		 * we should get prompted to allow the apply.
 		 */
-		gitStackedRebase(initialBranch, {
+		gitStackedRebase({
 			...common,
 			...noEditor,
 			[askQuestion__internal]: (q, ...rest) => {
