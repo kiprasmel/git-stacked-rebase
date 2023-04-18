@@ -101,7 +101,15 @@ export async function applyIfNeedsToApply({
 		 * is marked as needed to apply,
 		 * and is mandatory -- try to get a confirmation that it is ok to apply.
 		 */
-		const userAllowedToApply = autoApplyIfNeeded || (await askIfCanApply(config, askQuestion));
+		const userAllowedToApply =
+			autoApplyIfNeeded ||
+			(await askYesNoAlways({
+				questionToAsk: Questions.need_to_apply_before_continuing, //
+				askQuestion,
+				onAllowAlways: async () => {
+					await config.setBool(configKeys.autoApplyIfNeeded, 1);
+				},
+			}));
 
 		if (!userAllowedToApply) {
 			const msg = "\ncannot continue without mandatory --apply. Exiting.\n";
@@ -141,22 +149,29 @@ export async function applyIfNeedsToApply({
 	}
 }
 
-const askIfCanApply = async (config: Git.Config, askQuestion: AskQuestion = question): Promise<boolean> => {
-	const answer = await askQuestion(
-		Questions.need_to_apply_before_continuing, //
-		{ cb: (ans) => ans.trim().toLowerCase() }
-	);
+export type AskYesNoAlwaysCtx = {
+	questionToAsk: Parameters<AskQuestion>[0];
+	askQuestion: AskQuestion;
+	onAllowAlways?: () => void | Promise<void>;
+};
 
-	const userAllowedToApply: boolean = ["y", "yes", ""].includes(answer);
-	const userAllowedToApplyAlways: boolean = ["a", "always"].includes(answer);
+export const askYesNoAlways = async ({
+	questionToAsk, //
+	askQuestion = question,
+	onAllowAlways = () => {},
+}: AskYesNoAlwaysCtx): Promise<boolean> => {
+	const answer: string = await askQuestion(questionToAsk, { cb: (ans) => ans.trim().toLowerCase() });
 
-	if (userAllowedToApplyAlways) {
-		await config.setBool(configKeys.autoApplyIfNeeded, 1);
+	const userAllowed: boolean = ["y", "yes", ""].includes(answer);
+	const userAllowedAlways: boolean = ["a", "always"].includes(answer);
+
+	if (userAllowedAlways) {
+		await onAllowAlways();
 	}
 
-	const canApply = userAllowedToApply || userAllowedToApplyAlways;
+	const allowed = userAllowed || userAllowedAlways;
 
-	return canApply;
+	return allowed;
 };
 
 const getPaths = (
