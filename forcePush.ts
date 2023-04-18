@@ -12,6 +12,7 @@ import {
 } from "./branchSequencer";
 
 import { createQuestion } from "./util/createQuestion";
+import { Termination } from "./util/error";
 
 export const forcePush: BranchSequencerBase = (argsBase) =>
 	// /**
@@ -66,45 +67,10 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 			const forceWithLeaseOrForce: string = "--force-with-lease --force-if-includes";
 
 			if (!upstreamBranch) {
-				const remotes: string[] = await repo.getRemoteNames();
-
-				if (remotes.length === 0) {
-					throw new Error("0 remotes found, cannot push a new branch into a remote.");
-				}
-
-				let remote: string;
-
-				if (remotes.length === 1) {
-					remote = remotes[0];
-				} else {
-					const indices: string[] = remotes.map((_, i) => i + 1).map((x) => x.toString());
-
-					const question = createQuestion();
-
-					let answer: string = "";
-
-					let first = true;
-					while (!remotes.includes(answer)) {
-						answer = (
-							await question(
-								(first ? "\n" : "") +
-									"multiple remotes detected, please choose one for new branch:" +
-									remotes.map((r, i) => `\n  ${i + 1} ${r}`).join("") +
-									"\n> "
-							)
-						)
-							.trim()
-							.toLowerCase();
-
-						if (indices.includes(answer)) {
-							answer = remotes[Number(answer) - 1];
-						}
-
-						first = false;
-					}
-
-					remote = answer;
-				}
+				let remote: string = await pickRemoteFromRepo(repo, {
+					cannotDoXWhenZero: "Cannot push a new branch into a remote.",
+					pleaseChooseOneFor: "new branch",
+				});
 
 				const cmd = `push -u ${remote} ${branch.name()} ${forceWithLeaseOrForce}`;
 				console.log(`running ${cmd}`);
@@ -134,3 +100,55 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 		 */
 		reverseCheckoutOrder: true,
 	});
+
+export async function pickRemoteFromRepo(
+	repo: Git.Repository,
+	{
+		cannotDoXWhenZero,
+		pleaseChooseOneFor,
+	}: {
+		cannotDoXWhenZero?: string; //
+		pleaseChooseOneFor?: string;
+	}
+) {
+	const remotes: string[] = await repo.getRemoteNames();
+
+	if (remotes.length === 0) {
+		const msg = "0 remotes found." + (!cannotDoXWhenZero ? "" : " " + cannotDoXWhenZero);
+		throw new Termination(msg);
+	}
+
+	let remote: string;
+
+	if (remotes.length === 1) {
+		remote = remotes[0];
+	} else {
+		const indices: string[] = remotes.map((_, i) => i + 1).map((x) => x.toString());
+
+		const question = createQuestion();
+
+		let answer: string = "";
+
+		let first = true;
+		while (!remotes.includes(answer)) {
+			const q: string = [
+				first ? "\n" : "",
+				`multiple remotes detected, please choose one` + !pleaseChooseOneFor ? "." : " for" + pleaseChooseOneFor + ":",
+				remotes.map((r, i) => `  ${i + 1} ${r}`).join("\n"),
+				"> ",
+			].join("\n");
+
+			answer = (await question(q)).trim().toLowerCase();
+
+			if (indices.includes(answer)) {
+				answer = remotes[Number(answer) - 1];
+			}
+
+			first = false;
+		}
+
+		remote = answer;
+	}
+
+	return remote;
+}

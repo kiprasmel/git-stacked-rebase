@@ -144,7 +144,7 @@ export async function applyIfNeedsToApply({
 const askIfCanApply = async (config: Git.Config, askQuestion: AskQuestion = question): Promise<boolean> => {
 	const answer = await askQuestion(
 		Questions.need_to_apply_before_continuing, //
-		(ans) => ans.trim().toLowerCase()
+		{ cb: (ans) => ans.trim().toLowerCase() }
 	);
 
 	const userAllowedToApply: boolean = ["y", "yes", ""].includes(answer);
