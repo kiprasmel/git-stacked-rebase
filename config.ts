@@ -7,6 +7,9 @@ import { getGitConfig__internal } from "./internal";
 
 export const configKeyPrefix = "stackedrebase" as const;
 
+export type ConfigKeys = typeof configKeys;
+export type ConfigKey = keyof ConfigKeys;
+
 export const configKeys = {
 	gpgSign: "commit.gpgSign",
 	autoApplyIfNeeded: `${configKeyPrefix}.autoApplyIfNeeded`,
