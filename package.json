@@ -28,6 +28,7 @@
 	"dependencies": {
 		"nice-comment": "0.9.0",
 		"nodegit": "0.28.0-alpha.18",
+		"open": "8.4.2",
 		"pipestdio": "0.1.3"
 	}
 }
