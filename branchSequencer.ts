@@ -3,7 +3,7 @@ import assert from "assert";
 
 import Git from "nodegit";
 
-import { getWantedCommitsWithBranchBoundariesOurCustomImpl } from "./git-stacked-rebase";
+import { CommitAndBranchBoundary, getWantedCommitsWithBranchBoundariesOurCustomImpl, removeLocalRegex, removeRemoteRegex } from "./git-stacked-rebase";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { Termination } from "./util/error";
@@ -24,11 +24,13 @@ export type GetBranchesCtx = BranchRefs & {
 	repo: Git.Repository;
 	pathToStackedRebaseTodoFile: string;
 };
+
 export type SimpleBranchAndCommit = {
 	commitSHA: string | null;
 	branchEndFullName: string[];
 	// branchExistsYet: boolean; // TODO
 };
+
 export type GetBoundariesInclInitial = (
 	ctx: GetBranchesCtx //
 ) => SimpleBranchAndCommit[] | Promise<SimpleBranchAndCommit[]>;
@@ -39,7 +41,7 @@ export const isStackedRebaseInProgress = ({
 	pathToStackedRebaseDirInsideDotGit: string;
 }): boolean => fs.existsSync(pathToStackedRebaseDirInsideDotGit);
 
-const getBoundariesInclInitialByParsingNotYetAppliedState: GetBoundariesInclInitial = ({
+export const getBoundariesInclInitialByParsingNotYetAppliedState: GetBoundariesInclInitial = ({
 	pathToStackedRebaseDirInsideDotGit, //
 	rootLevelCommandName,
 	repo,
@@ -113,13 +115,15 @@ const getBoundariesInclInitialByParsingNotYetAppliedState: GetBoundariesInclInit
 		);
 };
 
-const getBoundariesInclInitialWithSipleBranchTraversal: GetBoundariesInclInitial = (argsBase) =>
+export const getBoundariesInclInitialWithSipleBranchTraversal: GetBoundariesInclInitial = (argsBase) =>
 	getWantedCommitsWithBranchBoundariesOurCustomImpl(
 		argsBase.repo, //
 		argsBase.initialBranch,
 		argsBase.currentBranch
-	).then((boundaries) =>
-		boundaries
+	).then((boundaries) => convertBoundaryToSimpleBranchAndCommit(boundaries));
+
+export function convertBoundaryToSimpleBranchAndCommit(boundaries: CommitAndBranchBoundary[]): SimpleBranchAndCommit[] {
+		return boundaries
 			.filter((b) => !!b.branchEnd?.length)
 			.map(
 				(boundary): SimpleBranchAndCommit => ({
@@ -127,7 +131,7 @@ const getBoundariesInclInitialWithSipleBranchTraversal: GetBoundariesInclInitial
 					commitSHA: boundary.commit.sha(),
 				})
 			)
-	);
+}
 
 /**
  * not sure if i'm a fan of this indirection tbh..
@@ -163,7 +167,7 @@ export const defaultGetBranchBoundariesBehavior =
 		"if-stacked-rebase-in-progress-then-parse-not-applied-state-otherwise-simple-branch-traverse"
 	];
 
-const pickBoundaryParser = ({
+export const pickBoundaryParser = ({
 	behaviorOfGetBranchBoundaries,
 	pathToStackedRebaseDirInsideDotGit,
 }: {
@@ -278,23 +282,7 @@ export const branchSequencer: BranchSequencer = async ({
 			initialBranch,
 			currentBranch,
 		})
-	).map((boundary) => {
-		boundary.branchEndFullName = boundary.branchEndFullName.map((x) => x.replace("refs/heads/", ""));
-		assert(boundary.branchEndFullName);
-
-		/**
-		 * if we only have the remote branch, but it's not checked out locally,
-		 * we'd end up in a detached state, and things would break.
-		 *
-		 * thus, we checkout the branch locally if it's not.
-		 */
-		if (boundary.branchEndFullName.some((x) => x.startsWith("refs/remotes/"))) {
-			boundary.branchEndFullName = boundary.branchEndFullName.map((x) => x.replace(/refs\/remotes\/[^/]+\//, ""));
-		}
-
-		// console.log({ targetCommitSHA, target: targetBranch });
-		return boundary;
-	});
+	).map(trimRefNamesOfBoundary);
 
 	/**
 	 * remove the initial branch
@@ -366,3 +354,20 @@ export const branchSequencer: BranchSequencer = async ({
 		return goNext();
 	}
 };
+
+export function trimRefNamesOfBoundary(boundary: SimpleBranchAndCommit) {
+	boundary.branchEndFullName = boundary.branchEndFullName.map((x) => x.replace(removeLocalRegex, ""));
+	assert(boundary.branchEndFullName);
+
+	/**
+	 * if we only have the remote branch, but it's not checked out locally,
+	 * we'd end up in a detached state, and things would break.
+	 *
+	 * thus, we checkout the branch locally if it's not.
+	 */
+	if (boundary.branchEndFullName.some((x) => x.startsWith("refs/remotes/"))) {
+		boundary.branchEndFullName = boundary.branchEndFullName.map((x) => x.replace(removeRemoteRegex, ""));
+	}
+
+	return boundary;
+}

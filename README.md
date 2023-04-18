@@ -94,7 +94,14 @@ git-stacked-rebase [-a|--apply]
 
 git-stacked-rebase [-p|--push -f|--force]
 
-    5. will push partial branches with --force (and extra safety).
+    5. will push partial branches with --force (and extra safety),
+    6. but will not create any pull requests until --pull-request is used.
+
+
+git-stacked-rebase [--pr|--pull-request]
+
+    7. generates a list of URLs that can be used to create stacked PRs.
+      (experimental, currently github-only.)
 
 
 

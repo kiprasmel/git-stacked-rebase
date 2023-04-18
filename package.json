@@ -10,11 +10,13 @@
 		"git-stacked-rebase": "./dist/git-stacked-rebase.js"
 	},
 	"scripts": {
-		"prebuild:lean": "node ./script/prebuild.js",
+		"dev": "yarn build:core && yarn tsc -w",
 		"test": "ts-node-dev ./test/run.ts",
-		"build": "yarn test && yarn build:lean",
-		"build:lean": "yarn tsc -b && yarn --cwd nvim-git-rebase-todo build && yarn --cwd git-reconcile-rewritten-list build",
-		"postbuild:lean": "node ./script/postbuild.js",
+		"build": "yarn test && yarn build:all",
+		"build:all": "node ./script/prebuild.js && yarn build:core && yarn build:nvim && yarn build:reconciler && node ./script/postbuild.js",
+		"build:core": "yarn tsc -b",
+		"build:nvim": "yarn --cwd nvim-git-rebase-todo build",
+		"build:reconciler": "yarn --cwd git-reconcile-rewritten-list build",
 		"prepack": "yarn build"
 	},
 	"devDependencies": {

@@ -30,6 +30,7 @@ import { forcePush } from "./forcePush";
 import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequencer";
 import { autosquash } from "./autosquash";
 import { askQuestion__internal, editor__internal, EitherEditor } from "./internal";
+import { generateListOfURLsToCreateStackedPRs } from "./pullRequestStack";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -167,6 +168,15 @@ export async function gitStackedRebase(
 				initialBranch,
 				currentBranch,
 			});
+		}
+
+		if (options.pullRequest) {
+			const githubFrontendURLsForUserToCreatePRs: string[] = await generateListOfURLsToCreateStackedPRs({ repo, initialBranch, currentBranch, askQuestion });
+
+			const out = "\n" + githubFrontendURLsForUserToCreatePRs.join("\n") + "\n\n";
+			process.stdout.write(out);
+
+			return;
 		}
 
 		if (options.branchSequencer) {
@@ -1237,9 +1247,12 @@ exit 1
 	return commitsWithBranchBoundaries;
 }
 
-const removeLocalRegex = /^refs\/heads\//;
-const removeRemoteRegex = /^refs\/remotes\/([^/]*)\//;
-noop(removeRemoteRegex);
+export const removeLocalRegex = /^refs\/heads\//;
+export const removeRemoteRegex = /^refs\/remotes\/([^/]+)\//;
+
+export function removeLocalAndRemoteRefPrefix(x: string): string {
+	return x.replace(removeLocalRegex, "").replace(removeRemoteRegex, "");
+}
 
 async function extendCommitsWithBranchEnds(
 	repo: Git.Repository,
@@ -1372,7 +1385,14 @@ git-stacked-rebase [-a|--apply]
 
 git-stacked-rebase [-p|--push -f|--force]
 
-    5. will push partial branches with --force (and extra safety).
+    5. will push partial branches with --force (and extra safety),
+    6. but will not create any pull requests until --pull-request is used.
+
+
+git-stacked-rebase [--pr|--pull-request]
+
+    7. generates a list of URLs that can be used to create stacked PRs.
+      (experimental, currently github-only.)
 
 
 
@@ -1417,7 +1437,9 @@ export async function git_stacked_rebase(argv: Argv = process.argv.slice(2)): Pr
 
 			process.exit(e.exitCode);
 		} else {
-			process.stderr.write(e);
+			const msg = e instanceof Error ? e.message : e;
+			process.stderr.write(msg + "\n");
+
 			process.exit(1);
 		}
 	}
@@ -1452,6 +1474,8 @@ export function parseArgv(argv: Argv): SpecifiableGitStackedRebaseOptions {
 		(xs) => last(xs).argVal,
 		_ => undefined
 	);
+
+	const isPullRequest: Maybe<boolean> = argp.eatNonPositionals(["--pr", "--pull-request"]).length > 0
 
 	const checkIsApply = (arg: MaybeArg): boolean => !!arg && ["--apply", "-a"].includes(arg);
 	const checkIsContinue = (arg: MaybeArg): boolean => !!arg && ["--continue", "-c"].includes(arg);
@@ -1529,6 +1553,7 @@ export function parseArgv(argv: Argv): SpecifiableGitStackedRebaseOptions {
 		forcePush: isForcePush,
 		branchSequencer: isBranchSequencer,
 		branchSequencerExec,
+		pullRequest: isPullRequest,
 	};
 
 	return options;
