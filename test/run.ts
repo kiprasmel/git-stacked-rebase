@@ -11,6 +11,14 @@ import { cleanupTmpRepos } from "./util/tmpdir";
 
 main();
 function main() {
+	process.on("uncaughtException", (e) => {
+		printErrorAndExit(e);
+	});
+
+	process.on("unhandledRejection", (e) => {
+		printErrorAndExit(e);
+	});
+
 	// TODO Promise.all
 	sequentialResolve([
 		testCase, //
@@ -24,8 +32,15 @@ function main() {
 			process.stdout.write("\nsuccess\n\n");
 			process.exit(0);
 		})
-		.catch((e) => {
-			process.stderr.write("\nfailure: " + e + "\n\n");
-			process.exit(1);
-		});
+		.catch(printErrorAndExit);
+}
+
+function printErrorAndExit(e: unknown) {
+	console.error(e);
+
+	console.log("\nfull trace:");
+	console.trace(e);
+
+	process.stdout.write("\nfailure\n\n");
+	process.exit(1);
 }
