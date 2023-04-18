@@ -10,7 +10,7 @@ import { Termination } from "./util/error";
 import { removeUndefinedProperties } from "./util/removeUndefinedProperties";
 
 import { InternalOnlyOptions } from "./internal";
-import { resolveGitConfigValues } from "./config";
+import { ConfigValues, defaultConfigValues, resolveGitConfigValues } from "./config";
 import { filenames } from "./filenames";
 import { noop } from "./util/noop";
 
@@ -39,6 +39,7 @@ export type _BaseOptionsForGitStackedRebase_Optional = Partial<{
 	gpgSign: boolean;
 	autoSquash: boolean;
 	autoApplyIfNeeded: boolean;
+	autoOpenPRUrlsInBrowser: ConfigValues["autoOpenPRUrlsInBrowser"];
 
 	apply: boolean;
 	continue: boolean;
@@ -119,6 +120,7 @@ export const getDefaultResolvedOptions = (): ResolvedGitStackedRebaseOptions => 
 	gpgSign: false,
 	autoSquash: false,
 	autoApplyIfNeeded: false,
+	autoOpenPRUrlsInBrowser: defaultConfigValues.autoOpenPRUrlsInBrowser,
 	//
 	apply: false,
 	//

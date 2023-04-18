@@ -28,6 +28,7 @@ export const question = (
 export const Questions = {
 	need_to_apply_before_continuing: "need to --apply before continuing. proceed? [Y/n/(a)lways] ", //
 	commit_has_multiple_branches_pointing_at_it__which_to_use_for_pr_stack: `Which branch to use for the PR stack? `,
+	open_urls_in_web_browser: "Open URLs in default web browser? [Y/n/(a)lways] ",
 } as const;
 
 /**

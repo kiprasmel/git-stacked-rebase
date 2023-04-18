@@ -8,7 +8,9 @@ import Git from "nodegit";
 import fs from "fs";
 import path from "path";
 import assert from "assert";
+
 import { bullets } from "nice-comment";
+import open from "open";
 
 /**
  * separate package (soon)
@@ -17,7 +19,7 @@ import { setupPostRewriteHookFor } from "./git-reconcile-rewritten-list/postRewr
 import { Argv, createArgParse, Maybe, maybe, last, MaybeArg } from "./argparse/argparse";
 
 import { filenames } from "./filenames";
-import { loadGitConfig } from "./config";
+import { ConfigValues, configKeys, loadGitConfig } from "./config";
 import {
 	getDefaultResolvedOptions, //
 	ResolvedGitStackedRebaseOptions,
@@ -25,7 +27,7 @@ import {
 	resolveOptions,
 	SpecifiableGitStackedRebaseOptions,
 } from "./options";
-import { apply, applyIfNeedsToApply, markThatNeedsToApply } from "./apply";
+import { apply, applyIfNeedsToApply, askYesNoAlways, markThatNeedsToApply } from "./apply";
 import { forcePush } from "./forcePush";
 import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequencer";
 import { autosquash } from "./autosquash";
@@ -40,7 +42,8 @@ import { Termination } from "./util/error";
 import { assertNever } from "./util/assertNever";
 import { Single, Tuple } from "./util/tuple";
 import { isDirEmptySync } from "./util/fs";
-import { AskQuestion, question } from "./util/createQuestion";
+import { AskQuestion, Questions, question } from "./util/createQuestion";
+import { delay } from "./util/delay";
 import {
     getParseTargetsCtxFromLine,
 	GoodCommand,
@@ -171,10 +174,31 @@ export async function gitStackedRebase(
 		}
 
 		if (options.pullRequest) {
-			const githubFrontendURLsForUserToCreatePRs: string[] = await generateListOfURLsToCreateStackedPRs({ repo, initialBranch, currentBranch, askQuestion });
+			const githubFrontendURLsForUserToCreatePRs: string[] = await generateListOfURLsToCreateStackedPRs({
+				repo, //
+				initialBranch,
+				currentBranch,
+				askQuestion,
+			});
 
-			const out = "\n" + githubFrontendURLsForUserToCreatePRs.join("\n") + "\n\n";
+			const out = "\n" + githubFrontendURLsForUserToCreatePRs.join("\n") + "\n";
 			process.stdout.write(out);
+
+			const shouldOpenURLsInWebBrowser: boolean = await askYesNoAlways({
+				questionToAsk: Questions.open_urls_in_web_browser, //
+				askQuestion,
+				onAllowAlways: async () => {
+					const always: ConfigValues["autoOpenPRUrlsInBrowser"] = "always";
+					await config.setString(configKeys.autoOpenPRUrlsInBrowser, always);
+				},
+			});
+
+			if (shouldOpenURLsInWebBrowser) {
+				for (const url of githubFrontendURLsForUserToCreatePRs) {
+					await open(url);
+					await delay(10);
+				}
+			}
 
 			return;
 		}

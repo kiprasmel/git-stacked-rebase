@@ -14,6 +14,7 @@ export const configKeys = {
 	gpgSign: "commit.gpgSign",
 	autoApplyIfNeeded: `${configKeyPrefix}.autoApplyIfNeeded`,
 	autoSquash: "rebase.autoSquash",
+	autoOpenPRUrlsInBrowser: `${configKeyPrefix}.autoOpenPRUrlsInBrowser`,
 } as const;
 
 export async function loadGitConfig(
@@ -25,27 +26,38 @@ export async function loadGitConfig(
 		: await Git.Config.openDefault();
 }
 
+/**
+ * DON'T FORGET TO UPDATE `_BaseOptionsForGitStackedRebase_Optional` in options.ts
+ */
 export type ConfigValues = {
 	gpgSign: boolean | undefined;
 	autoApplyIfNeeded: boolean | undefined;
 	autoSquash: boolean | undefined;
+	autoOpenPRUrlsInBrowser: "always" | "ask" | "never";
 };
+
+export const defaultConfigValues: Pick<ConfigValues, "autoOpenPRUrlsInBrowser"> = {
+	autoOpenPRUrlsInBrowser: "ask",
+}; // TODO TS satisfies ConfigValues
 
 export async function resolveGitConfigValues(config: Git.Config): Promise<ConfigValues> {
 	const [
 		gpgSign, //
 		autoApplyIfNeeded,
 		autoSquash,
+		autoOpenPRUrlsInBrowser,
 	] = await Promise.all([
 		resolveConfigBooleanValue(config.getBool(configKeys.gpgSign)),
 		resolveConfigBooleanValue(config.getBool(configKeys.autoApplyIfNeeded)),
 		resolveConfigBooleanValue(config.getBool(configKeys.autoSquash)),
+		resolveAutoOpenPRUrlsInBrowserValue(config.getStringBuf(configKeys.autoOpenPRUrlsInBrowser)),
 	]);
 
 	const configValues: ConfigValues = {
 		gpgSign,
 		autoApplyIfNeeded,
 		autoSquash,
+		autoOpenPRUrlsInBrowser,
 	};
 
 	return configValues;
@@ -67,3 +79,21 @@ export async function resolveGitConfigValues(config: Git.Config): Promise<Config
  */
 //
 export const resolveConfigBooleanValue = (x: Promise<number>) => x.then(Boolean).catch(() => false);
+
+export const resolveAutoOpenPRUrlsInBrowserValue = (
+	pendingConfigValue: Promise<Git.Buf>
+): Promise<ConfigValues["autoOpenPRUrlsInBrowser"]> => {
+	const parse = (x: Git.Buf) =>
+		autoOpenPRUrlsInBrowserAllowedValues.includes(x.ptr as ConfigValues["autoOpenPRUrlsInBrowser"])
+			? (x.ptr as ConfigValues["autoOpenPRUrlsInBrowser"])
+			: defaultConfigValues.autoOpenPRUrlsInBrowser;
+
+	return pendingConfigValue
+		.then(parse) //
+		.catch(() => defaultConfigValues.autoOpenPRUrlsInBrowser);
+};
+export const autoOpenPRUrlsInBrowserAllowedValues: ConfigValues["autoOpenPRUrlsInBrowser"][] = [
+	"always",
+	"ask",
+	"never",
+];
