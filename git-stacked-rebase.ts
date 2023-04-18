@@ -1016,17 +1016,6 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 	 * END check e.g. fork & origin/fork
 	 */
 
-	//
-
-	console.log({
-		//
-		bb,
-		str: bb.toString(),
-		name: bb.name(),
-		peeled: (await bb.peel(Git.Object.TYPE.ANY)).id().tostrS(),
-		resolved: (await bb.resolve()).name(),
-	});
-
 	const commitOfInitialBranch: Git.Oid = await referenceToOid(bb);
 	const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
 
@@ -1036,9 +1025,7 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 		commitOfInitialBranch,
 		commitOfCurrentBranch
 	);
-	console.log({
-		latestCommitOfOursThatInitialBranchAlreadyHas: latestCommitOfOursThatInitialBranchAlreadyHas.tostrS(),
-	});
+	console.log({ mergeBase: latestCommitOfOursThatInitialBranchAlreadyHas.tostrS() });
 
 	const commitOfInitialBranchAsCommit: Git.Commit = await Git.Commit.lookup(repo, commitOfInitialBranch);
 
