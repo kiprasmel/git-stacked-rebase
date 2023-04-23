@@ -9,7 +9,8 @@ set -e
 # (thru current branch), we don't want to push thru nightly either.
 #
 CURR_BRANCH_PUSHED="origin/$(git branch --show)"
-git branch -f nightly "$CURR_BRANCH_PUSHED"
+CURR_BRANCH_PUSHED_COMMIT=$(git rev-parse "$CURR_BRANCH_PUSHED")
+git branch -f nightly "$CURR_BRANCH_PUSHED_COMMIT"
 
 LOCAL_NIGHTLY="$(git rev-parse nightly)"
 REMOTE_NIGHTLY="$(git rev-parse origin/nightly)"
