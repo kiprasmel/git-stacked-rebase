@@ -1,5 +1,6 @@
 import fs from "fs";
 import assert from "assert";
+import os from "os";
 
 import Git from "nodegit";
 
@@ -8,7 +9,6 @@ import { CommitAndBranchBoundary, getWantedCommitsWithBranchBoundariesOurCustomI
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { Termination } from "./util/error";
 import { assertNever } from "./util/assertNever";
-import { sequentialResolve } from "./util/sequentialResolve";
 
 import { parseNewGoodCommands } from "./parse-todo-of-stacked-rebase/parseNewGoodCommands";
 import { GoodCommand, GoodCommandStacked } from "./parse-todo-of-stacked-rebase/validator";
@@ -295,19 +295,42 @@ export const branchSequencer: BranchSequencer = async ({
 		branchesAndCommits.reverse();
 	}
 
-	return checkout(branchesAndCommits);
+	const switchBackToLatestBranch = (msgCb?: (latestBranch: string) => string) => {
+		const latestBranch: string = currentBranch.shorthand();
+
+		if (msgCb && msgCb instanceof Function) {
+			process.stdout.write(msgCb(latestBranch));
+		}
+
+		execSyncInRepo(`${gitCmd} checkout ${latestBranch}`);
+	};
+
+	/**
+	 * if aborted, switch back to latest branch.
+	 */
+	function handleSigint() {
+		switchBackToLatestBranch((latestBranch) => `\ncaught SIGINT, switching back to latest branch '${latestBranch}'\n`);
+		process.exit(128 + os.constants.signals.SIGINT);
+	}
+	function handleSigterm() {
+		switchBackToLatestBranch((latestBranch) => `\ncaught SIGTERM, switching back to latest branch '${latestBranch}'\n`);
+		process.exit(128 + os.constants.signals.SIGTERM);
+	}
+
+	/** add listeners */
+	process.on("SIGINT", handleSigint);
+	process.on("SIGTERM", handleSigterm);
+
+	return checkout(branchesAndCommits).finally(() => {
+			/** remove listeners */
+			process.removeListener("SIGINT", handleSigint);
+			process.removeListener("SIGTERM", handleSigterm);
+		});
 
 	async function checkout(boundaries: SimpleBranchAndCommit[]): Promise<void> {
 		if (!boundaries.length) {
-			/**
-			 * done.
-			 *
-			 * now just checkout to the latest branch
-			 */
-
-			// await repo.checkoutBranch(latestBoundary.branchEndFullName);
-			execSyncInRepo(`${gitCmd} checkout ${currentBranch.shorthand()}`);
-
+			/** done */
+			switchBackToLatestBranch();
 			return;
 		}
 
@@ -332,24 +355,22 @@ export const branchSequencer: BranchSequencer = async ({
 			? boundaries.length === originalBoundariesLength
 			: boundaries.length === 1;
 
-		await sequentialResolve(
-			targetBranch.map((x) => async () => {
-				/**
-				 * https://libgit2.org/libgit2/#HEAD/group/checkout/git_checkout_head
-				 */
-				// await Git.Checkout.tree(repo, targetBranch as any); // TODO TS FIXME
-				execSyncInRepo(`${gitCmd} checkout ${x}`); // f this
+		for (const target of targetBranch) {
+			/**
+			 * https://libgit2.org/libgit2/#HEAD/group/checkout/git_checkout_head
+			 */
+			// await Git.Checkout.tree(repo, targetBranch as any); // TODO TS FIXME
+			execSyncInRepo(`${gitCmd} checkout ${target}`); // f this
 
-				await actionInsideEachCheckedOutBranch({
-					repo, //
-					gitCmd,
-					targetBranch: x,
-					targetCommitSHA,
-					isLatestBranch,
-					execSyncInRepo,
-				});
-			})
-		);
+			await actionInsideEachCheckedOutBranch({
+				repo, //
+				gitCmd,
+				targetBranch: target,
+				targetCommitSHA,
+				isLatestBranch,
+				execSyncInRepo,
+			});
+		}
 
 		return goNext();
 	}
