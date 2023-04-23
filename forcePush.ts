@@ -40,7 +40,7 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 	branchSequencer({
 		...argsBase,
 		// pathToStackedRebaseDirInsideDotGit,
-		actionInsideEachCheckedOutBranch: async ({ execSyncInRepo, repo }) => {
+		actionInsideEachCheckedOutBranch: async ({ execSyncInRepo, repo, collectError }) => {
 			const branch: Git.Reference = await repo.getCurrentBranch();
 			const upstreamBranch: Git.Reference | null = await Git.Branch.upstream(branch).catch(() => null);
 
@@ -66,17 +66,21 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 			 */
 			const forceWithLeaseOrForce: string = "--force-with-lease --force-if-includes";
 
-			if (!upstreamBranch) {
-				let remote: string = await pickRemoteFromRepo(repo, {
-					cannotDoXWhenZero: "Cannot push a new branch into a remote.",
-					pleaseChooseOneFor: "new branch",
-				});
+			try {
+				if (!upstreamBranch) {
+					let remote: string = await pickRemoteFromRepo(repo, {
+						cannotDoXWhenZero: "Cannot push a new branch into a remote.",
+						pleaseChooseOneFor: "new branch",
+					});
 
-				const cmd = `push -u ${remote} ${branch.name()} ${forceWithLeaseOrForce}`;
-				console.log(`running ${cmd}`);
-				execSyncInRepo(`${argsBase.gitCmd} ${cmd}`);
-			} else {
-				execSyncInRepo(`${argsBase.gitCmd} push ${forceWithLeaseOrForce}`);
+					const cmd = `push -u ${remote} ${branch.name()} ${forceWithLeaseOrForce}`;
+					console.log(`running ${cmd}`);
+					execSyncInRepo(`${argsBase.gitCmd} ${cmd}`);
+				} else {
+					execSyncInRepo(`${argsBase.gitCmd} push ${forceWithLeaseOrForce}`);
+				}
+			} catch (e) {
+				collectError(e);
 			}
 		},
 		delayMsBetweenCheckouts: 0,

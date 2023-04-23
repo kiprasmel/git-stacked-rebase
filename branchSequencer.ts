@@ -219,6 +219,8 @@ export type ActionInsideEachCheckedOutBranchCtx = {
 	targetCommitSHA: string;
 	isLatestBranch: boolean;
 	execSyncInRepo: ReturnType<typeof createExecSyncInRepo>;
+	
+	collectError: (e: unknown) => void;
 };
 export type ActionInsideEachCheckedOutBranch = (ctx: ActionInsideEachCheckedOutBranchCtx) => void | Promise<void>;
 
@@ -317,15 +319,42 @@ export const branchSequencer: BranchSequencer = async ({
 		process.exit(128 + os.constants.signals.SIGTERM);
 	}
 
+	const collectedErrors: unknown[] = [];
+
+	/**
+	 * node process may exit because of SIGINT/SIGTERM,
+	 * but before it can - an `UnhandledPromiseRejectionWarning` can occur,
+	 * which prints an ugly warning, and we don't want that,
+	 * since it most oftenly occurs only because of the SIGTERM (Ctrl-C),
+	 * which e.g. in forcePush interrupts the executed git child process.
+	 *
+	 * in such a case, we don't care about the warning,
+	 * and want to exit calmly.
+	 * 
+	 * thus, we collect the errors, and only throw them
+	 * after the performing the action on all branches.
+	 * obviously, we don't throw if the node process already exited.
+	 */
+	function collectError(e: unknown) {
+		collectedErrors.push(e);
+	}
+
 	/** add listeners */
 	process.on("SIGINT", handleSigint);
 	process.on("SIGTERM", handleSigterm);
 
 	return checkout(branchesAndCommits).finally(() => {
-			/** remove listeners */
-			process.removeListener("SIGINT", handleSigint);
-			process.removeListener("SIGTERM", handleSigterm);
-		});
+		/** remove listeners */
+		process.removeListener("SIGINT", handleSigint);
+		process.removeListener("SIGTERM", handleSigterm);
+
+		if (collectedErrors.length) {
+			console.error(collectedErrors);
+
+			const msg = `encountered ${collectedErrors.length} errors, aborting.`;
+			throw new Error(msg);
+		}
+	});
 
 	async function checkout(boundaries: SimpleBranchAndCommit[]): Promise<void> {
 		if (!boundaries.length) {
@@ -369,6 +398,7 @@ export const branchSequencer: BranchSequencer = async ({
 				targetCommitSHA,
 				isLatestBranch,
 				execSyncInRepo,
+				collectError,
 			});
 		}
 
