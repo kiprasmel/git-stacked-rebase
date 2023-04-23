@@ -178,6 +178,7 @@ export async function gitStackedRebase(
 				repo, //
 				initialBranch,
 				currentBranch,
+				ignoredBranches: options.ignoredBranches,
 				askQuestion,
 			});
 
