@@ -40,6 +40,7 @@ export type _BaseOptionsForGitStackedRebase_Optional = Partial<{
 	autoSquash: boolean;
 	autoApplyIfNeeded: boolean;
 	autoOpenPRUrlsInBrowser: ConfigValues["autoOpenPRUrlsInBrowser"];
+	ignoredBranches: ConfigValues["ignoredBranches"];
 
 	apply: boolean;
 	continue: boolean;
@@ -59,7 +60,13 @@ export type ResolvedGitStackedRebaseOptions = Required<_BaseOptionsForGitStacked
 /**
  * the specifiable ones in the library call (all optional)
  */
-export type SpecifiableGitStackedRebaseOptions = Partial<ResolvedGitStackedRebaseOptions>;
+export type SpecifiableGitStackedRebaseOptions = Partial<
+	Omit<
+		ResolvedGitStackedRebaseOptions,
+		/** some options can be specified thru config, but not as CLI arg: */
+		"ignoredBranches"
+	>
+>;
 
 export const defaultEditor = "vi" as const;
 export const defaultGitCmd = "/usr/bin/env git" as const;
@@ -121,6 +128,7 @@ export const getDefaultResolvedOptions = (): ResolvedGitStackedRebaseOptions => 
 	autoSquash: false,
 	autoApplyIfNeeded: false,
 	autoOpenPRUrlsInBrowser: defaultConfigValues.autoOpenPRUrlsInBrowser,
+	ignoredBranches: [],
 	//
 	apply: false,
 	//

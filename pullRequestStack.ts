@@ -16,13 +16,15 @@ export type GenerateListOfURLsToCreateStackedPRsCtx = {
 	repo: Git.Repository;
 	initialBranch: Git.Reference;
 	currentBranch: Git.Reference;
+	ignoredBranches: string[];
 	askQuestion: AskQuestion;
-}
+};
 
 export async function generateListOfURLsToCreateStackedPRs({
 	repo,
 	initialBranch,
 	currentBranch,
+	ignoredBranches,
 	askQuestion,
 }: GenerateListOfURLsToCreateStackedPRsCtx): Promise<string[]> {
 	const branchBoundaries: CommitAndBranchBoundary[] = await getWantedCommitsWithBranchBoundariesOurCustomImpl(
@@ -33,6 +35,7 @@ export async function generateListOfURLsToCreateStackedPRs({
 
 	const stackedBranchesReadyForStackedPRs: CommitBranch[] = await getStackedBranchesReadyForStackedPRs({
 		branchBoundaries,
+		ignoredBranches,
 		askQuestion,
 	});
 
@@ -87,10 +90,12 @@ export type CommitBranch = Triple<string, string, Git.Reference>;
 export type GetStackedBranchesReadyForStackedPRsCtx = {
 	branchBoundaries: CommitAndBranchBoundary[];
 	askQuestion: AskQuestion;
+	ignoredBranches: string[];
 };
 
 export async function getStackedBranchesReadyForStackedPRs({
 	branchBoundaries,
+	ignoredBranches,
 	askQuestion,
 }: GetStackedBranchesReadyForStackedPRsCtx): Promise<CommitBranch[]> {
 	const result: CommitBranch[] = [];
@@ -101,7 +106,9 @@ export async function getStackedBranchesReadyForStackedPRs({
 		}
 
 		const commitSha: string = boundary.commit.sha();
-		const branchEnds: string[] = boundary.branchEnd.map((b) => removeLocalAndRemoteRefPrefix(b.name()));
+		const branchEnds: string[] = boundary.branchEnd
+			.map((b) => removeLocalAndRemoteRefPrefix(b.name())) //
+			.filter((b) => !ignoredBranches.some((ignoredBranchSubstr) => b.includes(ignoredBranchSubstr)));
 
 		if (branchEnds.length === 1) {
 			result.push([commitSha, branchEnds[0], boundary.branchEnd[0]]);
