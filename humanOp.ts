@@ -9,6 +9,8 @@ import fs from "fs";
 
 import { RegularRebaseCommand } from "./parse-todo-of-stacked-rebase/validator";
 
+import { log } from "./util/log";
+
 type CommonArgs = {
 	filePath: string; //
 	commitSHA: string;
@@ -21,7 +23,7 @@ export function humanOpAppendLineAfterNthCommit(newLine: string, { filePath, com
 	const lines = readLines(filePath);
 	const lineIdx: number = findLineByCommit(lines, commitSHA);
 
-	console.log("commitSHA: %s, lineIdx: %s, newLine: %s", commitSHA, lineIdx, newLine);
+	log("commitSHA: %s, lineIdx: %s, newLine: %s", commitSHA, lineIdx, newLine);
 
 	lines.splice(lineIdx, 0, newLine);
 
@@ -35,7 +37,7 @@ export function humanOpChangeCommandOfNthCommitInto(
 	const lines = readLines(filePath);
 	const lineIdx: number = findLineByCommit(lines, commitSHA);
 
-	console.log("commitSHA: %s, lineIdx: %s, newCommand: %s", commitSHA, lineIdx, newCommand);
+	log("commitSHA: %s, lineIdx: %s, newCommand: %s", commitSHA, lineIdx, newCommand);
 
 	const parts = lines[lineIdx].split(" ");
 	parts[0] = newCommand;

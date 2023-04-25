@@ -7,6 +7,7 @@ import { combineRewrittenLists } from "./git-reconcile-rewritten-list/combineRew
 import { AskQuestion, question, Questions } from "./util/createQuestion";
 import { isDirEmptySync } from "./util/fs";
 import { Termination } from "./util/error";
+import { log } from "./util/log";
 
 import { filenames } from "./filenames";
 import { configKeys } from "./config";
@@ -41,9 +42,9 @@ const defaultApplyAction: ActionInsideEachCheckedOutBranch = async ({
 }) => {
 	const commit: Git.Commit = await Git.Commit.lookup(repo, targetCommitSHA);
 
-	console.log("will reset to commit", commit.sha(), "(" + commit.summary() + ")");
+	log("will reset to commit", commit.sha(), "(" + commit.summary() + ")");
 
-	console.log({ isLatestBranch });
+	log({ isLatestBranch });
 
 	if (!isLatestBranch) {
 		/**

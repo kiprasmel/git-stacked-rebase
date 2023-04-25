@@ -6,6 +6,8 @@ import assert from "assert"
 import fs from "fs"
 import { execSync } from "child_process"
 
+import { log} from "../util/log"
+
 export type StringFromToMap = { [key: string]: string }
 
 export type RewrittenListBlockBase = {
@@ -59,7 +61,7 @@ export function combineRewrittenLists(rewrittenListFileContent: string): Combine
 			})
 		)
 		// .map(list => Object.fromEntries(list))
-	console.log("rewrittenLists", rewrittenLists)
+	log("rewrittenLists", rewrittenLists)
 
 	let prev                       : RewrittenListBlockAmend[]  = []
 	let mergedReducedRewrittenLists: RewrittenListBlockRebase[] = []
@@ -271,7 +273,7 @@ export function combineRewrittenLists(rewrittenListFileContent: string): Combine
 	 * since could potentially lose some info if skipping partial steps?
 	 */
 
-	console.log("mergedReducedRewrittenLists", mergedReducedRewrittenLists)
+	log("mergedReducedRewrittenLists", mergedReducedRewrittenLists)
 
 	const combinedRewrittenList = Object.entries(lastRebaseList.mapping).map(([k, v]) => k + " " + v).join("\n") + "\n"
 	// fs.writeFileSync("rewritten-list", combinedRewrittenList)
@@ -309,7 +311,7 @@ export function reducePath(obj: StringFromToMap): StringFromToMap {
 
 			const valueIsAnotherKey = value in obj
 			if (valueIsAnotherKey) {
-				console.log("reducing. old:", key, "->", value, ";", value, "->", obj[value], "new:", key, "->", obj[value])
+				log("reducing. old:", key, "->", value, ";", value, "->", obj[value], "new:", key, "->", obj[value])
 				// reduce
 				obj[key] = obj[value]
 				keysMarkedForDeletion.add(value)
@@ -334,7 +336,7 @@ export function reducePath(obj: StringFromToMap): StringFromToMap {
 if (!module.parent) {
 	const prefix = "" // "test/.tmp-described.off/"
 	const rewrittenListFile = fs.readFileSync(prefix + ".git/stacked-rebase/rewritten-list", { encoding: "utf-8" })
-	console.log({ rewrittenListFile })
+	log({ rewrittenListFile })
 
 	const { mergedReducedRewrittenLists } = combineRewrittenLists(rewrittenListFile)
 
@@ -352,7 +354,7 @@ if (!module.parent) {
 	fs.writeFileSync(afterpath, after.join("\n") + "\n")
 
 	const N = after.length
-	console.log({ N })
+	log({ N })
 
 	const currpath = path.join(dir, "curr")
 	execSync(`git log --pretty=format:"%H" | head -n ${N} | tac - > ${currpath}`)

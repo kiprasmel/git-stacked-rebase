@@ -13,6 +13,7 @@ import {
 
 import { createQuestion } from "./util/createQuestion";
 import { Termination } from "./util/error";
+import { log } from "./util/log";
 
 export const forcePush: BranchSequencerBase = (argsBase) =>
 	// /**
@@ -74,7 +75,7 @@ export const forcePush: BranchSequencerBase = (argsBase) =>
 					});
 
 					const cmd = `push -u ${remote} ${branch.name()} ${forceWithLeaseOrForce}`;
-					console.log(`running ${cmd}`);
+					log(`running ${cmd}`);
 					execSyncInRepo(`${argsBase.gitCmd} ${cmd}`);
 				} else {
 					execSyncInRepo(`${argsBase.gitCmd} push ${forceWithLeaseOrForce}`);

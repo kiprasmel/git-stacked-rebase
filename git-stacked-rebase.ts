@@ -44,6 +44,7 @@ import { Single, Tuple } from "./util/tuple";
 import { isDirEmptySync } from "./util/fs";
 import { AskQuestion, Questions, question } from "./util/createQuestion";
 import { delay } from "./util/delay";
+import { log, GSR_LOGDIR } from "./util/log";
 import {
     getParseTargetsCtxFromLine,
 	GoodCommand,
@@ -70,7 +71,7 @@ export async function gitStackedRebase(
 
 		const options: ResolvedGitStackedRebaseOptions = await resolveOptions(specifiedOptions, { config, dotGitDirPath });
 
-		console.log({ options });
+		log({ options });
 
 		const pathToRegularRebaseDirInsideDotGit = path.join(dotGitDirPath, "rebase-merge");
 		const pathToStackedRebaseDirInsideDotGit = path.join(dotGitDirPath, "stacked-rebase");
@@ -111,7 +112,7 @@ export async function gitStackedRebase(
 				return;
 			}
 
-			console.log("after --continue, rebase done. trying to --apply");
+			log("after --continue, rebase done. trying to --apply");
 
 			/**
 			 * rebase has finished. we can try to --apply now
@@ -236,7 +237,7 @@ export async function gitStackedRebase(
 		const wasRegularRebaseInProgress: boolean = checkIsRegularRebaseStillInProgress();
 		// const
 
-		console.log({ wasRegularRebaseInProgress });
+		log({ wasRegularRebaseInProgress });
 
 		if (wasRegularRebaseInProgress) {
 			throw new Termination("regular rebase already in progress");
@@ -282,7 +283,7 @@ export async function gitStackedRebase(
 				if (editor instanceof Function) {
 					await editor({ filePath: pathToStackedRebaseTodoFile });
 				} else {
-					process.stdout.write("\nhint: Waiting for your editor to close the file... ");
+					process.stdout.write("hint: Waiting for your editor to close the file... ");
 					execSyncInRepo(`${editor} ${pathToStackedRebaseTodoFile}`);
 				}
 			} catch (_e) {
@@ -472,9 +473,9 @@ export async function gitStackedRebase(
 					`invalid old name of command in git-rebase-todo file. got "${words[0]}", expected one of "${allowedOldName}".`
 				);
 				words[0] = newName;
-				console.log({ before: linesOfEditedRebaseTodo[cmd.lineNumber] });
+				log({ before: linesOfEditedRebaseTodo[cmd.lineNumber] });
 				linesOfEditedRebaseTodo[cmd.lineNumber] = words.join(" ");
-				console.log({ after: linesOfEditedRebaseTodo[cmd.lineNumber] });
+				log({ after: linesOfEditedRebaseTodo[cmd.lineNumber] });
 			}
 
 			fs.writeFileSync(pathToStackedRebaseTodoFile, linesOfEditedRebaseTodo.join("\n"), { encoding: "utf-8" });
@@ -533,7 +534,7 @@ export async function gitStackedRebase(
 
 		const regularRebaseTodo: string = regularRebaseTodoLines.join("\n") + "\n";
 
-		console.log({
+		log({
 			regularRebaseTodo,
 			pathToRegularRebaseTodoFile,
 		});
@@ -595,7 +596,6 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 				},
 			}
 		);
-		console.log("big buns - the proper rebase returned");
 
 		/**
 		 * will need to apply, unless proven otherwise
@@ -642,7 +642,10 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 		);
 
 		if (isRegularRebaseStillInProgress) {
+			log("regular git rebase process exited, but rebase is not finished yet - exiting outselves.");
 			return;
+		} else {
+			log("regular git rebase process exited, and rebase is finished - continuing our execution.");
 		}
 
 		// await repo.continueRebase(undefined as any, () => {
@@ -661,17 +664,14 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 
 		// const rebase = await Git.Rebase.init()
 
-		console.log("CONTINUING AFTER EXEC SYNC rebase --continue");
-
 		const commitShaOfNewCurrentCommit = await getCurrentCommit();
 		const rebaseChangedLocalHistory: boolean = commitShaOfCurrentCommit !== commitShaOfNewCurrentCommit;
 
-		console.log({
+		log({
 			rebaseChangedLocalHistory, //
 			commitShaOfOldCurrentCommit: commitShaOfCurrentCommit,
 			commitShaOfNewCurrentCommit,
 		});
-		console.log("");
 
 		fs.unlinkSync(path.join(pathToStackedRebaseDirInsideDotGit, filenames.willNeedToApply));
 		if (rebaseChangedLocalHistory) {
@@ -942,7 +942,7 @@ function checkoutRemotePartialBranchesLocally(
 		return;
 	}
 
-	console.log({ branchesWhoNeedLocalCheckout });
+	log({ branchesWhoNeedLocalCheckout });
 
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
@@ -1005,7 +1005,7 @@ export async function getFileStatuses(repo: Git.Repository) {
 
 	const receivedStatuses = fileStatuses.map((statusFile) => {
 		const results = callAll((statusFile as unknown) as KeyToFunctionMap);
-		console.log({ results });
+		log({ results });
 		return results;
 	});
 
@@ -1060,7 +1060,7 @@ export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
 		commitOfInitialBranch,
 		commitOfCurrentBranch
 	);
-	console.log({ mergeBase: latestCommitOfOursThatInitialBranchAlreadyHas.tostrS() });
+	log({ mergeBase: latestCommitOfOursThatInitialBranchAlreadyHas.tostrS() });
 
 	const commitOfInitialBranchAsCommit: Git.Commit = await Git.Commit.lookup(repo, commitOfInitialBranch);
 
@@ -1158,7 +1158,7 @@ exit 1
 			`;
 	const editorScriptPath: string = path.join(dotGitDirPath, "editorScript.sh");
 	fs.writeFileSync(editorScriptPath, editorScript, { mode: "777" });
-	console.log("wrote editorScript");
+	log("wrote editorScript");
 
 	try {
 		const execSyncInRepo = createExecSyncInRepo(repo);
@@ -1196,7 +1196,7 @@ exit 1
 			">/dev/null",
 		].join(" ");
 
-		console.log("launching internal rebase with editorScript to create initial todo:\n%s", cmd);
+		log("launching internal rebase with editorScript to create initial todo:\n%s", cmd);
 
 		execSyncInRepo(cmd, {
 			env: {
@@ -1213,7 +1213,7 @@ exit 1
 		}
 	}
 
-	console.log("rebase -i exited successfully");
+	log("rebase -i exited successfully");
 
 	/** END COPY-PASTA */
 
@@ -1436,6 +1436,11 @@ non-positional args:
     makes git-stacked-rebase begin operating inside the specified directory.
 
 
+  --debug
+
+    prints the debug directory where logs are stored.
+
+
   -V|--version
   -h|--help
 
@@ -1481,6 +1486,11 @@ export function parseArgv(argv: Argv): SpecifiableGitStackedRebaseOptions {
 
 	if (argp.eatNonPositionals(["-V", "--version"]).length) {
 		const msg = `git-stacked-rebase __VERSION_REPLACEMENT_STR__\n`;
+		throw new Termination(msg, 0);
+	}
+
+	if (argp.eatNonPositionals(["--debug"]).length) {
+		const msg = GSR_LOGDIR + "\n";
 		throw new Termination(msg, 0);
 	}
 

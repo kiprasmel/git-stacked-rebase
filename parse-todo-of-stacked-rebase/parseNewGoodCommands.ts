@@ -16,6 +16,8 @@ import {
 	stackedRebaseCommands,
 } from "./validator";
 
+import { log } from "../util/log";
+
 export function parseNewGoodCommands(
 	repo: Git.Repository,
 	pathToStackedRebaseTodoFile: string //
@@ -62,8 +64,8 @@ export function parseNewGoodCommands(
 		//
 	});
 
-	console.log({ newCommits: newCommits.map((c) => c.newSHA + ": " + array(c.oldSHAs)) });
-	console.log({ oldCommits });
+	log({ newCommits: newCommits.map((c) => c.newSHA + ": " + array(c.oldSHAs)) });
+	log({ oldCommits });
 
 	/**
 	 * match oldCommits & goodCommands
@@ -140,9 +142,8 @@ export function parseNewGoodCommands(
 		 */
 		if (goodOldCommand.lineNumber < goodCommandMinIndex) {
 			// TODO VERIFY
-			console.warn(
-				`goodCommandOld.index (${goodOldCommand.lineNumber}) < goodCommandMinIndex (${goodCommandMinIndex}), continue'ing.`
-			);
+			const msg = `goodCommandOld.index (${goodOldCommand.lineNumber}) < goodCommandMinIndex (${goodCommandMinIndex}), continue'ing.`;
+			log(msg); // WARN
 
 			// goodCommandMinIndex++;
 
@@ -150,13 +151,13 @@ export function parseNewGoodCommands(
 		} else if (goodOldCommand.lineNumber === goodCommandMinIndex) {
 			// perfect?
 			// TODO VERIFY
-			console.info(`index match`);
+			log(`index match`);
 
 			update();
 		} else {
 			// jump?
 			// TODO VERIFY
-			console.warn(`jump, continue'ing`);
+			log(`jump, continue'ing`); // WARN
 
 			// update(); // TODO VERIFY
 			continue;
@@ -167,13 +168,12 @@ export function parseNewGoodCommands(
 
 	goodNewCommands.push(oldGoodCommands[oldGoodCommands.length - 1]);
 
-	// console.log({ goodNewCommands });
-	console.log({
+	log({
 		len: oldGoodCommands.length,
 		goodCommands: oldGoodCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
 	});
 
-	console.log({
+	log({
 		len: goodNewCommands.length,
 		goodNewCommands: goodNewCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
 	});
@@ -190,7 +190,7 @@ export function parseNewGoodCommands(
 		)
 		.filter((cmd) => !!cmd) as GoodCommand[]; // TODO TS should infer automatically
 
-	console.log({
+	log({
 		["stackedRebaseCommandsOld.length"]: stackedRebaseCommandsOld.length,
 		["stackedRebaseCommandsNew.length"]: stackedRebaseCommandsNew.length,
 	});
@@ -204,14 +204,14 @@ export function parseNewGoodCommands(
 }
 
 const logGoodCmds = (goodCommands: GoodCommand[]): void => {
-	console.log({
+	log({
 		goodCommands: goodCommands.map((c) => ({
 			...c,
 			targets: c.targets?.length === 1 ? c.targets[0] : array(c.targets ?? []),
 		})),
 	});
 
-	console.log({
+	log({
 		goodCommands: goodCommands.map((c) => c.commandOrAliasName + ": " + c.targets?.join(", ") + "."),
 	});
 };

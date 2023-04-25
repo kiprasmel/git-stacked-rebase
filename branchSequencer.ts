@@ -9,6 +9,7 @@ import { CommitAndBranchBoundary, getWantedCommitsWithBranchBoundariesOurCustomI
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { Termination } from "./util/error";
 import { assertNever } from "./util/assertNever";
+import { logAlways } from "./util/log";
 
 import { parseNewGoodCommands } from "./parse-todo-of-stacked-rebase/parseNewGoodCommands";
 import { GoodCommand, GoodCommandStacked } from "./parse-todo-of-stacked-rebase/validator";
@@ -363,7 +364,7 @@ export const branchSequencer: BranchSequencer = async ({
 			return;
 		}
 
-		console.log("\ncheckout", boundaries.length, reverseCheckoutOrder ? "(reversed)" : "");
+		logAlways("\ncheckout", boundaries.length, reverseCheckoutOrder ? "(reversed)" : "");
 
 		const goNext = () =>
 			new Promise<void>((r) => {
