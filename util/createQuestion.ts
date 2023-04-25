@@ -19,7 +19,7 @@ export type AskQuestion = typeof question;
 export const question = (
 	q: typeof Questions[keyof typeof Questions] | (string & {}), //
 	{
-		prefix = "\n", //
+		prefix = "", //
 		suffix = "",
 		cb = (ans: string): string => ans,
 	} = {}
@@ -39,14 +39,17 @@ export type AskWhichBranchEndToUseForStackedPRsCtx = {
 	branchEnds: string[];
 	commitSha: string;
 	askQuestion: AskQuestion;
+	nonFirstAsk: boolean;
 };
 export async function askWhichBranchEndToUseForStackedPRs({
 	branchEnds, //
 	commitSha,
 	askQuestion,
+	nonFirstAsk,
 }: AskWhichBranchEndToUseForStackedPRsCtx) {
 	const prefix: string =
-		`\nCommit: ${commitSha}` +
+		(nonFirstAsk ? "\n" : "") +
+		`Commit: ${commitSha}` +
 		`\nBranch:` +
 		"\n" +
 		branchEnds.map((branch, idx) => `[${idx + 1}] ${branch}`).join("\n") +

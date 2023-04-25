@@ -4,6 +4,8 @@ import Git from "nodegit";
 
 import { setupRepo, setupRepoBase } from "./setupRepo";
 
+import { log } from "../../util/log";
+
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function setupRemoteRepo() {
 	const {
@@ -38,7 +40,7 @@ export async function setupRemoteRepo() {
 			},
 		}));
 
-	console.log({ RemoteBareServer, RemoteAlice, LocalBob });
+	log({ RemoteBareServer, RemoteAlice, LocalBob });
 
 	RemoteAlice.push();
 	await LocalBob.fetch();

@@ -15,6 +15,7 @@ import { getBranches, nativeGetBranchNames, nativePush } from "../../native-git/
 
 import { createExecSyncInRepo } from "../../util/execSyncInRepo";
 import { UnpromiseFn } from "../../util/Unpromise";
+import { log } from "../../util/log";
 
 import { createTmpdir, CreateTmpdirOpts } from "./tmpdir";
 
@@ -58,7 +59,7 @@ export async function setupRepo({
 			initialCommitId
 		);
 
-		console.log("initial commit %s", initialCommit.tostrS());
+		log("initial commit %s", initialCommit.tostrS());
 	}
 
 	const commitOidsInInitial: Git.Oid[] = [];
@@ -101,11 +102,11 @@ export async function setupRepo({
 		["partial-3", 8],
 	] as const;
 
-	console.log("launching 0th rebase to create partial branches");
+	log("launching 0th rebase to create partial branches");
 	await gitStackedRebase({
 		...common,
 		[editor__internal]: ({ filePath }) => {
-			console.log("filePath %s", filePath);
+			log("filePath %s", filePath);
 
 			for (const [newPartial, nthCommit] of newPartialBranches) {
 				humanOpAppendLineAfterNthCommit(`branch-end-new ${newPartial}`, {
@@ -114,13 +115,12 @@ export async function setupRepo({
 				});
 			}
 
-			console.log("finished editor");
+			log("finished editor");
 
 			read();
 		},
 	});
 
-	// console.log("looking up branches to make sure they were created successfully");
 	read();
 	const partialBranches: Git.Reference[] = [];
 	for (const [newPartial] of newPartialBranches) {
@@ -176,7 +176,7 @@ export async function setupRepoBase({
 	 * TODO make concurrent-safe (lol)
 	 */
 	process.chdir(dir);
-	console.log("chdir to tmpdir %s", dir);
+	log("chdir to tmpdir %s", dir);
 
 	const repo: Git.Repository = await initRepo({ Git, dir, bare });
 
@@ -193,7 +193,7 @@ export async function setupRepoBase({
 	await config.setBool(configKeys.gpgSign, Git.Config.MAP.FALSE);
 
 	const sig: Git.Signature = await Git.Signature.default(repo);
-	console.log("sig %s", sig);
+	log("sig %s", sig);
 
 	const execSyncInRepo = createExecSyncInRepo(repo);
 
@@ -249,7 +249,7 @@ export async function appendCommitsTo(
 
 		alreadyExistingCommits.push(oid);
 
-		console.log(`oid of commit "%s" in branch "%s": %s`, commit, branchName, oid);
+		log(`oid of commit "%s" in branch "%s": %s`, commit, branchName, oid);
 	}
 
 	return await repo.getCurrentBranch();

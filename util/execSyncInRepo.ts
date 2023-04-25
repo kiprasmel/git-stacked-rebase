@@ -3,6 +3,8 @@ import { execSync } from "child_process";
 import Git from "nodegit";
 import { pipestdio } from "pipestdio";
 
+import { log } from "./log";
+
 export type CreateExecSyncInRepoConfig = {
 	logCmd?: boolean;
 };
@@ -20,7 +22,7 @@ export const createExecSyncInRepo = (repo: Git.Repository, { logCmd = false }: C
 	command: string,
 	extraOptions: Parameters<typeof execSync>[1] = {}
 ) => (
-	logCmd && console.log(`execSync: ${command}`),
+	logCmd && log(`execSync: ${command}`),
 	execSync(command, {
 		...pipestdio(),
 		...extraOptions,

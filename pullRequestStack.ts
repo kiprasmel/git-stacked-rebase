@@ -39,10 +39,6 @@ export async function generateListOfURLsToCreateStackedPRs({
 		askQuestion,
 	});
 
-	// console.log({
-	// 	stackedBranchesReadyForStackedPRs: stackedBranchesReadyForStackedPRs.map((x) => x.slice(0, 2).join("  ")),
-	// });
-
 	const remoteName: string = await pickRemoteFromRepo(repo, {
 		cannotDoXWhenZero: "Cannot create pull requests without any remotes.",
 		pleaseChooseOneFor: "creating pull requests",
@@ -76,8 +72,6 @@ export async function generateListOfURLsToCreateStackedPRs({
 		prevBranch = branch;
 	}
 
-	// console.log({ githubURLsForCreatingPRs });
-
 	return githubURLsForCreatingPRs;
 }
 
@@ -100,6 +94,8 @@ export async function getStackedBranchesReadyForStackedPRs({
 }: GetStackedBranchesReadyForStackedPRsCtx): Promise<CommitBranch[]> {
 	const result: CommitBranch[] = [];
 
+	let countOfCommitsWithMultipleBranches: number = 0;
+
 	for (let boundary of branchBoundaries) {
 		if (!boundary.branchEnd?.length) {
 			continue;
@@ -121,7 +117,12 @@ export async function getStackedBranchesReadyForStackedPRs({
 			 * because need to know on top of which to stack later PRs.
 			 */
 
-			const chosenBranch: string = await askWhichBranchEndToUseForStackedPRs({ branchEnds, commitSha, askQuestion });
+			const chosenBranch: string = await askWhichBranchEndToUseForStackedPRs({
+				branchEnds, //
+				commitSha,
+				askQuestion,
+				nonFirstAsk: countOfCommitsWithMultipleBranches > 0,
+			});
 			const chosenBranchRef: Git.Reference = boundary.branchEnd.find(
 				(be) => removeLocalAndRemoteRefPrefix(be.name()) === chosenBranch
 			)!;
@@ -132,6 +133,8 @@ export async function getStackedBranchesReadyForStackedPRs({
 			}
 
 			result.push([commitSha, chosenBranch, chosenBranchRef]);
+
+			countOfCommitsWithMultipleBranches++;
 		}
 	}
 

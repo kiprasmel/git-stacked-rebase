@@ -120,6 +120,11 @@ non-positional args:
     makes git-stacked-rebase begin operating inside the specified directory.
 
 
+  --debug
+
+    prints the debug directory where logs are stored.
+
+
   -V|--version
   -h|--help
 

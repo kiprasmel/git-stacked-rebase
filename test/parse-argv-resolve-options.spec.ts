@@ -16,10 +16,11 @@ import {
 } from "../git-stacked-rebase";
 
 import { rmdirSyncR } from "../util/fs";
+import { log } from "../util/log";
 
 export async function parseArgvResolveOptions_TC() {
 	for (const testData of simpleTests) {
-		console.log({ testData });
+		log({ testData });
 		await runSimpleTest(...testData);
 	}
 }
@@ -73,7 +74,7 @@ async function runSimpleTest(specifiedOptions: SimpleTestInput[0], expectedOptio
 	const tmpGitConfig: Git.Config = await Git.Config.openOndisk(tmpfile);
 
 	const parsedArgv = typeof specifiedOptions === "string" ? parseArgs(specifiedOptions) : parseArgv(specifiedOptions);
-	console.log({ parsedArgv });
+	log({ parsedArgv });
 
 	const resolvedOptions: ResolvedGitStackedRebaseOptions = await resolveOptions(parsedArgv, {
 		config: tmpGitConfig, //
