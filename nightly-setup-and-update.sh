@@ -6,10 +6,7 @@
 git checkout nightly
 git pull --rebase
 
-yarn
-yarn --cwd nvim-git-rebase-todo
-yarn --cwd git-reconcile-rewritten-list
-
+yarn install:all
 yarn build
 
 ## https://stackoverflow.com/a/69259147/9285308

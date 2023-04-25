@@ -47,4 +47,8 @@ jobs:
           cache-dependency-path: '**/yarn.lock'
       - run: yarn --frozen-lockfile
       - run: yarn test
+      # e2e
+      - run: yarn install:all
+      - run: yarn build:all
+      - run: ./dist/git-stacked-rebase.js --debug
  

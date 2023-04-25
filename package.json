@@ -10,6 +10,7 @@
 		"git-stacked-rebase": "./dist/git-stacked-rebase.js"
 	},
 	"scripts": {
+		"install:all": "yarn && yarn --cwd nvim-git-rebase-todo && yarn --cwd git-reconcile-rewritten-list",
 		"dev": "yarn build:core && yarn tsc -w",
 		"test": "ts-node-dev ./test/run.ts",
 		"build": "yarn test && yarn build:all",
