@@ -13,7 +13,6 @@ import { editor__internal } from "../internal";
 
 export async function testCase(): Promise<void> {
 	const {
-		initialBranch, //
 		common,
 		commitsInLatest,
 		read,
@@ -28,7 +27,7 @@ export async function testCase(): Promise<void> {
 
 	const nthCommit2ndRebase = 5;
 
-	await gitStackedRebase(initialBranch, {
+	await gitStackedRebase({
 		...common,
 		[editor__internal]: async ({ filePath }) => {
 			humanOpChangeCommandOfNthCommitInto("edit", {
@@ -69,7 +68,7 @@ export async function testCase(): Promise<void> {
 	console.log("attempting early 3rd rebase to --apply");
 	read();
 
-	await gitStackedRebase(initialBranch, {
+	await gitStackedRebase({
 		...common,
 		apply: true,
 	});

@@ -86,15 +86,15 @@ git-stacked-rebase <branch>
     2. but will not apply the changes to partial branches until --apply is used.
 
 
-git-stacked-rebase <branch> [-a|--apply]
+git-stacked-rebase [-a|--apply]
 
-    1. will apply the changes to partial branches,
-    2. but will not push any partial branches to a remote until --push is used.
+    3. will apply the changes to partial branches,
+    4. but will not push any partial branches to a remote until --push is used.
 
 
-git-stacked-rebase <branch> [-p|--push -f|--force]
+git-stacked-rebase [-p|--push -f|--force]
 
-    1. will push partial branches with --force (and extra safety).
+    5. will push partial branches with --force (and extra safety).
 
 
 
