@@ -48,6 +48,14 @@ REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.spl
 		merge_base_to_latest_to_initial === \"$INITIAL_BRANCH_COMMIT\"
 		&& merge_base_to_latest !== \"$INITIAL_BRANCH_COMMIT\" /** if merge base from ref to latest is initial, then ref does not exist inside latest. */
 
+	/**
+	 * if directly part of latest branch, then is inside the stack & has not diverged,
+	 * thus no repairs are needed (to integrate it into the stack / latest branch)
+	*/
+	const ref_is_directly_part_of_latest_branch =
+		ref_exists_between_latest_and_initial &&
+		merge_base_to_latest === x[0]
+
 	const ref = {
 		commit: x[0],
 		objtype: x[1],
@@ -57,9 +65,17 @@ REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.spl
 		merge_base_to_latest,
 		merge_base_to_latest_to_initial,
 		ref_exists_between_latest_and_initial,
+		ref_is_directly_part_of_latest_branch,
 	}
 
-	process.stdout.write(merge_base_to_initial + ' ' + merge_base_to_latest_to_initial + ' ' + merge_base_to_latest + ' ' + REF_PASSES_FILTER(ref) + '\n')
+	process.stdout.write([
+		merge_base_to_initial,
+		merge_base_to_latest_to_initial,
+		merge_base_to_latest,
+		REF_PASSES_FILTER(ref),
+		ref_is_directly_part_of_latest_branch,
+		'\n'
+	].join(' '))
 
 	return ref
 })
