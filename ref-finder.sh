@@ -31,8 +31,13 @@ cp = require('child_process')
 const ignoreTags = x => x.objtype !== 'tag'
 const ignoreTagLike = x => !x.refname.startsWith('refs/tags/')
 const ignoreOutsideStack = x => x.ref_exists_between_latest_and_initial
+const ignoreStash = x => x.refname !== 'refs/stash'
 
-const REF_PASSES_FILTER = (x) => ignoreTags(x) && ignoreTagLike(x) && ignoreOutsideStack(x)
+const REF_PASSES_FILTER = (x) =>
+	ignoreTags(x)
+	&& ignoreTagLike(x)
+	&& ignoreOutsideStack(x)
+	&& ignoreStash(x)
 
 REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.split(' ')).map(x => {
 	const mergeBase = (a, b) => cp.execSync(\`git merge-base \${a} \${b}\`, {encoding: 'utf-8'}).trim();
@@ -74,12 +79,19 @@ REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.spl
 		merge_base_to_latest,
 		REF_PASSES_FILTER(ref),
 		ref_is_directly_part_of_latest_branch,
-		'\n'
+		'\n',
 	].join(' '))
 
 	return ref
 })
 	.filter(REF_PASSES_FILTER)
+
+	/**
+	 * TODO FIXME:
+	 * for now, ignore remote branches.
+	 * will need to handle divergence between local & remote later.
+	*/
+	.filter(x => !x.refname.startsWith('refs/remotes/'))
 
 	//.filter(x => !x.ref_exists_between_latest_and_initial) // test
 	//.filter(x => x.merge_base_to_initial_is_initial_branch && !x.ref_exists_between_latest_and_initial) // test
