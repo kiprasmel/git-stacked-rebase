@@ -79,10 +79,14 @@ async function refFinder() {
 }
 
 async function processRef(x) {
-	const merge_base_to_initial = await mergeBase(x[0], \"$INITIAL_BRANCH\")
+	const refCommit = x[0]
+	const objtype = x[1]
+	const refname = x[2]
+
+	const merge_base_to_initial = await mergeBase(refCommit, \"$INITIAL_BRANCH\")
 	const merge_base_to_initial_is_initial_branch = merge_base_to_initial === \"$INITIAL_BRANCH_COMMIT\";
 
-	const merge_base_to_latest = await mergeBase(x[0], \"$LATEST_BRANCH\")
+	const merge_base_to_latest = await mergeBase(refCommit, \"$LATEST_BRANCH\")
 	const merge_base_to_latest_to_initial = await mergeBase(merge_base_to_latest, \"$INITIAL_BRANCH\")
 
 	/** the main thing we're looking for: */
@@ -96,15 +100,15 @@ async function processRef(x) {
 	*/
 	const ref_is_directly_part_of_latest_branch =
 		ref_exists_between_latest_and_initial &&
-		merge_base_to_latest === x[0]
+		merge_base_to_latest === refCommit
 
-	const range_diff_cmd = \`git range-diff \${x[2]}...\${merge_base_to_latest} HEAD...\${merge_base_to_latest}\`
+	const range_diff_cmd = \`git range-diff \${refname}...\${merge_base_to_latest} HEAD...\${merge_base_to_latest}\`
 	const range_diff_between_ref__base_to_latest__head__base_to_latest = await exec(range_diff_cmd).then(x => x.stdout.split('\n'))
 
 	const ref = {
-		commit: x[0],
-		objtype: x[1],
-		refname: x[2],
+		commit: refCommit,
+		objtype,
+		refname,
 		merge_base_to_initial,
 		merge_base_to_initial_is_initial_branch,
 		merge_base_to_latest,
