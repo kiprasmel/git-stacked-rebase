@@ -39,9 +39,10 @@ const REF_PASSES_FILTER = (x) =>
 	&& ignoreOutsideStack(x)
 	&& ignoreStash(x)
 
-REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.split(' ')).map(x => {
-	const mergeBase = (a, b) => cp.execSync(\`git merge-base \${a} \${b}\`, {encoding: 'utf-8'}).trim();
+const execS = (cmd, extra = {}) => cp.execSync(cmd, { encoding: 'utf-8', ...extra })
+const mergeBase = (a, b, extra = '') => execS(\`git merge-base \${extra} \${a} \${b}\`).trim()
 
+function processRef(x) {
 	const merge_base_to_initial = mergeBase(x[0], \"$INITIAL_BRANCH\")
 	const merge_base_to_initial_is_initial_branch = merge_base_to_initial === \"$INITIAL_BRANCH_COMMIT\";
 
@@ -61,6 +62,9 @@ REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.spl
 		ref_exists_between_latest_and_initial &&
 		merge_base_to_latest === x[0]
 
+	const range_diff_cmd = \`git range-diff \${x[2]}...\${merge_base_to_latest} HEAD...\${merge_base_to_latest}\`
+	const range_diff_between_ref__base_to_latest__head__base_to_latest = execS(range_diff_cmd).split('\n')
+
 	const ref = {
 		commit: x[0],
 		objtype: x[1],
@@ -71,6 +75,7 @@ REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.spl
 		merge_base_to_latest_to_initial,
 		ref_exists_between_latest_and_initial,
 		ref_is_directly_part_of_latest_branch,
+		range_diff_between_ref__base_to_latest__head__base_to_latest,
 	}
 
 	process.stdout.write([
@@ -83,7 +88,10 @@ REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.spl
 	].join(' '))
 
 	return ref
-})
+}
+
+REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.split(' '))
+	.map(x => processRef(x))
 	.filter(REF_PASSES_FILTER)
 
 	/**
@@ -95,6 +103,7 @@ REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.spl
 
 	//.filter(x => !x.ref_exists_between_latest_and_initial) // test
 	//.filter(x => x.merge_base_to_initial_is_initial_branch && !x.ref_exists_between_latest_and_initial) // test
+	.filter(x => !x.ref_is_directly_part_of_latest_branch) // test
 
 // console.log(REF_DATA.map(x => Object.values(x).join(' ')))
 //console.log(REF_DATA)
@@ -105,6 +114,8 @@ _ = require('lodash')
 
 REF_DATA_BY_COMMIT = _.groupBy(REF_DATA, 'commit')
 console.log(REF_DATA_BY_COMMIT)
+
+fs.writeFileSync('refout.json', JSON.stringify(REF_DATA_BY_COMMIT, null, 2), { encoding: 'utf-8' })
 
 //COMMIT_DATA_IN_LATEST_BRANCH = 
 
