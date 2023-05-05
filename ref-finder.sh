@@ -27,6 +27,7 @@ printf "initial branch:\n$INITIAL_BRANCH_COMMIT\n\n"
 git for-each-ref --format='%(objectname) %(objecttype) %(refname)' | node -pe "
 fs = require('fs')
 cp = require('child_process')
+util = require('util')
 
 const ignoreTags = x => x.objtype !== 'tag'
 const ignoreTagLike = x => !x.refname.startsWith('refs/tags/')
@@ -39,15 +40,50 @@ const REF_PASSES_FILTER = (x) =>
 	&& ignoreOutsideStack(x)
 	&& ignoreStash(x)
 
-const execS = (cmd, extra = {}) => cp.execSync(cmd, { encoding: 'utf-8', ...extra })
-const mergeBase = (a, b, extra = '') => execS(\`git merge-base \${extra} \${a} \${b}\`).trim()
+const execAsync = util.promisify(cp.exec)
+const exec = async (cmd, extra = {}) => await execAsync(cmd, { encoding: 'utf-8', ...extra })
+const mergeBase = async (a, b, extra = '') => await exec(\`git merge-base \${extra} \${a} \${b}\`).then(x => x.stdout.trim())
 
-function processRef(x) {
-	const merge_base_to_initial = mergeBase(x[0], \"$INITIAL_BRANCH\")
+refFinder()
+
+async function refFinder() {
+	STDIN = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.split(' '))
+
+	REF_DATA = (await Promise.all(STDIN.map(x => processRef(x))))
+		.filter(REF_PASSES_FILTER)
+
+		/**
+		* TODO FIXME:
+		* for now, ignore remote branches.
+		* will need to handle divergence between local & remote later.
+		*/
+		.filter(x => !x.refname.startsWith('refs/remotes/'))
+
+		//.filter(x => !x.ref_exists_between_latest_and_initial) // test
+		//.filter(x => x.merge_base_to_initial_is_initial_branch && !x.ref_exists_between_latest_and_initial) // test
+		.filter(x => !x.ref_is_directly_part_of_latest_branch) // test
+
+	// console.log(REF_DATA.map(x => Object.values(x).join(' ')))
+	//console.log(REF_DATA)
+
+	console.log(REF_DATA.length)
+
+	_ = require('lodash')
+
+	REF_DATA_BY_COMMIT = _.groupBy(REF_DATA, 'commit')
+	console.log(REF_DATA_BY_COMMIT)
+
+	fs.writeFileSync('refout.json', JSON.stringify(REF_DATA_BY_COMMIT, null, 2), { encoding: 'utf-8' })
+
+	//COMMIT_DATA_IN_LATEST_BRANCH = 
+}
+
+async function processRef(x) {
+	const merge_base_to_initial = await mergeBase(x[0], \"$INITIAL_BRANCH\")
 	const merge_base_to_initial_is_initial_branch = merge_base_to_initial === \"$INITIAL_BRANCH_COMMIT\";
 
-	const merge_base_to_latest = mergeBase(x[0], \"$LATEST_BRANCH\")
-	const merge_base_to_latest_to_initial = mergeBase(merge_base_to_latest, \"$INITIAL_BRANCH\")
+	const merge_base_to_latest = await mergeBase(x[0], \"$LATEST_BRANCH\")
+	const merge_base_to_latest_to_initial = await mergeBase(merge_base_to_latest, \"$INITIAL_BRANCH\")
 
 	/** the main thing we're looking for: */
 	const ref_exists_between_latest_and_initial =
@@ -63,7 +99,7 @@ function processRef(x) {
 		merge_base_to_latest === x[0]
 
 	const range_diff_cmd = \`git range-diff \${x[2]}...\${merge_base_to_latest} HEAD...\${merge_base_to_latest}\`
-	const range_diff_between_ref__base_to_latest__head__base_to_latest = execS(range_diff_cmd).split('\n')
+	const range_diff_between_ref__base_to_latest__head__base_to_latest = await exec(range_diff_cmd).then(x => x.stdout.split('\n'))
 
 	const ref = {
 		commit: x[0],
@@ -89,35 +125,6 @@ function processRef(x) {
 
 	return ref
 }
-
-REF_DATA = fs.readFileSync(0).toString().split('\n').slice(0, -1).map(x => x.split(' '))
-	.map(x => processRef(x))
-	.filter(REF_PASSES_FILTER)
-
-	/**
-	 * TODO FIXME:
-	 * for now, ignore remote branches.
-	 * will need to handle divergence between local & remote later.
-	*/
-	.filter(x => !x.refname.startsWith('refs/remotes/'))
-
-	//.filter(x => !x.ref_exists_between_latest_and_initial) // test
-	//.filter(x => x.merge_base_to_initial_is_initial_branch && !x.ref_exists_between_latest_and_initial) // test
-	.filter(x => !x.ref_is_directly_part_of_latest_branch) // test
-
-// console.log(REF_DATA.map(x => Object.values(x).join(' ')))
-//console.log(REF_DATA)
-
-console.log(REF_DATA.length)
-
-_ = require('lodash')
-
-REF_DATA_BY_COMMIT = _.groupBy(REF_DATA, 'commit')
-console.log(REF_DATA_BY_COMMIT)
-
-fs.writeFileSync('refout.json', JSON.stringify(REF_DATA_BY_COMMIT, null, 2), { encoding: 'utf-8' })
-
-//COMMIT_DATA_IN_LATEST_BRANCH = 
 
 void 0
 
