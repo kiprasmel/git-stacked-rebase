@@ -4,30 +4,56 @@ const fs = require("fs");
 const { execSync } = require("child_process");
 const { execSyncP } = require("pipestdio");
 
-const executablePath = "./dist/git-stacked-rebase.js";
+modifyLinesGSR();
+modifyLinesRefFinder();
 
-fs.chmodSync(executablePath, "755");
-execSyncP(`ls -la ${executablePath}`);
+/**
+ * general util for modifying lines
+ */
+function modifyLines(exePath, linesCb) {
+	fs.chmodSync(exePath, "755");
+	// execSyncP(`ls -la ${exePath}`);
 
-modifyLines(executablePath);
-
-function modifyLines(path) {
-	const file = fs.readFileSync(path, { encoding: "utf-8" });
+	const file = fs.readFileSync(exePath, { encoding: "utf-8" });
 	const lines = file.split("\n");
 
-	const afterUpdateShebang = updateShebang(lines);
-	const afterInjectRelativeBuildDatePrinter = injectRelativeBuildDatePrinter(lines);
-	const afterInjectVersionStr = injectVersionStr(lines);
+	const afterModificationCb = linesCb(lines);
 
 	const newFile = lines.join("\n");
-	fs.writeFileSync(path, newFile);
+	fs.writeFileSync(exePath, newFile);
 
-	afterUpdateShebang();
-	afterInjectRelativeBuildDatePrinter();
-	afterInjectVersionStr();
+	if (afterModificationCb instanceof Function) afterModificationCb();
 }
 
-function updateShebang(lines) {
+function modifyLinesGSR() {
+	const exePath = "./dist/git-stacked-rebase.js";
+
+	modifyLines(exePath, (lines) => {
+		const afterUpdateShebang = updateShebang(lines, exePath);
+		const afterInjectRelativeBuildDatePrinter = injectRelativeBuildDatePrinter(lines, exePath);
+		const afterInjectVersionStr = injectVersionStr(lines);
+
+		return () => {
+			afterUpdateShebang();
+			afterInjectRelativeBuildDatePrinter();
+			afterInjectVersionStr();
+		};
+	});
+}
+
+function modifyLinesRefFinder() {
+	const exePath = "./dist/ref-finder.js";
+
+	modifyLines(exePath, (lines) => {
+		const afterUpdateShebang = updateShebang(lines, exePath);
+
+		return () => {
+			afterUpdateShebang();
+		};
+	});
+}
+
+function updateShebang(lines, exePath) {
 	const oldShebang = "#!/usr/bin/env ts-node-dev";
 	const newShebang = "#!/usr/bin/env node";
 
@@ -37,10 +63,14 @@ function updateShebang(lines) {
 		lines.splice(0, 0, newShebang);
 	}
 
-	return () => execSyncP(`cat ${executablePath} | head -n 2`);
+	return () => {
+		process.stdout.write(exePath + "\n");
+		execSyncP(`cat ${exePath} | head -n 2`);
+		process.stdout.write("\n");
+	};
 }
 
-function injectRelativeBuildDatePrinter(lines) {
+function injectRelativeBuildDatePrinter(lines, exePath) {
 	const BUILD_DATE_REPLACEMENT_STR = "__BUILD_DATE_REPLACEMENT_STR__";
 	const targetLineIdx = lines.findIndex((line) => line.includes(BUILD_DATE_REPLACEMENT_STR));
 
@@ -56,7 +86,11 @@ function injectRelativeBuildDatePrinter(lines) {
 
 	lines[targetLineIdx] = lines[targetLineIdx].replace(BUILD_DATE_REPLACEMENT_STR, printRelativeDate);
 
-	return () => execSyncP(`cat ${executablePath} | grep " mins ago"`);
+	return () => {
+		process.stdout.write(exePath + "\n");
+		execSyncP(`cat ${exePath} | grep " mins ago"`);
+		process.stdout.write("\n");
+	};
 }
 
 function injectVersionStr(lines) {
