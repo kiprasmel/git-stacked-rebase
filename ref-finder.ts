@@ -44,13 +44,17 @@ export async function refFinder({
 	LATEST_BRANCH = '',
 	// LATEST_BRANCH_COMMIT = '',
 } = {}) {
-	// process.on("unhandledRejection", () => process.exit(1))
+	process.on("unhandledRejection", (e) => {
+		console.error(e)
+		process.exit(1)
+	})
 
 	if (!INITIAL_BRANCH_COMMIT) INITIAL_BRANCH_COMMIT = await exec(`git rev-parse "${INITIAL_BRANCH}"`)
 	if (!LATEST_BRANCH) LATEST_BRANCH = await exec(`git branch --show`)
 	// if (!LATEST_BRANCH_COMMIT) LATEST_BRANCH_COMMIT = await exec(`git rev-parse "${LATEST_BRANCH}"`)
 
-	process.stdout.write(`initial branch:\n${INITIAL_BRANCH_COMMIT}\n\n`)
+	const iniBranchInfo = "initial branch:\n" + INITIAL_BRANCH + "\n" + INITIAL_BRANCH_COMMIT + "\n\n"
+	process.stdout.write(iniBranchInfo)
 
 	const STDIN: GitRefOutputLine[] = (await exec(`git for-each-ref --format="${gitRefFormat}"`))
 		.split('\n')
@@ -87,9 +91,10 @@ export async function refFinder({
 	const _ = require('lodash')
 
 	const REF_DATA_BY_COMMIT = _.groupBy(REF_DATA, 'commit')
-	console.log(REF_DATA_BY_COMMIT)
+	//console.log(REF_DATA_BY_COMMIT)
 
 	fs.writeFileSync('refout.json', JSON.stringify(REF_DATA_BY_COMMIT, null, 2), { encoding: 'utf-8' })
+	fs.writeFileSync('refout.all.json', JSON.stringify(ALL_REF_DATA, null, 2), { encoding: 'utf-8' })
 
 	//COMMIT_DATA_IN_LATEST_BRANCH = 
 }
@@ -105,6 +110,7 @@ export type Ref = {
 	ref_exists_between_latest_and_initial: boolean;
 	ref_is_directly_part_of_latest_branch: boolean;
 	range_diff_between_ref__base_to_latest__head__base_to_latest: string[];
+	range_diff_parsed: RangeDiff[];
 }
 
 export type ProcessRefArgs = {
@@ -145,6 +151,8 @@ export async function processRef(x: GitRefOutputLine, {
 	const range_diff_cmd = `git range-diff ${refname}...${merge_base_to_latest} HEAD...${merge_base_to_latest}`
 	const range_diff_between_ref__base_to_latest__head__base_to_latest: string[] = await exec(range_diff_cmd).then(processRangeDiff)
 
+	const range_diff_parsed = parseRangeDiff(range_diff_between_ref__base_to_latest__head__base_to_latest)
+
 	const ref: Ref = {
 		commit: refCommit,
 		objtype,
@@ -156,6 +164,7 @@ export async function processRef(x: GitRefOutputLine, {
 		ref_exists_between_latest_and_initial,
 		ref_is_directly_part_of_latest_branch,
 		range_diff_between_ref__base_to_latest__head__base_to_latest,
+		range_diff_parsed,
 	}
 
 	process.stdout.write([
@@ -170,7 +179,84 @@ export async function processRef(x: GitRefOutputLine, {
 	return ref
 }
 
-export const processRangeDiff = (x: string): string[] => x.split('\n').map((x: string) => x.trim())
+export const processRangeDiff = (x: string): string[] => x.trim().split('\n').map((x: string) => x.trim())
+
+export type RangeDiff = {
+	nth_before: string;
+	sha_before: string;
+	eq_sign: string;
+	nth_after: string;
+	sha_after: string;
+	msg: string;
+	diff_lines: string[];
+}
+
+/**
+ * head = 9563f3a77c1d86093447893e6538e34d1a18dfd2
+ * argv-parser-rewrite = f11914d1de05863fac52077a269e66590d92e319
+ *
+ * ```sh
+ * MERGE_BASE=094cddc223e8de5926dbc810449373e614d4cdef git range-diff argv-parser-rewrite...$MERGE_BASE HEAD...$MERGE_BASE
+ * ```
+ */
+export const parseRangeDiff = (lines: string[]): RangeDiff[] => {
+	if (!lines.length || (lines.length === 1 && !lines[0])) {
+		return []
+	}
+
+	const range_diffs: RangeDiff[] = []
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = replaceManySpacesToOne(lines[i])
+
+		const [nth_before, tmp1, ...tmp2s] = line.split(":").map((x, i) => i < 2 ? x.trim() : x)
+		const [sha_before, eq_sign, nth_after] = tmp1.split(" ")
+		const [sha_after, ...msgs] = tmp2s.join(":").trim().split(" ")
+		const msg = msgs.join(" ")
+
+		const diff_lines: string[] = []
+
+		if (eq_sign === "!") {
+			while (++i < lines.length && !isNewRangeDiffLine(lines[i], nth_before)) {
+				diff_lines.push(lines[i])
+			}
+
+			--i
+		}
+
+		const range_diff: RangeDiff = {
+			nth_before,
+			sha_before,
+			eq_sign,
+			nth_after,
+			sha_after,
+			msg,
+			diff_lines,
+		}
+
+		range_diffs.push(range_diff)
+	}
+
+	return range_diffs
+}
+
+/**
+ * TODO FIXME: can affect commit msg
+ */
+export const replaceManySpacesToOne = (x: string) => x.replace(/\s+/g, " ")
+
+export const isNewRangeDiffLine = (line: string, nth_before: string) => {
+	const nth_before_num = Number(nth_before)
+
+	if (Number.isNaN(nth_before_num)) {
+		return false
+	}
+
+	const next: number = nth_before_num + 1
+	const expectedStart = `${next}: `
+
+	return line.startsWith(expectedStart)
+}
 
 if (!module.parent) {
 	refFinder()

@@ -8,6 +8,7 @@ import { applyTC } from "./apply.spec";
 import { argparse_TC } from "../argparse/argparse.spec";
 import { parseArgvResolveOptions_TC } from "./parse-argv-resolve-options.spec";
 import { nonFirstRebaseHasInitialBranchCached_TC } from "./non-first-rebase-has-initial-branch-cached.spec";
+import { parseRangeDiff_TC } from "./parseRangeDiff.spec";
 
 import { sequentialResolve } from "../util/sequentialResolve";
 import { cleanupTmpRepos } from "./util/tmpdir";
@@ -32,6 +33,7 @@ function main() {
 		async () => argparse_TC(),
 		parseArgvResolveOptions_TC,
 		nonFirstRebaseHasInitialBranchCached_TC,
+		async () => parseRangeDiff_TC(),
 	])
 		.then(cleanupTmpRepos)
 		.then(() => {
