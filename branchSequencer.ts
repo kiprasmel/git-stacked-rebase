@@ -269,7 +269,7 @@ export const branchSequencer: BranchSequencer = async ({
 	//
 	reverseCheckoutOrder = false,
 }) => {
-	const execSyncInRepo = createExecSyncInRepo(repo);
+	const execSyncInRepo = createExecSyncInRepo(repo.workdir());
 
 	const getBoundariesInclInitial: GetBoundariesInclInitial = pickBoundaryParser({
 		behaviorOfGetBranchBoundaries,

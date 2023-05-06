@@ -1,6 +1,5 @@
 import { execSync } from "child_process";
 
-import Git from "nodegit";
 import { pipestdio } from "pipestdio";
 
 import { log } from "./log";
@@ -18,7 +17,7 @@ export type CreateExecSyncInRepoConfig = {
  * as opposted to the actual target repo (would be very bad!)
  */
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-export const createExecSyncInRepo = (repo: Git.Repository, { logCmd = false }: CreateExecSyncInRepoConfig = {}) => (
+export const createExecSyncInRepo = (repoPath: string, { logCmd = !!process.env.GSR_DEBUG }: CreateExecSyncInRepoConfig = {}) => (
 	command: string,
 	extraOptions: Parameters<typeof execSync>[1] = {}
 ) => (
@@ -31,6 +30,6 @@ export const createExecSyncInRepo = (repo: Git.Repository, { logCmd = false }: C
 		 * to avoid accidentally overwriting it.
 		 * TODO TS - enforce
 		 */
-		cwd: repo.workdir(),
+		cwd: repoPath,
 	})
 );

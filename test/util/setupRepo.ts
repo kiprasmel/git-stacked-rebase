@@ -195,7 +195,7 @@ export async function setupRepoBase({
 	const sig: Git.Signature = await Git.Signature.default(repo);
 	log("sig %s", sig);
 
-	const execSyncInRepo = createExecSyncInRepo(repo);
+	const execSyncInRepo = createExecSyncInRepo(repo.workdir());
 
 	/**
 	 * common options to GitStackedRebase,

@@ -65,13 +65,15 @@ export async function gitStackedRebase(
 	specifiedOptions: SpecifiableGitStackedRebaseOptions = {}
 ): Promise<void> {
 	try {
-		const repo: Git.Repository = await Git.Repository.open(specifiedOptions.gitDir || getDefaultResolvedOptions().gitDir);
+		const {	repoRootDir, execSyncInRepo } = parsePrereqs(specifiedOptions);
+
+		const repo: Git.Repository = await Git.Repository.open(repoRootDir);
 		const config: Git.Config = await loadGitConfig(repo, specifiedOptions);
 		const dotGitDirPath: string = repo.path();
 
 		const options: ResolvedGitStackedRebaseOptions = await resolveOptions(specifiedOptions, { config, dotGitDirPath });
 
-		log({ options });
+		log({ options, repoRootDir });
 
 		const pathToRegularRebaseDirInsideDotGit = path.join(dotGitDirPath, "rebase-merge");
 		const pathToStackedRebaseDirInsideDotGit = path.join(dotGitDirPath, "stacked-rebase");
@@ -82,7 +84,6 @@ export async function gitStackedRebase(
 		const initialBranch: Git.Reference = await parseInitialBranch(repo, options.initialBranch);
 		const currentBranch: Git.Reference = await repo.getCurrentBranch();
 
-		const execSyncInRepo = createExecSyncInRepo(repo);
 		const checkIsRegularRebaseStillInProgress = (): boolean => fs.existsSync(pathToRegularRebaseDirInsideDotGit);
 		const askQuestion: AskQuestion = askQuestion__internal in options ? options[askQuestion__internal]! : question;
 
@@ -754,6 +755,19 @@ mv -f "${preparedRegularRebaseTodoFile}" "${pathToRegularRebaseTodoFile}"
 	}
 }
 
+export function parsePrereqs(specifiedOptions: SpecifiableGitStackedRebaseOptions) {
+	const potentialRepoPath = specifiedOptions.gitDir || getDefaultResolvedOptions().gitDir;
+	const gitCmd = specifiedOptions.gitCmd || getDefaultResolvedOptions().gitCmd;
+
+	const execSyncInRepo = createExecSyncInRepo(potentialRepoPath);
+	const repoRootDir: string = execSyncInRepo(`${gitCmd} rev-parse --show-toplevel`, { encoding: "utf-8", stdio: "pipe" }).toString().trim();
+	
+	return {
+		repoRootDir,
+		execSyncInRepo,
+	}
+}
+
 function referenceToOid(ref: Git.Reference): Promise<Git.Oid> {
 	return ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
 }
@@ -944,7 +958,7 @@ function checkoutRemotePartialBranchesLocally(
 
 	log({ branchesWhoNeedLocalCheckout });
 
-	const execSyncInRepo = createExecSyncInRepo(repo);
+	const execSyncInRepo = createExecSyncInRepo(repo.workdir());
 
 	for (const b of branchesWhoNeedLocalCheckout) {
 		const cmd = `git checkout -b ${b.wantedLocalBranchName} --track ${b.fullNameOfBranchWithRemote}`;
@@ -1161,7 +1175,7 @@ exit 1
 	log("wrote editorScript");
 
 	try {
-		const execSyncInRepo = createExecSyncInRepo(repo);
+		const execSyncInRepo = createExecSyncInRepo(repo.workdir());
 
 		const cmd = [
 			gitCmd,
