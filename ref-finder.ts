@@ -111,6 +111,7 @@ export type Ref = {
 	ref_is_directly_part_of_latest_branch: boolean;
 	range_diff_between_ref__base_to_latest__head__base_to_latest: string[];
 	range_diff_parsed: RangeDiff[];
+	is_easy_scenario_and_can_automatically_generate_rewritten_list: EasyScenarioRet;
 }
 
 export type ProcessRefArgs = {
@@ -153,6 +154,8 @@ export async function processRef(x: GitRefOutputLine, {
 
 	const range_diff_parsed = parseRangeDiff(range_diff_between_ref__base_to_latest__head__base_to_latest)
 
+	const is_easy_scenario_and_can_automatically_generate_rewritten_list: EasyScenarioRet = checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList(range_diff_parsed)
+
 	const ref: Ref = {
 		commit: refCommit,
 		objtype,
@@ -164,6 +167,7 @@ export async function processRef(x: GitRefOutputLine, {
 		ref_exists_between_latest_and_initial,
 		ref_is_directly_part_of_latest_branch,
 		range_diff_between_ref__base_to_latest__head__base_to_latest,
+		is_easy_scenario_and_can_automatically_generate_rewritten_list,
 		range_diff_parsed,
 	}
 
@@ -256,6 +260,65 @@ export const isNewRangeDiffLine = (line: string, nth_before: string) => {
 	const expectedStart = `${next}: `
 
 	return line.startsWith(expectedStart)
+}
+
+export type EasyScenarioRet = {
+    is_easy_scenario: boolean;
+	//
+    eq_from: number;
+    eq_till: number;
+    eq_count: number;
+	//
+    ahead_from: number;
+    ahead_till: number;
+    ahead_count: number;
+	//
+    behind_from: number;
+    behind_till: number;
+    behind_count: number;
+}
+
+export const checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList = (range_diffs: RangeDiff[]): EasyScenarioRet => {
+	let i = 0
+	const eq_from = i
+	while (i < range_diffs.length && range_diffs[i].eq_sign === "=") {
+		++i
+	}
+	const eq_till = i
+	const eq_count = eq_till - eq_from
+
+	// extra commits in diverged branch, that need to be integrated back into latest
+	const ahead_from = i
+	while (i < range_diffs.length && range_diffs[i].eq_sign === "<") {
+		++i
+	}
+	const ahead_till = i
+	const ahead_count = ahead_till - ahead_from
+
+	const behind_from = i
+	while (i < range_diffs.length && range_diffs[i].eq_sign === ">") {
+		++i
+	}
+	const behind_till = i
+	const behind_count = behind_till - behind_from
+
+	const is_easy_scenario = i + 1 < range_diffs.length ? false : true
+
+	return {
+		is_easy_scenario,
+		//
+		eq_from,
+		eq_till,
+		eq_count,
+		//
+		ahead_from,
+		ahead_till,
+		ahead_count,
+		//
+		behind_from,
+		behind_till,
+		behind_count,
+	}
 }
 
 if (!module.parent) {
