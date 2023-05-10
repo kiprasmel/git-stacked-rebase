@@ -16,10 +16,13 @@
 		"build": "yarn test && yarn build:all",
 		"build:all": "node ./script/prebuild.js && yarn build:core && yarn build:nvim && yarn build:reconciler && node ./script/postbuild.js",
 		"build:core": "yarn tsc -b",
+		"build:core:prod": "node ./script/prebuild.js && yarn build:core && node ./script/postbuild.js",
 		"build:nvim": "yarn --cwd nvim-git-rebase-todo build",
 		"build:reconciler": "yarn --cwd git-reconcile-rewritten-list build",
 		"prepack": "yarn build",
-		"cloc": "./script/cloc.sh"
+		"cloc": "./script/cloc.sh",
+		"debug": "yarn build:core:prod && yarn debug:run",
+		"debug:run": "GSR_THROW=1 node --trace-warnings --trace-uncaught ./dist/git-stacked-rebase.js"
 	},
 	"devDependencies": {
 		"@types/node": "16.11.11",
