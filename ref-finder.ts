@@ -156,7 +156,8 @@ export async function processRef(x: GitRefOutputLine, {
 	const range_diff_cmd = `git range-diff ${refname}...${merge_base_to_latest} HEAD...${merge_base_to_latest}`
 	const range_diff_between_ref__base_to_latest__head__base_to_latest: string[] = await exec(range_diff_cmd).then(processRangeDiff)
 
-	const range_diff_parsed = await parseRangeDiff(range_diff_between_ref__base_to_latest__head__base_to_latest)
+	const range_diff_parsed_base: RangeDiffBase[] = parseRangeDiff(range_diff_between_ref__base_to_latest__head__base_to_latest)
+	const range_diff_parsed: RangeDiff[] = await enhanceRangeDiffsWithFullSHAs(range_diff_parsed_base)
 
 	const easy_repair_scenario: EasyScenarioRet = checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList(range_diff_parsed)
 
@@ -189,14 +190,12 @@ export async function processRef(x: GitRefOutputLine, {
 
 export const processRangeDiff = (x: string): string[] => x.trim().split('\n').map((x: string) => x.trim())
 
-export type RangeDiff = {
+export type RangeDiffBase = {
 	nth_before: string;
 	sha_before: string;
-	sha_before_full: string;
 	eq_sign: string;
 	nth_after: string;
 	sha_after: string;
-	sha_after_full: string;
 	msg: string;
 	diff_lines: string[];
 }
@@ -209,15 +208,12 @@ export type RangeDiff = {
  * MERGE_BASE=094cddc223e8de5926dbc810449373e614d4cdef git range-diff argv-parser-rewrite...$MERGE_BASE HEAD...$MERGE_BASE
  * ```
  */
-export const parseRangeDiff = async (lines: string[]): Promise<RangeDiff[]> => {
+export const parseRangeDiff = (lines: string[]): RangeDiffBase[] => {
 	if (!lines.length || (lines.length === 1 && !lines[0])) {
 		return []
 	}
 
-	const range_diffs: RangeDiff[] = []
-
-	const before_shas = []
-	const after_shas = []
+	const range_diffs: RangeDiffBase[] = []
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = replaceManySpacesToOne(lines[i])
@@ -237,10 +233,7 @@ export const parseRangeDiff = async (lines: string[]): Promise<RangeDiff[]> => {
 			--i
 		}
 
-		before_shas.push(sha_before)
-		after_shas.push(sha_after)
-
-		const range_diff: Omit<RangeDiff, "sha_before_full" | "sha_after_full"> = {
+		const range_diff: RangeDiffBase = {
 			nth_before,
 			sha_before,
 			eq_sign,
@@ -250,20 +243,28 @@ export const parseRangeDiff = async (lines: string[]): Promise<RangeDiff[]> => {
 			diff_lines,
 		}
 
-		range_diffs.push(range_diff as any) // TODO TS
-	}
-
-	const short_before_shas = before_shas.flat().join(" ")
-	const short_after_shas = after_shas.flat().join(" ")
-	const full_before_shas = await exec(`git rev-parse ${short_before_shas}`).then(x => x.split("\n"))
-	const full_after_shas = await exec(`git rev-parse ${short_after_shas}`).then(x => x.split("\n"))
-
-	for (let i = 0; i < range_diffs.length; i++) {
-		range_diffs[i].sha_before_full = full_before_shas[i]
-		range_diffs[i].sha_after_full = full_after_shas[i]
+		range_diffs.push(range_diff)
 	}
 
 	return range_diffs
+}
+
+export type RangeDiff = RangeDiffBase & {
+	sha_before_full: string;
+	sha_after_full: string;
+}
+
+export const enhanceRangeDiffsWithFullSHAs = async (range_diffs: RangeDiffBase[]): Promise<RangeDiff[]> => {
+	const before_shas: string[] = range_diffs.map(r => r.sha_before)
+	const after_shas: string[] = range_diffs.map(r => r.sha_after)
+
+	const short_before_shas: string = before_shas.flat().join(" ")
+	const short_after_shas: string = after_shas.flat().join(" ")
+
+	const full_before_shas: string[] = await exec(`git rev-parse ${short_before_shas}`).then(x => x.split("\n"))
+	const full_after_shas: string[] = await exec(`git rev-parse ${short_after_shas}`).then(x => x.split("\n"))
+
+	return range_diffs.map((rd, i) => ({ ...rd, sha_before_full: full_before_shas[i], sha_after_full: full_after_shas[i] }))
 }
 
 /**

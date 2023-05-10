@@ -3,7 +3,7 @@
 import assert from "assert";
 
 import { log } from "../util/log";
-import { RangeDiff, parseRangeDiff } from "../ref-finder";
+import { RangeDiffBase, parseRangeDiff } from "../ref-finder";
 
 export async function parseRangeDiff_TC() {
 	for (const testData of simpleTests) {
@@ -16,7 +16,7 @@ export async function parseRangeDiff_TC() {
 	}
 }
 
-type SimpleTestInput = [lines: string, rangeDiff: RangeDiff[]];
+type SimpleTestInput = [lines: string, rangeDiff: RangeDiffBase[]];
 
 const simpleTests: SimpleTestInput[] = [
 	// https://git-scm.com/docs/git-range-diff#_examples
@@ -47,8 +47,8 @@ const simpleTests: SimpleTestInput[] = [
 				msg: "Prepare for the inevitable!",
 				nth_after: "1",
 				nth_before: "-",
-				sha_after: "0ddba11",
-				sha_before: "-------",
+				sha_after: "-------",
+				sha_before: "0ddba11",
 			},
 			{
 				diff_lines: [],
@@ -56,8 +56,8 @@ const simpleTests: SimpleTestInput[] = [
 				msg: "Add a helpful message at the start",
 				nth_after: "2",
 				nth_before: "1",
-				sha_after: "cab005e",
-				sha_before: "c0debee",
+				sha_after: "c0debee",
+				sha_before: "cab005e",
 			},
 			{
 				diff_lines: [
@@ -79,17 +79,17 @@ const simpleTests: SimpleTestInput[] = [
 				msg: "Describe a bug",
 				nth_after: "3",
 				nth_before: "2",
-				sha_after: "decafe1",
-				sha_before: "f00dbal",
+				sha_after: "f00dbal",
+				sha_before: "decafe1",
 			},
 			{
-				nth_before: "3",
-				sha_before: "bedead",
-				eq_sign: "<",
-				nth_after: "-",
-				sha_after: "-------",
-				msg: "TO-UNDO",
 				diff_lines: [],
+				eq_sign: "<",
+				msg: "TO-UNDO",
+				nth_after: "-",
+				nth_before: "3",
+				sha_after: "bedead",
+				sha_before: "-------",
 			},
 		],
 	],
