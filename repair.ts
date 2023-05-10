@@ -11,6 +11,7 @@ import { RangeDiff, RepairableRef, refFinder } from "./ref-finder";
 import { AskQuestion, question } from "./util/createQuestion";
 import { Termination } from "./util/error";
 import { log } from "./util/log";
+import { stdout } from "./util/stdout";
 
 export type RepairCtx = {
 	initialBranch: Git.Reference;
@@ -62,7 +63,6 @@ export async function repair({
 
 		for (const ref of autoRepairableRefs) {
 			const { refname } = ref;
-			// console.log("refname", refname)
 			let repair_nth_sha: number = ref_repaired_sha_index.get(refname)!;
 			const incr_ref_sha_index = () => ref_repaired_sha_index.set(refname, ++repair_nth_sha);
 
@@ -78,7 +78,6 @@ export async function repair({
 
 			if (!found_sha) {
 				if (refs_in_progress.has(refname)) {
-					// console.log({eq_count: ref.easy_repair_scenario.eq_count, repair_nth_sha})
 					const msg = `\nref "${refname}" repair was in progress, reached repair index ${repair_nth_sha}, but did not find matching SHA in latest.\n\n`;
 					throw new Termination(msg);
 				} else {
@@ -226,8 +225,6 @@ export async function findAutoRepairableRefs({
 		}
 	}
 
-	// const repairInfo = `${candidateRefs.length} refs found for repairing, ${autoRepairableRefs.length} of them auto-repairable.\n\n`
-	// stdout(repairInfo)
 	stdout(`${candidateRefs.length} candidates found.\n`)
 
 	if (nonAutoRepairableRefs.length) {
@@ -250,36 +247,12 @@ export async function findAutoRepairableRefs({
 
 		const nth = i + 1
 		const nth_str = nth.toString().padStart(autoRepairableRefs.length.toString().length, " ")
-		// const nth_info = `[${nth_str}/${autoRepairableRefs.length}]`
 		const nth_info = `  ${nth_str}`
 
 		stdout(`${nth_info} ${ref.refname}\n`)
-
-		// const isAutoRepairable: boolean = ref.is_easy_repair_scenario_and_can_automatically_generate_rewritten_list.is_easy_repair_scenario
-		// if (!isAutoRepairable) {
-		// 	const msg = `${nth_info} ref "${ref.refname}" is not auto-repairable. skipping.\n`
-		// 	stdout(msg)
-		// 	continue
-		// }
-
-		// const q = `${nth_info} ref "${ref.refname}" is auto-repairable. Repair? [Y / n / repair (a)ll / (p)rint info] `
-		// const _ans: string = await askQuestion(q, { cb: (ans) => ans.trim().toLowerCase() });
-		// console.log({ans})
-		// stdout("\n")
 	}
 
-	// const q = `\nWhich refs do you want to auto-repair? `
-	// const suffix = [
-	// 	`\nEnter:`,
-	// 	`- a selection of numbers (1,2,5)`,
-	// 	`- a range of numbers (1-5)`,
-	// 	`- a combination of above, or "all".`,
-	// 	`> `,
-	// ].join("\n")
-
 	const q = `\nRepair all? [Y/n/<selection of numbers to repair>] `
-
-	// const ans: string = await askQuestion(q, { suffix })
 	const ans: string = (await askQuestion(q)).trim().toLowerCase()
 
 	const choices: string[] = ans.replace(/\s+/g, ",").split(",")
@@ -298,57 +271,9 @@ export async function findAutoRepairableRefs({
 		return allowedIndices.includes(idx)
 	}
 
-	const allowedToRepairRefs: RepairableRef[] = []
-	for (let i = 0; i < autoRepairableRefs.length; i++) {
-		const ref = autoRepairableRefs[i]
-		const repairInfo = ref.easy_repair_scenario
-
-		stdout(`${ref.refname}:\n`)
-
-		/**
-		 * TODO: only repair if user picked
-		 */
-		const allowed = refAllowedToBeRepaired(i)
-		stdout(`allowed: ${allowed}\n`)
-
-		if (!allowed) {
-			continue
-		}
-
-		allowedToRepairRefs.push(ref)
-
-		for (let j = repairInfo.eq_from; j < repairInfo.eq_till; j++) {
-			const rd = ref.range_diff_parsed[j]
-
-			const msg = [
-				`drop ${rd.sha_before}`,
-				`pick ${rd.sha_after}`,
-			].join("\n")
-			stdout(msg + "\n")
-		}
-
-		// - pick commits into latest
-		if (repairInfo.ahead_count > 0) {
-			stdout(`# extra because ahead: \n`)
-
-			for (let j = repairInfo.ahead_from; j < repairInfo.ahead_till; j++) {
-				const rd = ref.range_diff_parsed[j]
-
-				const sha_rewrite_msg = `pick ${rd.sha_before}\n`
-				stdout(sha_rewrite_msg)
-			}
-		}
-
-		// - reset branch to latest
-		stdout(`reset ${ref.refname}\n`)
-
-		stdout(`\n`)
-	}
-
+	const allowedToRepairRefs: RepairableRef[] = autoRepairableRefs.filter((_, i) => refAllowedToBeRepaired(i))
 	return allowedToRepairRefs
 }
-
-const stdout = (msg: string) => process.stdout.write(msg)
 
 export function parseChoicesRanges(choices: string[]) {
 	const allowed: number[] = []
