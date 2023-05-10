@@ -286,11 +286,12 @@ export const enhanceRangeDiffsWithFullSHAs = async (range_diffs: RangeDiffBase[]
 	const full_shas: string[] = await exec(`git rev-parse ${short_shas_list}`).then(x => x.split("\n"))
 
 	let ret: RangeDiff[] = []
-	for (let i = 0; i < range_diffs.length; i += 2) {
+	let shas_idx = 0
+	for (let i = 0; i < range_diffs.length; i++) {
 		ret.push({
 			 ...range_diffs[i],
-			 sha_before_full: full_shas[i],
-			 sha_after_full: full_shas[i + 1]
+			 sha_before_full: full_shas[shas_idx++],
+			 sha_after_full: full_shas[shas_idx++]
 		})
 	}
 
