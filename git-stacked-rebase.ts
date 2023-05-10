@@ -868,65 +868,11 @@ export async function createInitialEditTodoOfGitStackedRebase(
 				const { refname } = ref
 				// console.log("refname", refname)
 
-				const repair_nth_sha: number = ref_repaired_sha_index.get(refname)!
+				let repair_nth_sha: number = ref_repaired_sha_index.get(refname)!
+				const incr_ref_sha_index = () => ref_repaired_sha_index.set(refname, ++repair_nth_sha)
 
 				const ref_already_finished: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count + 1
 				if (ref_already_finished) {
-					continue
-				}
-
-				const incr_ref_sha_index = () => ref_repaired_sha_index.set(refname, repair_nth_sha + 1)
-				const just_finished_ref: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count
-
-				if (just_finished_ref) {
-					refs_in_progress.delete(refname)
-					incr_ref_sha_index() // mark as done
-
-					/**
-					 * insert extra commits
-					 * 
-					 * TODO: if multiple refs, is this good?
-					 * 
-					 * because then, ref order matters..
-					 * & could get merge conflicts
-					 *
-					 */
-					if (ref.easy_repair_scenario.ahead_count) {
-						for (let delta_idx = ref.easy_repair_scenario.ahead_from; delta_idx < ref.easy_repair_scenario.ahead_till; delta_idx++) {
-							const delta = ref.range_diff_parsed[delta_idx]
-
-							const extraCommit: CommitAndBranchBoundary = {
-								commit: await Git.Commit.lookup(repo, delta.sha_after_full),
-								commitCommand: "pick",
-								branchEnd: null,
-							}
-
-							insertCommit(extraCommit)
-						}
-					}
-					
-					/**
-					 * add the branchEnd to the latest commit.
-					 * 
-					 * note: previous commits (which are now replaced) might've had branchEnds -
-					 * those branchEnds have been removed in the repair process.
-					 * 
-					 * if there's some branchEnds on the commit,
-					 * they're coming from other refs.
-					 */
-
-					const latest_commit_idx = i + added_new_commits
-
-					if (!commitsWithBranchBoundaries[latest_commit_idx].branchEnd) {
-						commitsWithBranchBoundaries[latest_commit_idx].branchEnd = []
-					}
-
-					const adjustedBranchEnd: Git.Reference = await Git.Branch.lookup(repo, ref.refnameshort, Git.Branch.BRANCH.ALL)
-					commitsWithBranchBoundaries[latest_commit_idx].branchEnd!.push(adjustedBranchEnd)
-
-					// TODO: add comment that finished repairing ref
-					// tho, prolly pretty obvious since the new branch-end will be there?
-
 					continue
 				}
 
@@ -991,6 +937,60 @@ export async function createInitialEditTodoOfGitStackedRebase(
 					}
 
 					incr_ref_sha_index()
+				}
+
+				const just_finished_ref: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count
+
+				if (just_finished_ref) {
+					refs_in_progress.delete(refname)
+					incr_ref_sha_index() // mark as done
+
+					/**
+					 * insert extra commits
+					 * 
+					 * TODO: if multiple refs, is this good?
+					 * 
+					 * because then, ref order matters..
+					 * & could get merge conflicts
+					 *
+					 */
+					if (ref.easy_repair_scenario.ahead_count) {
+						for (let delta_idx = ref.easy_repair_scenario.ahead_from; delta_idx < ref.easy_repair_scenario.ahead_till; delta_idx++) {
+							const delta = ref.range_diff_parsed[delta_idx]
+
+							const extraCommit: CommitAndBranchBoundary = {
+								commit: await Git.Commit.lookup(repo, delta.sha_after_full),
+								commitCommand: "pick",
+								branchEnd: null,
+							}
+
+							insertCommit(extraCommit)
+						}
+					}
+					
+					/**
+					 * add the branchEnd to the latest commit.
+					 * 
+					 * note: previous commits (which are now replaced) might've had branchEnds -
+					 * those branchEnds have been removed in the repair process.
+					 * 
+					 * if there's some branchEnds on the commit,
+					 * they're coming from other refs.
+					 */
+
+					const latest_commit_idx = i + added_new_commits
+
+					if (!commitsWithBranchBoundaries[latest_commit_idx].branchEnd) {
+						commitsWithBranchBoundaries[latest_commit_idx].branchEnd = []
+					}
+
+					const adjustedBranchEnd: Git.Reference = await Git.Branch.lookup(repo, ref.refnameshort, Git.Branch.BRANCH.ALL)
+					commitsWithBranchBoundaries[latest_commit_idx].branchEnd!.push(adjustedBranchEnd)
+
+					// TODO: add comment that finished repairing ref
+					// tho, prolly pretty obvious since the new branch-end will be there?
+
+					continue
 				}
 			}
 
