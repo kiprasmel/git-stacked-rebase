@@ -270,6 +270,20 @@ export const stackedRebaseCommands = {
 			return [split[1], split[2]];
 		},
 	}),
+	/**
+	 * similar to `branch-end`,
+	 * but will reset the branch to its commit.
+	 * 
+	 * this is needed e.g. for `--repair`.
+	 */
+	"branch-end-reset": createCommand("branch-end-reset", {
+		makesGitRebaseExitToPause: false,
+		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
+
+		maxUseCount: Infinity,
+		isRestValid: branchValidator,
+		parseTargets: ({ rest }) => [rest],
+	}),
 	"branch-end-initial": createCommand("branch-end-initial", {
 		makesGitRebaseExitToPause: false,
 		willDisappearFromCommandsListInNextGitRebaseTodoFile: false,
@@ -294,6 +308,7 @@ export type StackedRebaseCommand = keyof typeof stackedRebaseCommands;
 const stackedRebaseCommandAliases = {
 	be: "branch-end",
 	ben: "branch-end-new",
+	ber: "branch-end-reset",
 } as const;
 
 export type StackedRebaseCommandAlias = keyof typeof stackedRebaseCommandAliases;
@@ -561,4 +576,3 @@ export function getParseTargetsCtxFromLine(fullLine: string): ParseTargetsCtx {
 export function getRest(fullLine: string): ParseTargetsCtx["rest"] {
 	return fullLine.split(" ").slice(1).join(" ")
 }
-

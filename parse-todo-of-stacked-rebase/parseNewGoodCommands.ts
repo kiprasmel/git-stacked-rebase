@@ -198,6 +198,11 @@ export function parseNewGoodCommands(
 	const oldCommandCount: number = stackedRebaseCommandsOld.length;
 	const newCommandCount: number = stackedRebaseCommandsNew.length;
 
+	log({
+		stackedRebaseCommandsOld,
+		stackedRebaseCommandsNew,
+	})
+
 	assert.equal(oldCommandCount, newCommandCount);
 
 	return stackedRebaseCommandsNew;

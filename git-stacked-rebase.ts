@@ -315,10 +315,10 @@ export async function gitStackedRebase(
 
 		// eslint-disable-next-line no-inner-declarations
 		async function createBranchForCommand(
-			cmd: GoodCommand & { commandName: StackedRebaseCommand & "branch-end-new" }
+			cmd: GoodCommand & { commandName: StackedRebaseCommand & ("branch-end-new" | "branch-end-reset") }
 		): Promise<void> {
 			const newBranchName: string = cmd.targets![0];
-			const force: number = 0;
+			const force: number = cmd.commandName === "branch-end-reset" ? 1 : 0;
 			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 			const targetCommitSHA: string = cmd.commitSHAThatBranchPointsTo!;
 			const targetCommit: Git.Commit = await Git.Commit.lookup(repo, targetCommitSHA);
@@ -509,6 +509,9 @@ export async function gitStackedRebase(
 				regularRebaseTodoLines.push(cmd.fullLine);
 			} else if (cmd.rebaseKind === "stacked") {
 				if (cmd.commandName === "branch-end-new") {
+					await createBranchForCommand(cmd as any); // TODO TS
+				} else if (cmd.commandName === "branch-end-reset") {
+					/** same as branch-end-new, but force-resets. */
 					await createBranchForCommand(cmd as any); // TODO TS
 				} else if (cmd.commandName === "branch-end-new-from-remote") {
 					const b = parseBranchWhichNeedsLocalCheckout(cmd.targets!); // TODO TS NARROWER TYPES
