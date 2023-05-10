@@ -33,8 +33,7 @@ import { BehaviorOfGetBranchBoundaries, branchSequencer } from "./branchSequence
 import { autosquash } from "./autosquash";
 import { askQuestion__internal, editor__internal, EitherEditor } from "./internal";
 import { generateListOfURLsToCreateStackedPRs } from "./pullRequestStack";
-import { RangeDiff, RepairableRef } from "./ref-finder";
-import { findAutoRepairableRefs } from "./repair";
+import { repair } from "./repair";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { noop } from "./util/noop";
@@ -773,7 +772,7 @@ export function parsePrereqs(specifiedOptions: SpecifiableGitStackedRebaseOption
 	}
 }
 
-function referenceToOid(ref: Git.Reference): Promise<Git.Oid> {
+export function referenceToOid(ref: Git.Reference): Promise<Git.Oid> {
 	return ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
 }
 
@@ -783,7 +782,7 @@ export async function createInitialEditTodoOfGitStackedRebase(
 	currentBranch: Git.Reference,
 	pathToRebaseTodoFile: string,
 	autoSquash: boolean,
-	repair: boolean,
+	repairFlag: boolean,
 	askQuestion: AskQuestion,
 	getCommitsWithBranchBoundaries: () => Promise<CommitAndBranchBoundary[]> = () =>
 		getWantedCommitsWithBranchBoundariesOurCustomImpl(
@@ -816,7 +815,7 @@ export async function createInitialEditTodoOfGitStackedRebase(
 
 	noop(commitsWithBranchBoundaries);
 
-	if (autoSquash && repair) {
+	if (autoSquash && repairFlag) {
 		/**
 		 * TODO: if autoSquash, but if explicit, instead of implicit via config,
 		 * then throw
@@ -829,371 +828,8 @@ export async function createInitialEditTodoOfGitStackedRebase(
 	if (autoSquash) {
 		commitsWithBranchBoundaries = await autosquash(repo, commitsWithBranchBoundaries);
 	}
-	if (repair) {
-		// TODO: move into `repair` fn
-		const initialBranchCommit: string = await referenceToOid(initialBranch).then(x => x.tostrS());
-
-		const autoRepairableRefs: RepairableRef[] = await findAutoRepairableRefs({
-			initialBranch: initialBranch.name(),
-			initialBranchCommit,
-			latestBranch: currentBranch.name(),
-			askQuestion,
-		});
-
-		log({ autoRepairableRefs });
-
-		const ref_repaired_sha_index: Map<RepairableRef["refname"], number> = new Map(autoRepairableRefs.map(r => [r.refname, 0]))
-		const refs_in_progress: Set<RepairableRef["refname"]> = new Set()
-
-		for (let i = 0; i < commitsWithBranchBoundaries.length; i++) {
-			const bb = commitsWithBranchBoundaries[i]
-			const bb_commit_sha: string = bb.commit.sha()
-
-			let added_new_commits = 0
-
-			const insertCommit = (newCommit: CommitAndBranchBoundary): void => void commitsWithBranchBoundaries.splice(i + (++added_new_commits), 0, newCommit)
-
-			/**
-			 * either has not been replaced yet,
-			 * 
-			 * or if has been replaced already,
-			 * then the replacement commit must match in all refs that need replacing;
-			 * otherwise undefined behavior.
-			 * 
-			 */
-			let current_commit_has_been_replaced_by_sha: string | null = null
-			const refs_repairing_current_sha: Map<RepairableRef["refname"], RepairableRef["range_diff_parsed"][number]["sha_after_full"]> = new Map() // DEBUG
-
-			for (const ref of autoRepairableRefs) {
-				const { refname } = ref
-				// console.log("refname", refname)
-
-				let repair_nth_sha: number = ref_repaired_sha_index.get(refname)!
-				const incr_ref_sha_index = () => ref_repaired_sha_index.set(refname, ++repair_nth_sha)
-
-				const ref_already_finished: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count + 1
-				if (ref_already_finished) {
-					continue
-				}
-
-				const delta: RangeDiff = ref.range_diff_parsed[repair_nth_sha]
-				const old_sha_to_find: string = delta.sha_before_full
-
-				const found_sha: boolean = bb_commit_sha === old_sha_to_find
-				
-				if (!found_sha) {
-					if (refs_in_progress.has(refname)) {
-						// console.log({eq_count: ref.easy_repair_scenario.eq_count, repair_nth_sha})
-
-						const msg = `\nref "${refname}" repair was in progress, reached repair index ${repair_nth_sha}, but did not find matching SHA in latest.\n\n`
-						throw new Termination(msg)
-					} else {
-						continue
-					}
-				} else {
-					if (!refs_in_progress.has(refname)) {
-						refs_in_progress.add(refname)
-
-						/**
-						 * TODO: insert comment that it's the start of repairment of `ref`
-						 */
-					}
-					refs_repairing_current_sha.set(refname, delta.sha_after_full)
-
-					if (!current_commit_has_been_replaced_by_sha) {
-						/** drop the current commit */
-						bb.commitCommand = "drop"
-
-						/**
-						 * drop the branchEnd -- will get a new one assigned
-						 * from the diverged branch (once done)
-						 */
-						bb.branchEnd = null
-						
-						/** add new */
-						insertCommit({
-							commit: await Git.Commit.lookup(repo, delta.sha_after_full),
-							commitCommand: "pick",
-							branchEnd: null
-						})
-
-						/** mark as added */
-						current_commit_has_been_replaced_by_sha = delta.sha_after_full
-					} else {
-						/** verify that the replacement sha is the same as we have for replacement. */
-
-						const replaced_sha_is_same_as_our_replacement = current_commit_has_been_replaced_by_sha === delta.sha_after_full
-
-						if (!replaced_sha_is_same_as_our_replacement) {
-							const old_sha = `old sha: ${old_sha_to_find}`
-							const repairing_refs = [...refs_repairing_current_sha.entries()]
-							const longest_refname: number = repairing_refs.map(([name]) => name.length).reduce((acc, curr) => Math.max(acc, curr), 0)
-
-							const progress = repairing_refs.map(([name, sha]) => name.padEnd(longest_refname, " ") + ": " + sha).join("\n")
-							const msg = `\nmultiple refs want to repair the same SHA, but their resulting commit SHAs differ:\n\n` + old_sha + "\n\n" + progress + "\n\n"
-
-							throw new Termination(msg)
-						}
-					}
-
-					incr_ref_sha_index()
-				}
-
-				const just_finished_ref: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count
-
-				if (just_finished_ref) {
-					refs_in_progress.delete(refname)
-					incr_ref_sha_index() // mark as done
-
-					/**
-					 * insert extra commits
-					 * 
-					 * TODO: if multiple refs, is this good?
-					 * 
-					 * because then, ref order matters..
-					 * & could get merge conflicts
-					 *
-					 */
-					if (ref.easy_repair_scenario.ahead_count) {
-						for (let delta_idx = ref.easy_repair_scenario.ahead_from; delta_idx < ref.easy_repair_scenario.ahead_till; delta_idx++) {
-							const delta = ref.range_diff_parsed[delta_idx]
-
-							const extraCommit: CommitAndBranchBoundary = {
-								commit: await Git.Commit.lookup(repo, delta.sha_after_full),
-								commitCommand: "pick",
-								branchEnd: null,
-							}
-
-							insertCommit(extraCommit)
-						}
-					}
-					
-					/**
-					 * add the branchEnd to the latest commit.
-					 * 
-					 * note: previous commits (which are now replaced) might've had branchEnds -
-					 * those branchEnds have been removed in the repair process.
-					 * 
-					 * if there's some branchEnds on the commit,
-					 * they're coming from other refs.
-					 */
-
-					const latest_commit_idx = i + added_new_commits
-
-					if (!commitsWithBranchBoundaries[latest_commit_idx].branchEnd) {
-						commitsWithBranchBoundaries[latest_commit_idx].branchEnd = []
-					}
-
-					const adjustedBranchEnd: Git.Reference = await Git.Branch.lookup(repo, ref.refnameshort, Git.Branch.BRANCH.ALL)
-					commitsWithBranchBoundaries[latest_commit_idx].branchEnd!.push(adjustedBranchEnd)
-
-					// TODO: add comment that finished repairing ref
-					// tho, prolly pretty obvious since the new branch-end will be there?
-
-					continue
-				}
-			}
-
-			i += added_new_commits
-		}
-
-		assert.deepStrictEqual(refs_in_progress.size, 0, `expected all refs to have finished repairing, but ${refs_in_progress.size} are still in progress.\n`)
-
-		/**
-		 * TODO FIXME:
-		 * current solution (v2) is trash too! (again!)
-		 * 
-		 * problem is that multiple branches have the same 1st N commits (since start from same merge base),
-		 * and since we add both `drop` and `pick` commands,
-		 * non-1st branch chokes because finds `drop` commit.
-		 * 
-		 * we should probably go commit-by-commit from `commitsWithBranchBoundaries`,
-		 * check all refs if at least 1 has a commit to replace,
-		 * and then drop and pick properly, and advance all the refs' delta_idx's where replacement was needed.
-		 * 
-		 * for each ref, when delta_idx reaches end, then place the ref there (after adding `ahead_count`)
-		 * 
-		 * 
-		 * 
-		 * TODO:
-		 * what to do if multiple branches have `ahead_count > 0`,
-		 * i.e. commits need to be added on top -- in which order to add?
-		 * 
-		 */
-		// for (const ref of autoRepairableRefs) {
-		// 	console.log("\n")
-		// 	console.log({ref})
-		// 	const sha_to_find = ref.range_diff_parsed[0].sha_before_full
-
-		// 	// console.log({commit_shas_in_boundary, sha_to_find})
-
-		// 	/** need to re-compute for each ref */
-		// 	const commit_shas_in_boundary: string[] = commitsWithBranchBoundaries.map(x => x.commit.sha())
-		// 	console.log("commitsWithBranchBoundaries", commitsWithBranchBoundaries.map(x => x.commitCommand + " " + x.commit.sha() + " " + x.branchEnd?.join(" ")).join("\n"))
-
-		// 	if (!commit_shas_in_boundary.includes(sha_to_find)) {
-		// 		const msg = `\nexpected to find an old commit sha of repairable ref in commits with boundaries.\n\n`
-		// 		throw new Termination(msg)
-		// 	}
-
-		// 	for (let i = 0; i < commitsWithBranchBoundaries.length; i++) {
-		// 		// console.log("bb commit", i, commitsWithBranchBoundaries[i], commitsWithBranchBoundaries[i].commit)
-
-		// 		const potential_sha = commit_shas_in_boundary[i]
-		// 		// console.log({potential_sha})
-		// 		if (potential_sha !== sha_to_find) {
-		// 			continue
-		// 		}
-
-		// 		console.log("found sha", sha_to_find)
-
-		// 		console.log({ commit_shas_in_boundary_from_i: commit_shas_in_boundary.slice(i)})
-
-		// 		//let orig_i = i
-		// 		//for (; i < commitsWithBranchBoundaries.length; i++) {
-		// 		for (let delta_idx = 0; delta_idx < ref.easy_repair_scenario.eq_count; delta_idx++) {
-		// 			//const delta_idx = i - orig_i
-		// 			const delta = ref.range_diff_parsed[delta_idx]
-		// 			const bb = commitsWithBranchBoundaries[i]
-
-		// 			console.log({i, delta_idx, delta, bb_commit: commit_shas_in_boundary[i]})
-
-		// 			if (commit_shas_in_boundary[i] !== delta.sha_before_full) {
-		// 				if (delta_idx !== ref.easy_repair_scenario.eq_count) {
-		// 					const msg = `\ncommit sha mismatch between branch boundary and range diff.\n\n`
-		// 					throw new Termination(msg)
-		// 				} else {
-		// 					break
-		// 				}
-		// 			}
-
-		// 			console.log("changed to drop")
-		// 			bb.commitCommand = "drop"
-
-		// 			/** if bb has branchEnd, forward it to the new item */
-		// 			let branchEnd = null
-		// 			if (bb.branchEnd) {
-		// 				branchEnd = bb.branchEnd
-		// 				bb.branchEnd = null
-		// 			}
-					
-		// 			const replacementCommit: Git.Commit = await Git.Commit.lookup(repo, delta.sha_after_full)
-		// 			console.log("finished looking up")
-		// 			const newItem: CommitAndBranchBoundary = {
-		// 				commit: replacementCommit,
-		// 				commitCommand: "pick",
-		// 				branchEnd,
-		// 			}
-
-		// 			++i
-		// 			commitsWithBranchBoundaries.splice(i, 0, newItem)
-		// 			commit_shas_in_boundary.splice(i, 0, delta.sha_after_full)
-		// 			++i
-		// 			console.log("inner loop cycle done")
-		// 		}
-		// 		console.log("1st inner loop done")
-
-		// 		if (ref.easy_repair_scenario.ahead_count) {
-		// 			let branchEnd = commitsWithBranchBoundaries[i].branchEnd
-
-		// 			if (!branchEnd) {
-		// 				const msg = `\nexpected the last commit in branch boundary to contain the branchEnd.\n\n`
-		// 				throw new Termination(msg)
-		// 			}
-
-		// 			for (let delta_idx = ref.easy_repair_scenario.ahead_from; delta_idx < ref.easy_repair_scenario.ahead_till; delta_idx++) {
-		// 				const delta = ref.range_diff_parsed[delta_idx]
-
-		// 				const replacementCommit: Git.Commit = await Git.Commit.lookup(repo, delta.sha_after_full)
-		// 				const extraItem: CommitAndBranchBoundary = {
-		// 					commit: replacementCommit,
-		// 					commitCommand: "pick",
-		// 					branchEnd: null,
-		// 				}
-
-		// 				commitsWithBranchBoundaries.splice(++i, 0, extraItem)
-		// 			};
-
-		// 			commitsWithBranchBoundaries[i].branchEnd = branchEnd
-		// 		}
-
-		// 		const be = commitsWithBranchBoundaries[i].branchEnd
-		// 		console.log({be})
-		// 		if (!be) {
-		// 			const fixedBe: Git.Reference = await Git.Branch.lookup(repo, ref.refname, Git.Branch.BRANCH.ALL)
-		// 			commitsWithBranchBoundaries[i].branchEnd = [fixedBe]
-		// 			console.log({fixedBe})
-		// 		}
-
-		// 		/** commits of ref have been repaired & integrated back into latest */
-		// 		console.log("finished ref", ref.refname, "\n")
-		// 		break
-		// 	};
-
-		// 	// const boundaryToRepair = branchBoundariesWithCommits.find(bb => bb.branchEnds.some(be => ref.refname === be.name()))
-		// 	// if (!boundaryToRepair) {
-		// 	// 	continue
-		// 	// }
-		// 	// // TODO: verify this is correct
-		// 	// assert.deepStrictEqual(boundaryToRepair.commits.length, ref.easy_repair_scenario.eq_count)
-
-		// 	// //boundaryToRepair.commits[0][0].
-			
-		// }
-
-		// //for (const bb of branchBoundariesWithCommits) {
-		// //	if (autoRepairableRefs.find(ref => bb.branchEnds.some(be => ref.refname === be.name()))) {
-		// //		
-		// //	}
-		// //};
-		
-		/**
-		 * TODO: this is trash,
-		 * look at autosquash & re-implement
-		 * 
-		 * - need to replace all commits,
-		 * not only the one where branchEnd is.
-		 */
-		
-		//for (let i = 0; i < commitsWithBranchBoundaries.length; i++) {
-		//	const bb = commitsWithBranchBoundaries[i]
-
-		//	if (!bb.branchEnd) {
-		//		continue
-		//	}
-		//	
-		//	for (let j = 0; j < bb.branchEnd.length; j++) {
-		//		const be = bb.branchEnd[j]
-		//		const repairable = autoRepairableRefs.find(r => r.refname === be.name())
-
-		//		if (!repairable) {
-		//			continue
-		//		}
-
-		//		// ~~- change from pick to drop~~
-		//		// - verify that current SHA matches
-		//		// - remove current
-		//		//   - add as drop w/o branchEnd
-		//		// - add pick w/ branchEnd
-
-		//		commitsWithBranchBoundaries.splice(i, 1, {
-		//			branchEnd: null,
-		//			commit,
-		//		}, {
-		//			branchEnd: bb.branchEnd,
-		//			commitCommand: "pick",
-		//			commit: repairable.
-		//		})
-		//	}
-		//}
-		//// for (const ref of autoRepairableRefs) {
-		//// }
-
-		//// commitsWithBranchBoundaries = await repair(commitsWithBranchBoundaries); // TODO
-
-		log({commitsWithBranchBoundaries})
-
-		console.log("REPAIR DONE")
+	if (repairFlag) {
+		await repair({ initialBranch, currentBranch, askQuestion, commitsWithBranchBoundaries, repo });
 	}
 
 	const rebaseTodo = commitsWithBranchBoundaries
@@ -1533,9 +1169,6 @@ async function getWantedCommitsWithBranchBoundariesUsingNativeGitRebase({
 	pathToStackedRebaseTodoFile: string;
 	pathToRegularRebaseDirInsideDotGit: string;
 }): Promise<CommitAndBranchBoundary[]> {
-	const referenceToOid = (ref: Git.Reference): Promise<Git.Oid> =>
-		ref.peel(Git.Object.TYPE.COMMIT).then((x) => x.id());
-
 	// const commitOfInitialBranch: Git.Oid = await referenceToOid(bb);
 	const commitOfInitialBranch: Git.Oid = await referenceToOid(initialBranch);
 	const commitOfCurrentBranch: Git.Oid = await referenceToOid(currentBranch);
