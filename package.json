@@ -18,7 +18,8 @@
 		"build:core": "yarn tsc -b",
 		"build:nvim": "yarn --cwd nvim-git-rebase-todo build",
 		"build:reconciler": "yarn --cwd git-reconcile-rewritten-list build",
-		"prepack": "yarn build"
+		"prepack": "yarn build",
+		"cloc": "./script/cloc.sh"
 	},
 	"devDependencies": {
 		"@types/node": "16.11.11",
