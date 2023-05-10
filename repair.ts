@@ -235,9 +235,8 @@ export async function findAutoRepairableRefs({
 	}
 
 	if (!autoRepairableRefs.length) {
-		const msg = `0 auto-repairable refs found. exiting.\n`
-		stdout(msg)
-		return []
+		const msg = `\nnothing to do: 0 auto-repairable refs found. exiting.\n\n`
+		throw new Termination(msg, 0)
 	}
 
 	stdout(`\n${autoRepairableRefs.length} refs that can be auto-repaired:\n`)
