@@ -255,16 +255,20 @@ export type RangeDiff = RangeDiffBase & {
 }
 
 export const enhanceRangeDiffsWithFullSHAs = async (range_diffs: RangeDiffBase[]): Promise<RangeDiff[]> => {
-	const before_shas: string[] = range_diffs.map(r => r.sha_before)
-	const after_shas: string[] = range_diffs.map(r => r.sha_after)
+	const short_shas: string[] = range_diffs.map(r => [r.sha_before, r.sha_after]).flat()
+	const short_shas_list: string = short_shas.join(" ")
+	const full_shas: string[] = await exec(`git rev-parse ${short_shas_list}`).then(x => x.split("\n"))
 
-	const short_before_shas: string = before_shas.flat().join(" ")
-	const short_after_shas: string = after_shas.flat().join(" ")
+	let ret: RangeDiff[] = []
+	for (let i = 0; i < range_diffs.length; i += 2) {
+		ret.push({
+			 ...range_diffs[i],
+			 sha_before_full: full_shas[i],
+			 sha_after_full: full_shas[i + 1]
+		})
+	}
 
-	const full_before_shas: string[] = await exec(`git rev-parse ${short_before_shas}`).then(x => x.split("\n"))
-	const full_after_shas: string[] = await exec(`git rev-parse ${short_after_shas}`).then(x => x.split("\n"))
-
-	return range_diffs.map((rd, i) => ({ ...rd, sha_before_full: full_before_shas[i], sha_after_full: full_after_shas[i] }))
+	return ret
 }
 
 /**
