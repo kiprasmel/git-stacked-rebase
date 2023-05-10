@@ -1532,12 +1532,20 @@ export async function git_stacked_rebase(argv: Argv = process.argv.slice(2)): Pr
 				process.stdout.write(e.message);
 			} else {
 				process.stderr.write(e.message);
+
+				if (process.env.GSR_THROW) {
+					throw e;
+				}
 			}
 
 			process.exit(e.exitCode);
 		} else {
 			const msg = e instanceof Error ? e.message : e;
 			process.stderr.write(msg + "\n");
+
+			if (process.env.GSR_THROW) {
+				throw e;
+			}
 
 			process.exit(1);
 		}
