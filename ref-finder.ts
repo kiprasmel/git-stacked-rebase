@@ -6,16 +6,25 @@ const util = require('util')
 
 import { log } from "./util/log"
 
-export const ignoreTags = (x: RepairableRef) => x.objtype !== 'tag'
-export const ignoreTagLike = (x: RepairableRef) => !x.refname.startsWith('refs/tags/')
-export const ignoreOutsideStack = (x: RepairableRef) => x.ref_exists_between_latest_and_initial
-export const ignoreStash = (x: RepairableRef) => x.refname !== 'refs/stash'
+export const ignoreTags = (x: RefBase) => x.objtype !== 'tag'
+export const ignoreTagLike = (x: RefBase) => !x.refname.startsWith('refs/tags/')
+export const ignoreOutsideStack = (x: RefBase) => x.ref_exists_between_latest_and_initial
+export const ignoreStash = (x: RefBase) => x.refname !== 'refs/stash'
+export const ignoreRemotes = (x: RefBase) => !x.refname.startsWith('refs/remotes/')
+export const ignoreIfDoNotNeedRepair = (x: RefBase) => !x.ref_is_directly_part_of_latest_branch
 
-export const REF_PASSES_FILTER = (x: RepairableRef) =>
+export const REF_PASSES_AUTO_REPAIR_FILTER = (x: RefBase) =>
 	ignoreTags(x)
 	&& ignoreTagLike(x)
 	&& ignoreOutsideStack(x)
 	&& ignoreStash(x)
+	/**
+	* TODO FIXME:
+	* for now, ignore remote branches.
+	* will need to handle divergence between local & remote later.
+	*/
+	&& ignoreRemotes(x)
+	&& ignoreIfDoNotNeedRepair(x)
 
 export const execAsync = util.promisify(cp.exec)
 export const exec = async (cmd: string, extra = {}) => (await execAsync(cmd, { encoding: 'utf-8', ...extra })).stdout.trim()
@@ -70,20 +79,12 @@ export async function refFinder({
 		// LATEST_BRANCH_COMMIT,
 	}))
 
-	const ALL_REF_DATA: RepairableRef[] = await Promise.all(REF_PROMISES)
-	const REF_DATA: RepairableRef[] = ALL_REF_DATA
-		.filter(REF_PASSES_FILTER)
-
-		/**
-		* TODO FIXME:
-		* for now, ignore remote branches.
-		* will need to handle divergence between local & remote later.
-		*/
-		.filter(x => !x.refname.startsWith('refs/remotes/'))
+	const ALL_REF_DATA: ProcessedRef[] = await Promise.all(REF_PROMISES)
+	const REF_DATA: RepairableRef[] = (ALL_REF_DATA
+		.filter(r => r.can_be_auto_repaired) as RepairableRef[])
 
 		//.filter(x => !x.ref_exists_between_latest_and_initial) // test
 		//.filter(x => x.merge_base_to_initial_is_initial_branch && !x.ref_exists_between_latest_and_initial) // test
-		.filter(x => !x.ref_is_directly_part_of_latest_branch) // test
 
 	// console.log(REF_DATA.map(x => Object.values(x).join(' ')))
 	//console.log(REF_DATA)
@@ -103,7 +104,7 @@ export async function refFinder({
 	return REF_DATA
 }
 
-export type RepairableRef = {
+export type RefBase = {
 	commit: string;
 	objtype: string;
 	refname: string;
@@ -113,10 +114,15 @@ export type RepairableRef = {
 	merge_base_to_latest_to_initial: string;
 	ref_exists_between_latest_and_initial: boolean;
 	ref_is_directly_part_of_latest_branch: boolean;
+}
+
+export type RepairableRef = RefBase & {
 	range_diff_between_ref__base_to_latest__head__base_to_latest: string[];
 	range_diff_parsed: RangeDiff[];
 	easy_repair_scenario: EasyScenarioRet;
 }
+
+export type ProcessedRef = (RefBase & { can_be_auto_repaired: false }) | (RepairableRef & { can_be_auto_repaired: true })
 
 export type ProcessRefArgs = {
 	INITIAL_BRANCH: string;
@@ -129,7 +135,7 @@ export async function processRef(x: GitRefOutputLine, {
 	INITIAL_BRANCH_COMMIT,
 	LATEST_BRANCH,
 	// LATEST_BRANCH_COMMIT,
-}: ProcessRefArgs): Promise<RepairableRef> {
+}: ProcessRefArgs): Promise<ProcessedRef> {
 	const refCommit = x[0]
 	const objtype = x[1]
 	const refname = x[2]
@@ -153,15 +159,7 @@ export async function processRef(x: GitRefOutputLine, {
 		ref_exists_between_latest_and_initial &&
 		merge_base_to_latest === refCommit
 
-	const range_diff_cmd = `git range-diff ${refname}...${merge_base_to_latest} HEAD...${merge_base_to_latest}`
-	const range_diff_between_ref__base_to_latest__head__base_to_latest: string[] = await exec(range_diff_cmd).then(processRangeDiff)
-
-	const range_diff_parsed_base: RangeDiffBase[] = parseRangeDiff(range_diff_between_ref__base_to_latest__head__base_to_latest)
-	const range_diff_parsed: RangeDiff[] = await enhanceRangeDiffsWithFullSHAs(range_diff_parsed_base)
-
-	const easy_repair_scenario: EasyScenarioRet = checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList(range_diff_parsed)
-
-	const ref: RepairableRef = {
+	const ref_base: RefBase = {
 		commit: refCommit,
 		objtype,
 		refname,
@@ -171,21 +169,45 @@ export async function processRef(x: GitRefOutputLine, {
 		merge_base_to_latest_to_initial,
 		ref_exists_between_latest_and_initial,
 		ref_is_directly_part_of_latest_branch,
+	}
+
+	const can_be_auto_repaired: boolean = REF_PASSES_AUTO_REPAIR_FILTER(ref_base)
+
+	if (!can_be_auto_repaired) {
+		/**
+		 * will not be used as an auto-repairable ref,
+		 * thus optimize perf by not computing the range diff et al.
+		 */
+		(ref_base as ProcessedRef).can_be_auto_repaired = can_be_auto_repaired
+		return ref_base as ProcessedRef
+		
+	}
+
+	const range_diff_cmd = `git range-diff ${refname}...${merge_base_to_latest} HEAD...${merge_base_to_latest}`
+	const range_diff_between_ref__base_to_latest__head__base_to_latest: string[] = await exec(range_diff_cmd).then(processRangeDiff)
+
+	const range_diff_parsed_base: RangeDiffBase[] = parseRangeDiff(range_diff_between_ref__base_to_latest__head__base_to_latest)
+	const range_diff_parsed: RangeDiff[] = await enhanceRangeDiffsWithFullSHAs(range_diff_parsed_base)
+
+	const easy_repair_scenario: EasyScenarioRet = checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList(range_diff_parsed)
+
+	const ref: RepairableRef = Object.assign(ref_base, {
 		range_diff_between_ref__base_to_latest__head__base_to_latest,
 		easy_repair_scenario,
 		range_diff_parsed,
-	}
+	})
 
 	log([
 		merge_base_to_initial,
 		merge_base_to_latest_to_initial,
 		merge_base_to_latest,
-		REF_PASSES_FILTER(ref),
+		can_be_auto_repaired,
 		ref_is_directly_part_of_latest_branch,
 		'\n',
-	].join(' '))
+	].join(' '));
 
-	return ref
+	(ref as ProcessedRef).can_be_auto_repaired = can_be_auto_repaired
+	return (ref as ProcessedRef)
 }
 
 export const processRangeDiff = (x: string): string[] => x.trim().split('\n').map((x: string) => x.trim())
