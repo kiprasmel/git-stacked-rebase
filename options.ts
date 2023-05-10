@@ -51,6 +51,8 @@ export type _BaseOptionsForGitStackedRebase_Optional = Partial<{
 	branchSequencerExec: string | false;
 
 	pullRequest: boolean;
+
+	repair: boolean;
 }>;
 
 export type ResolvedGitStackedRebaseOptions = Required<_BaseOptionsForGitStackedRebase_Optional> &
@@ -141,6 +143,8 @@ export const getDefaultResolvedOptions = (): ResolvedGitStackedRebaseOptions => 
 	branchSequencerExec: false,
 	//
 	pullRequest: false,
+	//
+	repair: false,
 });
 
 export function areOptionsIncompatible(

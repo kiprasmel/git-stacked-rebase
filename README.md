@@ -104,6 +104,14 @@ git-stacked-rebase [--pr|--pull-request]
       (experimental, currently github-only.)
 
 
+git-stacked-rebase --repair
+
+      (experimental)
+       finds branches that have diverged,
+       checks if they can be automatically re-integrated back into the stack,
+       and performs the repair if user accepts.
+
+
 
 non-positional args:
 

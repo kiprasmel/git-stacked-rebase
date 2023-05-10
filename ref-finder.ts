@@ -4,12 +4,14 @@ const fs = require('fs')
 const cp = require('child_process')
 const util = require('util')
 
-export const ignoreTags = (x: Ref) => x.objtype !== 'tag'
-export const ignoreTagLike = (x: Ref) => !x.refname.startsWith('refs/tags/')
-export const ignoreOutsideStack = (x: Ref) => x.ref_exists_between_latest_and_initial
-export const ignoreStash = (x: Ref) => x.refname !== 'refs/stash'
+import { log } from "./util/log"
 
-export const REF_PASSES_FILTER = (x: Ref) =>
+export const ignoreTags = (x: RepairableRef) => x.objtype !== 'tag'
+export const ignoreTagLike = (x: RepairableRef) => !x.refname.startsWith('refs/tags/')
+export const ignoreOutsideStack = (x: RepairableRef) => x.ref_exists_between_latest_and_initial
+export const ignoreStash = (x: RepairableRef) => x.refname !== 'refs/stash'
+
+export const REF_PASSES_FILTER = (x: RepairableRef) =>
 	ignoreTags(x)
 	&& ignoreTagLike(x)
 	&& ignoreOutsideStack(x)
@@ -54,7 +56,7 @@ export async function refFinder({
 	// if (!LATEST_BRANCH_COMMIT) LATEST_BRANCH_COMMIT = await exec(`git rev-parse "${LATEST_BRANCH}"`)
 
 	const iniBranchInfo = "initial branch:\n" + INITIAL_BRANCH + "\n" + INITIAL_BRANCH_COMMIT + "\n\n"
-	process.stdout.write(iniBranchInfo)
+	log(iniBranchInfo)
 
 	const STDIN: GitRefOutputLine[] = (await exec(`git for-each-ref --format="${gitRefFormat}"`))
 		.split('\n')
@@ -68,8 +70,8 @@ export async function refFinder({
 		// LATEST_BRANCH_COMMIT,
 	}))
 
-	const ALL_REF_DATA: Ref[] = await Promise.all(REF_PROMISES)
-	const REF_DATA: Ref[] = ALL_REF_DATA
+	const ALL_REF_DATA: RepairableRef[] = await Promise.all(REF_PROMISES)
+	const REF_DATA: RepairableRef[] = ALL_REF_DATA
 		.filter(REF_PASSES_FILTER)
 
 		/**
@@ -86,7 +88,7 @@ export async function refFinder({
 	// console.log(REF_DATA.map(x => Object.values(x).join(' ')))
 	//console.log(REF_DATA)
 
-	console.log(REF_DATA.length)
+	log(REF_DATA.length)
 
 	const _ = require('lodash')
 
@@ -97,9 +99,11 @@ export async function refFinder({
 	fs.writeFileSync('refout.all.json', JSON.stringify(ALL_REF_DATA, null, 2), { encoding: 'utf-8' })
 
 	//COMMIT_DATA_IN_LATEST_BRANCH = 
+
+	return REF_DATA
 }
 
-export type Ref = {
+export type RepairableRef = {
 	commit: string;
 	objtype: string;
 	refname: string;
@@ -111,7 +115,7 @@ export type Ref = {
 	ref_is_directly_part_of_latest_branch: boolean;
 	range_diff_between_ref__base_to_latest__head__base_to_latest: string[];
 	range_diff_parsed: RangeDiff[];
-	is_easy_scenario_and_can_automatically_generate_rewritten_list: EasyScenarioRet;
+	easy_repair_scenario: EasyScenarioRet;
 }
 
 export type ProcessRefArgs = {
@@ -125,7 +129,7 @@ export async function processRef(x: GitRefOutputLine, {
 	INITIAL_BRANCH_COMMIT,
 	LATEST_BRANCH,
 	// LATEST_BRANCH_COMMIT,
-}: ProcessRefArgs): Promise<Ref> {
+}: ProcessRefArgs): Promise<RepairableRef> {
 	const refCommit = x[0]
 	const objtype = x[1]
 	const refname = x[2]
@@ -152,11 +156,11 @@ export async function processRef(x: GitRefOutputLine, {
 	const range_diff_cmd = `git range-diff ${refname}...${merge_base_to_latest} HEAD...${merge_base_to_latest}`
 	const range_diff_between_ref__base_to_latest__head__base_to_latest: string[] = await exec(range_diff_cmd).then(processRangeDiff)
 
-	const range_diff_parsed = parseRangeDiff(range_diff_between_ref__base_to_latest__head__base_to_latest)
+	const range_diff_parsed = await parseRangeDiff(range_diff_between_ref__base_to_latest__head__base_to_latest)
 
-	const is_easy_scenario_and_can_automatically_generate_rewritten_list: EasyScenarioRet = checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList(range_diff_parsed)
+	const easy_repair_scenario: EasyScenarioRet = checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList(range_diff_parsed)
 
-	const ref: Ref = {
+	const ref: RepairableRef = {
 		commit: refCommit,
 		objtype,
 		refname,
@@ -167,11 +171,11 @@ export async function processRef(x: GitRefOutputLine, {
 		ref_exists_between_latest_and_initial,
 		ref_is_directly_part_of_latest_branch,
 		range_diff_between_ref__base_to_latest__head__base_to_latest,
-		is_easy_scenario_and_can_automatically_generate_rewritten_list,
+		easy_repair_scenario,
 		range_diff_parsed,
 	}
 
-	process.stdout.write([
+	log([
 		merge_base_to_initial,
 		merge_base_to_latest_to_initial,
 		merge_base_to_latest,
@@ -188,9 +192,11 @@ export const processRangeDiff = (x: string): string[] => x.trim().split('\n').ma
 export type RangeDiff = {
 	nth_before: string;
 	sha_before: string;
+	sha_before_full: string;
 	eq_sign: string;
 	nth_after: string;
 	sha_after: string;
+	sha_after_full: string;
 	msg: string;
 	diff_lines: string[];
 }
@@ -203,19 +209,22 @@ export type RangeDiff = {
  * MERGE_BASE=094cddc223e8de5926dbc810449373e614d4cdef git range-diff argv-parser-rewrite...$MERGE_BASE HEAD...$MERGE_BASE
  * ```
  */
-export const parseRangeDiff = (lines: string[]): RangeDiff[] => {
+export const parseRangeDiff = async (lines: string[]): Promise<RangeDiff[]> => {
 	if (!lines.length || (lines.length === 1 && !lines[0])) {
 		return []
 	}
 
 	const range_diffs: RangeDiff[] = []
 
+	const before_shas = []
+	const after_shas = []
+
 	for (let i = 0; i < lines.length; i++) {
 		const line = replaceManySpacesToOne(lines[i])
 
 		const [nth_before, tmp1, ...tmp2s] = line.split(":").map((x, i) => i < 2 ? x.trim() : x)
-		const [sha_before, eq_sign, nth_after] = tmp1.split(" ")
-		const [sha_after, ...msgs] = tmp2s.join(":").trim().split(" ")
+		const [sha_after, eq_sign, nth_after] = tmp1.split(" ")
+		const [sha_before, ...msgs] = tmp2s.join(":").trim().split(" ")
 		const msg = msgs.join(" ")
 
 		const diff_lines: string[] = []
@@ -228,7 +237,10 @@ export const parseRangeDiff = (lines: string[]): RangeDiff[] => {
 			--i
 		}
 
-		const range_diff: RangeDiff = {
+		before_shas.push(sha_before)
+		after_shas.push(sha_after)
+
+		const range_diff: Omit<RangeDiff, "sha_before_full" | "sha_after_full"> = {
 			nth_before,
 			sha_before,
 			eq_sign,
@@ -238,7 +250,17 @@ export const parseRangeDiff = (lines: string[]): RangeDiff[] => {
 			diff_lines,
 		}
 
-		range_diffs.push(range_diff)
+		range_diffs.push(range_diff as any) // TODO TS
+	}
+
+	const short_before_shas = before_shas.flat().join(" ")
+	const short_after_shas = after_shas.flat().join(" ")
+	const full_before_shas = await exec(`git rev-parse ${short_before_shas}`).then(x => x.split("\n"))
+	const full_after_shas = await exec(`git rev-parse ${short_after_shas}`).then(x => x.split("\n"))
+
+	for (let i = 0; i < range_diffs.length; i++) {
+		range_diffs[i].sha_before_full = full_before_shas[i]
+		range_diffs[i].sha_after_full = full_after_shas[i]
 	}
 
 	return range_diffs
@@ -263,7 +285,7 @@ export const isNewRangeDiffLine = (line: string, nth_before: string) => {
 }
 
 export type EasyScenarioRet = {
-    is_easy_scenario: boolean;
+    is_easy_repair_scenario: boolean;
 	//
     eq_from: number;
     eq_till: number;
@@ -302,10 +324,10 @@ export const checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList = (range_diff
 	const behind_till = i
 	const behind_count = behind_till - behind_from
 
-	const is_easy_scenario = i + 1 < range_diffs.length ? false : true
+	const is_easy_repair_scenario = i === range_diffs.length
 
 	return {
-		is_easy_scenario,
+		is_easy_repair_scenario,
 		//
 		eq_from,
 		eq_till,
