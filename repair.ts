@@ -1,9 +1,10 @@
 #!/usr/bin/env ts-node-dev
 
 import { gitStackedRebase } from "./git-stacked-rebase";
+import { askQuestion__internal } from "./internal";
 import { RepairableRef, refFinder } from "./ref-finder";
 
-import { AskQuestion } from "./util/createQuestion";
+import { AskQuestion, question } from "./util/createQuestion";
 import { Termination } from "./util/error";
 
 export type RepairCtx = {
@@ -95,13 +96,18 @@ export async function findAutoRepairableRefs({
 	// const ans: string = await askQuestion(q, { suffix })
 	const ans: string = (await askQuestion(q)).trim().toLowerCase()
 
-	const { choices, allowedIndices } = parseChoicesRanges(ans)
+	const choices: string[] = ans.replace(/\s+/g, ",").split(",")
+	let allowedIndices: number[] | null = null
 
 	const refAllowedToBeRepaired = (idx: number): boolean => {
 		if (!ans || ans === "y") return true
 		if (ans === "n") return false
 
 		if (!choices.length || (choices.length === 1 && !choices[0].trim())) return false
+
+		if (!allowedIndices) {
+			allowedIndices = parseChoicesRanges(choices)
+		}
 
 		return allowedIndices.includes(idx)
 	}
@@ -158,12 +164,12 @@ export async function findAutoRepairableRefs({
 
 const stdout = (msg: string) => process.stdout.write(msg)
 
-export function parseChoicesRanges(ans: string) {
-	const choices = ans.replace(/\s+/g, ",").split(",")
-
+export function parseChoicesRanges(choices: string[]) {
 	const allowed: number[] = []
+
 	for (const choice of choices) {
 		const isRange = choice.includes("-")
+
 		if (isRange) {
 			const choicesNum: number[] = choice.split("-").map(Number)
 
@@ -181,12 +187,9 @@ export function parseChoicesRanges(ans: string) {
 			allowed.push(choiceNum)
 		}
 	}
-	const allowedIndices = allowed.map(x => x - 1)
 
-	return {
-		choices,
-		allowedIndices,
-	}
+	const allowedIndices = allowed.map(x => x - 1)
+	return allowedIndices
 }
 
 if (!module.parent) {
