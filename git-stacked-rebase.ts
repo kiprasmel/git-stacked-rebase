@@ -869,17 +869,60 @@ export async function createInitialEditTodoOfGitStackedRebase(
 				// console.log("refname", refname)
 
 				const repair_nth_sha: number = ref_repaired_sha_index.get(refname)!
-				const finished_ref: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count
 
-				if (finished_ref) {
+				const ref_already_finished: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count + 1
+				if (ref_already_finished) {
+					continue
+				}
+
+				const incr_ref_sha_index = () => ref_repaired_sha_index.set(refname, repair_nth_sha + 1)
+				const just_finished_ref: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count
+
+				if (just_finished_ref) {
 					refs_in_progress.delete(refname)
+					incr_ref_sha_index() // mark as done
 
-					// TODO: add extra commits from ref
+					/**
+					 * insert extra commits
+					 * 
+					 * TODO: if multiple refs, is this good?
+					 * 
+					 * because then, ref order matters..
+					 * & could get merge conflicts
+					 *
+					 */
 					if (ref.easy_repair_scenario.ahead_count) {
-						//
+						for (let delta_idx = ref.easy_repair_scenario.ahead_from; delta_idx < ref.easy_repair_scenario.ahead_till; delta_idx++) {
+							const delta = ref.range_diff_parsed[delta_idx]
+
+							const extraCommit: CommitAndBranchBoundary = {
+								commit: await Git.Commit.lookup(repo, delta.sha_after_full),
+								commitCommand: "pick",
+								branchEnd: null,
+							}
+
+							insertCommit(extraCommit)
+						}
+					}
+					
+					/**
+					 * add the branchEnd to the latest commit.
+					 * 
+					 * note: previous commits (which are now replaced) might've had branchEnds -
+					 * those branchEnds have been removed in the repair process.
+					 * 
+					 * if there's some branchEnds on the commit,
+					 * they're coming from other refs.
+					 */
+
+					const latest_commit_idx = i + added_new_commits
+
+					if (!commitsWithBranchBoundaries[latest_commit_idx].branchEnd) {
+						commitsWithBranchBoundaries[latest_commit_idx].branchEnd = []
 					}
 
-					// TODO: carry over branchEnd
+					const adjustedBranchEnd: Git.Reference = await Git.Branch.lookup(repo, ref.refnameshort, Git.Branch.BRANCH.ALL)
+					commitsWithBranchBoundaries[latest_commit_idx].branchEnd!.push(adjustedBranchEnd)
 
 					// TODO: add comment that finished repairing ref
 					// tho, prolly pretty obvious since the new branch-end will be there?
@@ -912,17 +955,23 @@ export async function createInitialEditTodoOfGitStackedRebase(
 					refs_repairing_current_sha.set(refname, delta.sha_after_full)
 
 					if (!current_commit_has_been_replaced_by_sha) {
-						/** drop the current commit & add new & mark as replaced by ours */
-
+						/** drop the current commit */
 						bb.commitCommand = "drop"
+
+						/**
+						 * drop the branchEnd -- will get a new one assigned
+						 * from the diverged branch (once done)
+						 */
+						bb.branchEnd = null
 						
-						const newCommit: CommitAndBranchBoundary = {
+						/** add new */
+						insertCommit({
 							commit: await Git.Commit.lookup(repo, delta.sha_after_full),
 							commitCommand: "pick",
-							branchEnd: null // TODO carry over branchEnd
-						}
+							branchEnd: null
+						})
 
-						insertCommit(newCommit)
+						/** mark as added */
 						current_commit_has_been_replaced_by_sha = delta.sha_after_full
 					} else {
 						/** verify that the replacement sha is the same as we have for replacement. */
@@ -941,7 +990,7 @@ export async function createInitialEditTodoOfGitStackedRebase(
 						}
 					}
 
-					ref_repaired_sha_index.set(refname, repair_nth_sha + 1)
+					incr_ref_sha_index()
 				}
 			}
 

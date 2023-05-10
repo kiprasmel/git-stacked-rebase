@@ -4,6 +4,8 @@ const fs = require('fs')
 const cp = require('child_process')
 const util = require('util')
 
+import { removeLocalAndRemoteRefPrefix } from "./git-stacked-rebase"
+
 import { log } from "./util/log"
 
 export const ignoreTags = (x: RefBase) => x.objtype !== 'tag'
@@ -108,6 +110,7 @@ export type RefBase = {
 	commit: string;
 	objtype: string;
 	refname: string;
+	refnameshort: string;
 	merge_base_to_initial: string;
 	merge_base_to_initial_is_initial_branch: boolean;
 	merge_base_to_latest: string;
@@ -163,6 +166,7 @@ export async function processRef(x: GitRefOutputLine, {
 		commit: refCommit,
 		objtype,
 		refname,
+		refnameshort: removeLocalAndRemoteRefPrefix(refname),
 		merge_base_to_initial,
 		merge_base_to_initial_is_initial_branch,
 		merge_base_to_latest,
