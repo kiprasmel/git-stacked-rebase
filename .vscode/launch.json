@@ -57,6 +57,44 @@
 			"cwd": "${workspaceRoot}",
 			"protocol": "inspector",
 			"internalConsoleOptions": "openOnSessionStart"
+		},
+
+		/**
+		 * seems broken
+		 *
+		 * instead, run:
+		 * ```
+			yarn build:core && ./script/postbuild.js
+			GSR_DEBUG=1 node --inspect-brk ./dist/repair.js
+		 ```
+		 *
+		 * & open debugger in chrome:
+		 * about://inspect
+		 *
+		 * works better than vscode.
+		 *
+		 *
+		 * can modify options & other stuff, e.g. how questions get answered, 
+		 * directly in the file.
+		 *
+		 *
+		 * if don't need proper debugging experience, can just run
+		 * ```
+		 	GSR_DEBUG=1 ./repair.ts
+		 * ```
+		 *
+		 */
+		{
+			"name": "debug repair.ts (broken, see comment in launch.json how to debug)",
+			"type": "node",
+			"request": "launch",
+			"args": ["repair.ts"],
+			"runtimeArgs": ["--inspect-brk", "-r", "ts-node/register"],
+			"cwd": "${workspaceRoot}",
+			"env": {
+				"GSR_DEBUG_REPAIR": "1",
+			},
+			"internalConsoleOptions": "openOnSessionStart",
 		}
 	]
 }

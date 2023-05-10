@@ -193,8 +193,22 @@ export function parseChoicesRanges(choices: string[]) {
 }
 
 if (!module.parent) {
-	gitStackedRebase({
-		initialBranch: "origin/master",
-		repair: true
-	})
+	if (process.env.GSR_DEBUG || process.env.GSR_DEBUG_REPAIR) {
+		gitStackedRebase({
+			initialBranch: "origin/master",
+			repair: true,
+			[askQuestion__internal]: (q, ...rest) => {
+				if (q.includes("Repair all?")) {
+					return "y" /** can modify easily here */
+				}
+	
+				return question(q, ...rest)
+			}
+		})
+	} else {
+		gitStackedRebase({
+			initialBranch: "origin/master",
+			repair: true,
+		})
+	}
 }
