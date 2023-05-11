@@ -512,12 +512,9 @@ export async function gitStackedRebase(
 				if (cmd.commandName === "branch-end-new") {
 					await createBranchForCommand(cmd as any); // TODO TS
 				} else if (cmd.commandName === "branch-end-reset") {
-					/** same as branch-end-new, but force-resets. */
-					
-					// TODO FIXME HACK
-					cmd.targets![0] = removeLocalAndRemoteRefPrefix(cmd.targets![0])
-
-					await createBranchForCommand(cmd as any); // TODO TS
+					/** the "big epiphany" */ 
+					const branch: string = removeLocalAndRemoteRefPrefix(cmd.targets![0]);
+					regularRebaseTodoLines.push(`exec ${options.gitCmd} branch -f "${branch}" HEAD`);
 				} else if (cmd.commandName === "branch-end-new-from-remote") {
 					const b = parseBranchWhichNeedsLocalCheckout(cmd.targets!); // TODO TS NARROWER TYPES
 					branchesWhoNeedLocalCheckout.push(b);
