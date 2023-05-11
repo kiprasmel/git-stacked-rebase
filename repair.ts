@@ -107,7 +107,8 @@ export async function repair({
 					insertCommit({
 						commit: await Git.Commit.lookup(repo, delta.sha_after_full),
 						commitCommand: "pick",
-						branchEnd: null
+						branchEnd: null,
+						branchEndCommands: null,
 					});
 
 					/** mark as added */
@@ -154,6 +155,7 @@ export async function repair({
 							commit: await Git.Commit.lookup(repo, delta.sha_after_full),
 							commitCommand: "pick",
 							branchEnd: null,
+							branchEndCommands: null,
 						};
 
 						insertCommit(extraCommit);
@@ -173,10 +175,12 @@ export async function repair({
 
 				if (!commitsWithBranchBoundaries[latest_commit_idx].branchEnd) {
 					commitsWithBranchBoundaries[latest_commit_idx].branchEnd = [];
+					commitsWithBranchBoundaries[latest_commit_idx].branchEndCommands = new Map();
 				}
 
 				const adjustedBranchEnd: Git.Reference = await Git.Branch.lookup(repo, ref.refnameshort, Git.Branch.BRANCH.ALL);
 				commitsWithBranchBoundaries[latest_commit_idx].branchEnd!.push(adjustedBranchEnd);
+				commitsWithBranchBoundaries[latest_commit_idx].branchEndCommands!.set(ref.refname, "branch-end-reset");
 
 				// TODO: add comment that finished repairing ref
 				// tho, prolly pretty obvious since the new branch-end will be there?

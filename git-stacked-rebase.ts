@@ -57,6 +57,7 @@ import {
 	StackedRebaseCommand,
 	StackedRebaseCommandAlias,
     stackedRebaseCommands,
+    StackedRebaseEitherCommandOrAlias,
     Targets,
 } from "./parse-todo-of-stacked-rebase/validator";
 
@@ -512,6 +513,10 @@ export async function gitStackedRebase(
 					await createBranchForCommand(cmd as any); // TODO TS
 				} else if (cmd.commandName === "branch-end-reset") {
 					/** same as branch-end-new, but force-resets. */
+					
+					// TODO FIXME HACK
+					cmd.targets![0] = removeLocalAndRemoteRefPrefix(cmd.targets![0])
+
 					await createBranchForCommand(cmd as any); // TODO TS
 				} else if (cmd.commandName === "branch-end-new-from-remote") {
 					const b = parseBranchWhichNeedsLocalCheckout(cmd.targets!); // TODO TS NARROWER TYPES
@@ -836,10 +841,11 @@ export async function createInitialEditTodoOfGitStackedRebase(
 	}
 
 	const rebaseTodo = commitsWithBranchBoundaries
-		.map(({ commit, commitCommand, branchEnd }, i) => {
+		.map(({ commit, commitCommand, branchEnd, branchEndCommands }, i) => {
 			if (i === 0) {
 				assert(!!branchEnd?.length, `very first commit has a branch (${commit.sha()}).`);
 				assert.strictEqual(branchEnd.length, 1, "must be only a single initial branch");
+				assert(!branchEndCommands, `cannot have custom branch-end command for initial branch`);
 
 				// return [];
 				return [
@@ -853,6 +859,7 @@ export async function createInitialEditTodoOfGitStackedRebase(
 
 			if (i === commitsWithBranchBoundaries.length - 1) {
 				assert(!!branchEnd?.length, `very last commit has a branch. sha = ${commit.sha()}`);
+				assert(!branchEndCommands, `cannot have custom branch-end command for latest branch`);
 
 				return [
 					`${commitCommand} ${commit.sha()} ${commit.summary()}`,
@@ -908,7 +915,11 @@ export async function createInitialEditTodoOfGitStackedRebase(
 								fullNameOfBranchWithRemote: getFullNameOfBranchWithRemote({ wantedLocalBranchName, remoteName })
 							})
 						} else {
-							return `branch-end ${branch.name()}`;
+							const branchName: string = branch.name();
+							const wantedCommand: StackedRebaseEitherCommandOrAlias | undefined = branchEndCommands?.get(branchName);
+							const branchCmd: StackedRebaseEitherCommandOrAlias = wantedCommand ? wantedCommand : "branch-end";
+
+							return `${branchCmd} ${branchName}`;
 						}
 					}), //
 				];
@@ -1089,6 +1100,7 @@ export type CommitAndBranchBoundary = {
 	commit: Git.Commit;
 	commitCommand: RegularRebaseEitherCommandOrAlias;
 	branchEnd: Git.Reference[] | null;
+	branchEndCommands: Map<string, StackedRebaseEitherCommandOrAlias> | null;
 };
 
 export async function getWantedCommitsWithBranchBoundariesOurCustomImpl(
@@ -1439,6 +1451,7 @@ async function extendCommitsWithBranchEnds(
 			commit: c,
 			commitCommand: commandOrAliasNames[i] || "pick",
 			branchEnd: !matchedRefs.length ? null : matchedRefs,
+			branchEndCommands: null,
 		}
 	);
 
