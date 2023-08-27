@@ -66,12 +66,30 @@ export async function repair({
 			let repair_nth_sha: number = ref_repaired_sha_index.get(refname)!;
 			const incr_ref_sha_index = () => ref_repaired_sha_index.set(refname, ++repair_nth_sha);
 
-			const ref_already_finished: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count + 1;
+			const ref_already_finished: boolean = repair_nth_sha === ref.easy_repair_scenario.behind_from + 1; // TODO verify - idk if need + 1
 			if (ref_already_finished) {
 				continue;
 			}
 
 			const delta: RangeDiff = ref.range_diff_parsed[repair_nth_sha];
+
+			const isAhead = () => ref.range_diff_parsed[i].eq_sign === "<"
+			if (isAhead()) {
+				let delta_tmp: RangeDiff
+				while ((delta_tmp = ref.range_diff_parsed[i]) && isAhead()) {
+					const extraCommit: CommitAndBranchBoundary = {
+						commit: await Git.Commit.lookup(repo, delta.sha_after_full),
+						commitCommand: "pick",
+						branchEnd: null,
+						branchEndCommands: null,
+					};
+
+					insertCommit(extraCommit);
+				}
+
+				continue; // TODO: wat do if other refs want to be pointing to earlier sha, but we incremented `i`?
+			}
+
 			const old_sha_to_find: string = delta.sha_before_full;
 
 			const found_sha: boolean = bb_commit_sha === old_sha_to_find;
@@ -132,7 +150,7 @@ export async function repair({
 				incr_ref_sha_index();
 			}
 
-			const just_finished_ref: boolean = repair_nth_sha === ref.easy_repair_scenario.eq_count;
+			const just_finished_ref: boolean = repair_nth_sha === ref.easy_repair_scenario.behind_from;
 
 			if (just_finished_ref) {
 				refs_in_progress.delete(refname);

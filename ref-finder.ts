@@ -319,13 +319,8 @@ export const isNewRangeDiffLine = (line: string, nth_before: string) => {
 export type EasyScenarioRet = {
     is_easy_repair_scenario: boolean;
 	//
-    eq_from: number;
-    eq_till: number;
-    eq_count: number;
-	//
-    ahead_from: number;
-    ahead_till: number;
-    ahead_count: number;
+	eq_indices: Set<number>;
+	ahead_indices: Set<number>;
 	//
     behind_from: number;
     behind_till: number;
@@ -333,21 +328,21 @@ export type EasyScenarioRet = {
 }
 
 export const checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList = (range_diffs: RangeDiff[]): EasyScenarioRet => {
-	let i = 0
-	const eq_from = i
-	while (i < range_diffs.length && range_diffs[i].eq_sign === "=") {
-		++i
-	}
-	const eq_till = i
-	const eq_count = eq_till - eq_from
+	const eq_indices: EasyScenarioRet["eq_indices"] = new Set()
+	const ahead_indices: EasyScenarioRet["ahead_indices"] = new Set()
 
-	// extra commits in diverged branch, that need to be integrated back into latest
-	const ahead_from = i
-	while (i < range_diffs.length && range_diffs[i].eq_sign === "<") {
-		++i
+	let i = 0
+	const isEq = () => range_diffs[i].eq_sign === "=" 
+	const isAhead = () => range_diffs[i].eq_sign === "<"
+	while (i < range_diffs.length) {
+		if (isEq()) {
+			eq_indices.add(i++)
+		} else if (isAhead()) {
+			ahead_indices.add(i++)
+		} else {
+			break
+		}
 	}
-	const ahead_till = i
-	const ahead_count = ahead_till - ahead_from
 
 	const behind_from = i
 	while (i < range_diffs.length && range_diffs[i].eq_sign === ">") {
@@ -361,13 +356,8 @@ export const checkIfIsEasyScenarioWhenCanAutoGenerateRewrittenList = (range_diff
 	return {
 		is_easy_repair_scenario,
 		//
-		eq_from,
-		eq_till,
-		eq_count,
-		//
-		ahead_from,
-		ahead_till,
-		ahead_count,
+		eq_indices,
+		ahead_indices,
 		//
 		behind_from,
 		behind_till,
