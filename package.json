@@ -9,9 +9,11 @@
 		"git-stacked-rebase": "./dist/git-stacked-rebase.js"
 	},
 	"scripts": {
-		"prebuild": "node ./script/prebuild.js",
-		"build": "yarn tsc -b",
-		"postbuild": "node ./script/postbuild.js",
+		"prebuild:lean": "node ./script/prebuild.js",
+		"test": "ts-node-dev ./test/run.ts",
+		"build": "yarn test && yarn build:lean",
+		"build:lean": "yarn tsc -b",
+		"postbuild:lean": "node ./script/postbuild.js",
 		"prepack": "yarn build"
 	},
 	"devDependencies": {

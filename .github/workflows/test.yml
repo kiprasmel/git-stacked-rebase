@@ -1,0 +1,54 @@
+name: "tests"
+
+on: [push, workflow_dispatch]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+
+    # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-preventing-a-specific-failing-matrix-job-from-failing-a-workflow-run
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [12, 14]
+        experimental: [false]
+        exclude:
+          - os: macos-latest
+            node: 12
+        include:
+          # test macos - for some reason, internet conn fails @ github actions
+          - os: macos-latest
+            node: 12
+            experimental: true
+
+          # - os: ubuntu-latest
+          #   node: 10
+          #   experimental: true
+          # - os: ubuntu-latest
+          #   # v16 should work fine; there're some issues in CI with `krb5-config`
+          #   node: 16
+          #   experimental: true
+          # - os: ubuntu-latest
+          #   node: 18
+          #   experimental: true
+          
+          # # test windows, w/ wanted versions
+          # - os: windows-latest
+          #   node: 12
+          #   experimental: true
+          # - os: windows-latest
+          #   node: 14
+          #   experimental: true
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'yarn'
+          cache-dependency-path: '**/yarn.lock'
+      - run: yarn --frozen-lockfile
+      - run: yarn test
+ 
