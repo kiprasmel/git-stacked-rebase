@@ -1,0 +1,92 @@
+showing the current commit's info (while in the git-rebase-todo file) would save a lot of time.
+
+could potentially add extra stuff like grouping files by which commits modified them, or vice versa, etc.
+
+need a monorepo setup for this, if nvim's node-client [1] works well
+
+[1] https://github.com/neovim/node-client
+
+
+setup
+==========
+
+yarn
+
+
+development
+===========
+
+# terminal 1
+yarn dev
+
+# terminal 2
+NVIM_LISTEN_ADDRESS=/tmp/nvim NVIM_NODE_LOG_FILE=nvim.log nvim ../.git/stacked-rebase/git-rebase-todo
+
+# terminal 3 (potentially vsplit w/ terminal 2)
+NVIM_LISTEN_ADDRESS=/tmp/nvim node
+
+let v, w, c
+nvim = await require('neovim/scripts/nvim') // comes from https://github.com/neovim/node-client/blob/e01ecaa6ba616738e6fc2b9d1b283f095a84899b/packages/neovim/scripts/nvim.js
+v = nvim
+w = await v.getWindow()
+c = await w.client
+// v.command("vsp")
+// v.command("q")
+await c.line
+
+line = await c.line
+commit = line.split(" ")[1]
+const cp = require("child_process")
+stat = cp.execSync(`git show --stat ${commit}`, { encoding: "utf8" }).split("\n")
+
+# potentially terminal 4
+watch cat nvim.log
+
+# upon changes in source code, re-run in nvim
+# to update the generated rplugin.vim manifest
+:UpdateRemotePlugins
+
+---
+
+see also:
+- https://github.com/neovim/node-client
+	- https://neovim.io/node-client/
+		- https://neovim.io/node-client/modules.html
+			- https://neovim.io/node-client/classes/Neovim.html
+			- https://neovim.io/node-client/classes/NeovimClient.html
+			- https://neovim.io/node-client/classes/Window.html
+- ! https://neovim.io/doc/user/api.html
+	- https://neovim.io/doc/user/windows.html#window
+	- same as :help
+		- :help events
+		- :help nvim_open_win|nvim_win_close|nvim_win_get_cursor
+		- :help BufEnter|BufLeave|CursorMoved|CursorMovedI
+		- etc
+- ! https://github.com/neovim/node-client/tree/master/packages/neovim/src/api/Neovim.ts
+	- Neovim
+	- Buffer
+	- Window
+- NerdTree's `ToggleTabTree` & following to what it leads (via simple file search)
+	- https://github.com/preservim/nerdtree/blob/eed488b1cd1867bd25f19f90e10440c5cc7d6424/autoload/nerdtree/ui_glue.vim#L643
+
+mixing these up was the most useful.
+
+in general, i tried to read from the start of the API reference, but just couldn't focus - nothing seemed important.
+
+then, found the nodejs REPL demo from node-client:
+- https://github.com/neovim/node-client/blob/e01ecaa6ba616738e6fc2b9d1b283f095a84899b/packages/neovim/scripts/nvim.js
+and started playing w/ stuff.
+
+it took a long time to figure out how to properly link the (remote) plugin for nvim to detect.
+the package.json's "postinstall" script now has this.
+though, TODO: create a PR to upstream to clear this up. i wasted a good few hours on this.
+
+& then bit by bit, continued trying to figure out how to write the plugin.
+i think after creating a new Buffer and then opening a new Window with it,
+i knew what's up, and switched from the REPL to the TS file.
+
+there were many, many iterations of it. sadly didn't commit any of them,
+only the latest one now.. good fun anyhow!
+
+really appreciate both the RPC capabilities, and the nvim-node-client.
+wouldn't have been able to do this in lua -- not in a single day for sure.
