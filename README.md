@@ -19,6 +19,14 @@ a branch is just a reference to some commit (literally, it's a single-line file 
 
 from those partial branches, you can create pull requests. with this workflow, you get to comfortably iterate in a single branch; your teammates get the benefits of reviewing smaller PRs (when they're ready). win win. that's it.
 
+## a note about git rebase --update-refs
+
+git-stacked-rebase got started 6 months before git rebase learned its own `--update-refs`.
+for the purposes of simply updating branches that are part of your stack,
+git's rebase with --update-refs works just fine.
+git-stacked-rebase still has unique features (and novel ideas yet to be implemented),
+but hasn't been maintained for a little while now. this may change when i get more capacity to work on it.
+
 ---
 
 `git-stacked-rebase` is not specific to any host like github or gitlab. it's "specific" to `git` itself.
