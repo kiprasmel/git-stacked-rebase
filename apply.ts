@@ -256,7 +256,9 @@ const doesNeedToApply = (pathToStackedRebaseDirInsideDotGit: string): boolean =>
 	return needsToApplyPart2;
 };
 
-export function readRewrittenListNotAppliedOrAppliedOrError(repoPath: string): {
+export function readRewrittenListNotAppliedOrAppliedOrError(
+	repoPath: string
+): {
 	pathOfRewrittenList: string;
 	pathOfRewrittenListApplied: string;
 	rewrittenListRaw: string;

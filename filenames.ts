@@ -17,3 +17,11 @@ export const filenames = {
 	 * TODO extract others into here
 	 */
 } as const;
+
+export const FILENAMES_THAT_INDICATE_STACKED_REBASE_IN_PROGRESS = [
+	filenames.rewrittenList,
+	filenames.willNeedToApply,
+	filenames.needsToApply,
+	filenames.applied,
+	filenames.gitRebaseTodo,
+];

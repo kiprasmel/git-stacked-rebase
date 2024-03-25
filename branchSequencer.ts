@@ -5,6 +5,7 @@ import os from "os";
 import Git from "nodegit";
 
 import { CommitAndBranchBoundary, getWantedCommitsWithBranchBoundariesOurCustomImpl, removeLocalRegex, removeRemoteRegex } from "./git-stacked-rebase";
+import { FILENAMES_THAT_INDICATE_STACKED_REBASE_IN_PROGRESS } from "./filenames";
 
 import { createExecSyncInRepo } from "./util/execSyncInRepo";
 import { Termination } from "./util/error";
@@ -36,11 +37,20 @@ export type GetBoundariesInclInitial = (
 	ctx: GetBranchesCtx //
 ) => SimpleBranchAndCommit[] | Promise<SimpleBranchAndCommit[]>;
 
+/**
+ * TODO RENAME: "canTraverseBranchStackFromRebaseTodoFile" or similar,
+ * because currently we're using this in different ways & it's a big mess & doesn't work.
+ */
 export const isStackedRebaseInProgress = ({
 	pathToStackedRebaseDirInsideDotGit,
 }: {
 	pathToStackedRebaseDirInsideDotGit: string;
-}): boolean => fs.existsSync(pathToStackedRebaseDirInsideDotGit);
+}): boolean => {
+	if (!fs.existsSync(pathToStackedRebaseDirInsideDotGit)) return false;
+
+	const entries = fs.readdirSync(pathToStackedRebaseDirInsideDotGit);
+	return entries.some(x => FILENAMES_THAT_INDICATE_STACKED_REBASE_IN_PROGRESS.includes(x as any));
+}
 
 export const getBoundariesInclInitialByParsingNotYetAppliedState: GetBoundariesInclInitial = ({
 	pathToStackedRebaseDirInsideDotGit, //

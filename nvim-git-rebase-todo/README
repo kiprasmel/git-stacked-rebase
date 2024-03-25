@@ -10,7 +10,16 @@ need a monorepo setup for this, if nvim's node-client [1] works well
 setup
 ==========
 
+# install deps:
+
 yarn
+
+# install node package of neovim
+
+npm i -g neovim
+
+# (nvim doesn't detect yarn's somehow,
+#  otherwise could yarn global add) ...
 
 
 development

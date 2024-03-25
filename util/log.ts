@@ -11,7 +11,7 @@ const GSR_CURRENT_LAUNCH_LOGFILE = path.join(GSR_LOGDIR, GSR_LAUNCH_TIMESTAMP + 
 
 export function log(...msgs: any[]): void {
 	if (process.env.GSR_DEBUG || process.env.CI) {
-		console.log(...msgs);
+		console.error(...msgs);
 	}
 
 	const out = util.format(...msgs) + "\n";
@@ -23,7 +23,7 @@ export function log(...msgs: any[]): void {
  * while also storing into logfile.
  */
 export function logAlways(...msgs: any[]): void {
-	console.log(...msgs);
+	console.error(...msgs);
 
 	const out = util.format(...msgs) + "\n";
 	fs.appendFileSync(GSR_CURRENT_LAUNCH_LOGFILE, out, { encoding: "utf-8" });

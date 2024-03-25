@@ -3,7 +3,7 @@
 # meant for users of GSR;
 # for updating nightly - use ./goodnight.sh
 
-git checkout nightly
+#git checkout nightly
 git pull --rebase
 
 yarn install:all
@@ -13,4 +13,5 @@ yarn build
 #yarn global add link:.
 
 # https://github.com/yarnpkg/yarn/issues/3256#issuecomment-433096967
-yarn global add file:$PWD
+# https://classic.yarnpkg.com/en/docs/cli/add#toc-adding-dependencies
+yarn global add link:$PWD
